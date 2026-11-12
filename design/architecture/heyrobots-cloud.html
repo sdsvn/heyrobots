@@ -1,0 +1,257 @@
+<title>heyrobots in the Cloud</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one reading column; the diagram breaks out wider and scrolls sideways on phones. Same tokens as the architecture page. */
+:root {
+  --bg: #FAF9FE; --fg: #24213A; --muted: #5F5B78; --line: #CFCAE6; --panel: #FFFFFF;
+  --accent: #5848E0; --accent-soft: #ECE8FF; --warn: #B4501E; --warn-soft: #FFEADD; --ok: #1E7A62; --ok-soft: #DDF5EC;
+  --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15131F; --fg: #ECEAF7; --muted: #A9A4C4; --line: #3B3656; --panel: #201D30;
+  --accent: #9D93FF; --accent-soft: #2B2650; --warn: #F2A77E; --warn-soft: #3A2620; --ok: #5FD0B0; --ok-soft: #1E3A33; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15131F; --fg: #ECEAF7; --muted: #A9A4C4; --line: #3B3656; --panel: #201D30;
+  --accent: #9D93FF; --accent-soft: #2B2650; --warn: #F2A77E; --warn-soft: #3A2620; --ok: #5FD0B0; --ok-soft: #1E3A33; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 16px/1.6 var(--body); }
+main { max-width: 1060px; margin: 0 auto; padding-block: 40px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 28px; }
+.prose { max-width: 68ch; }
+h1 { font: 700 clamp(30px, 5vw, 44px)/1.1 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+h2 { font: 700 24px/1.2 var(--display); margin: 0 0 6px; text-wrap: balance; }
+h3 { font: 700 17px/1.3 var(--display); margin: 18px 0 4px; }
+p { margin: 0 0 10px; }
+ul { margin: 0 0 10px; padding-left: 20px; }
+li { margin-bottom: 6px; }
+.lede { font-size: 18px; color: var(--muted); }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+code { font: 500 .88em var(--mono); background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+a { color: var(--accent); }
+figure { margin: 0; }
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); padding: 12px; }
+.scroll svg { display: block; width: 100%; min-width: 760px; height: auto; color: var(--fg); }
+figcaption { font-size: 14px; color: var(--muted); margin-top: 10px; max-width: 80ch; }
+.box { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+.band { fill: var(--accent-soft); stroke: none; }
+.key { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.8; }
+.out { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 1.5; }
+.home { fill: var(--ok-soft); stroke: var(--ok); stroke-width: 1.5; }
+.later { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 6 5; }
+.edge { fill: none; stroke: currentColor; stroke-width: 1.5; }
+.edge.dash { stroke-dasharray: 6 5; stroke: var(--muted); }
+.edge.hot { stroke: var(--accent); stroke-width: 2; }
+.t { fill: currentColor; font: 600 14px var(--body); }
+.s { fill: var(--muted); font: 500 12px var(--body); }
+.m { fill: var(--muted); font: 500 11.5px var(--mono); }
+.a { fill: var(--accent); font: 600 12px var(--body); }
+.w { fill: var(--warn); font: 600 12px var(--body); }
+.g { fill: var(--ok); font: 600 12px var(--body); }
+.cap { fill: var(--accent); font: 700 12px var(--mono); letter-spacing: .06em; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.tablewrap { overflow-x: auto; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { font: 600 13px var(--body); color: var(--muted); }
+td:first-child { font-weight: 600; white-space: nowrap; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.cards div { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--panel); min-width: 0; }
+.cards b { display: block; font-family: var(--display); margin-bottom: 4px; }
+.cards p { font-size: 14px; color: var(--muted); margin: 0; }
+.phase { border-left: 3px solid var(--accent); padding-left: 14px; }
+.phase .k { font: 600 12px var(--mono); color: var(--accent); letter-spacing: .06em; text-transform: uppercase; }
+</style>
+
+<main>
+  <header class="prose">
+    <div class="eyebrow">heyrobots · a draft for a hosted version</div>
+    <h1>heyrobots in the cloud</h1>
+    <p class="lede">Today heyrobots is one Go binary on your Mac: one SQLite file, one vault key, agents as child processes, approvals on your phone. A hosted version keeps that shape and multiplies it. Each person gets a cell, their own copy of the server, and a thin control plane does only what a single Mac can't: stay reachable, wake cells, and relay to the devices that hold the things a cloud shouldn't.</p>
+    <p class="lede">This is a draft to argue with, not a plan that's been approved. The companion page <a href="https://claude.ai/artifact/Ak8cYcvuDyQCzW2MaqxTz9">heyrobots Agent Architecture</a> describes what runs inside a cell.</p>
+  </header>
+
+  <section>
+    <div class="prose">
+      <h2>1. The shape: cells, a control plane, and runners</h2>
+      <p>The unit of deployment is the person, not the service. A cell is the unmodified heyrobotsd with its own data folder. Cells never talk to each other. The control plane owns accounts, placement, public endpoints and timers. A runner is a device the person owns (their Mac, a home server) that connects outbound and offers what it has: a subscription agent, local files, a place to run commands.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1000 620" role="img" aria-label="Cloud shape: outside sources and the phone reach a thin control plane, which routes to one cell per person; each cell is a full heyrobots server with its own store, vault and task folders; a runner on the person's own Mac connects outbound and serves the subscription agent, files and commands to its cell; cells call model APIs directly.">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"></path></marker>
+          </defs>
+
+          <!-- Outside -->
+          <text class="cap" x="40" y="30">OUTSIDE</text>
+          <rect class="box" x="40" y="42" width="170" height="50" rx="10"></rect>
+          <text class="t" x="125" y="66" text-anchor="middle">Phone app</text>
+          <text class="s" x="125" y="82" text-anchor="middle">chat, approvals, push</text>
+          <rect class="box" x="230" y="42" width="200" height="50" rx="10"></rect>
+          <text class="t" x="330" y="66" text-anchor="middle">Bots</text>
+          <text class="s" x="330" y="82" text-anchor="middle">Slack, Telegram, WhatsApp</text>
+          <rect class="box" x="450" y="42" width="230" height="50" rx="10"></rect>
+          <text class="t" x="565" y="66" text-anchor="middle">Connected apps</text>
+          <text class="s" x="565" y="82" text-anchor="middle">webhooks, OAuth, MCP servers</text>
+          <rect class="box" x="760" y="42" width="200" height="50" rx="10"></rect>
+          <text class="t" x="860" y="66" text-anchor="middle">Model APIs</text>
+          <text class="s" x="860" y="82" text-anchor="middle">Anthropic, Gemini, OpenAI…</text>
+
+          <path class="edge" d="M125 92 V148" marker-end="url(#ar)"></path>
+          <path class="edge" d="M330 92 V148" marker-end="url(#ar)"></path>
+          <path class="edge" d="M565 92 V148" marker-end="url(#ar)"></path>
+
+          <!-- Control plane -->
+          <text class="cap" x="40" y="138">CONTROL PLANE · thin, shared, holds no task data</text>
+          <rect class="band" x="40" y="150" width="640" height="112" rx="12"></rect>
+          <rect class="box" x="56" y="166" width="140" height="80" rx="10"></rect>
+          <text class="t" x="126" y="190" text-anchor="middle">Accounts</text>
+          <text class="s" x="126" y="208" text-anchor="middle">sign-in, billing,</text>
+          <text class="s" x="126" y="223" text-anchor="middle">cell placement</text>
+          <rect class="box" x="212" y="166" width="140" height="80" rx="10"></rect>
+          <text class="t" x="282" y="190" text-anchor="middle">Ingress</text>
+          <text class="s" x="282" y="208" text-anchor="middle">one public URL per</text>
+          <text class="s" x="282" y="223" text-anchor="middle">bot and webhook</text>
+          <rect class="box" x="368" y="166" width="140" height="80" rx="10"></rect>
+          <text class="t" x="438" y="190" text-anchor="middle">Wake timers</text>
+          <text class="s" x="438" y="208" text-anchor="middle">next schedule or</text>
+          <text class="s" x="438" y="223" text-anchor="middle">lease per cell</text>
+          <rect class="box" x="524" y="166" width="140" height="80" rx="10"></rect>
+          <text class="t" x="594" y="190" text-anchor="middle">Relay</text>
+          <text class="s" x="594" y="208" text-anchor="middle">runner tunnels,</text>
+          <text class="s" x="594" y="223" text-anchor="middle">push to phones</text>
+
+          <path class="edge hot" d="M282 262 V318" marker-end="url(#ar)"></path>
+          <text class="a" x="292" y="296">route or wake</text>
+          <path class="edge hot" d="M438 262 V318" marker-end="url(#ar)"></path>
+          <path class="edge dash" d="M740 262 V318" marker-end="url(#ar)"></path>
+          <text class="s" x="750" y="296">another person's cell</text>
+
+          <!-- Cells -->
+          <text class="cap" x="40" y="308">CELLS · one per person, scale to zero when idle</text>
+          <rect class="key" x="40" y="320" width="560" height="180" rx="12"></rect>
+          <text class="t" x="56" y="344">Anna's cell · heyrobotsd, unchanged</text>
+          <rect class="box" x="56" y="358" width="160" height="56" rx="10"></rect>
+          <text class="t" x="136" y="380" text-anchor="middle">Store + vault</text>
+          <text class="s" x="136" y="397" text-anchor="middle">SQLite on a volume, KEK in KMS</text>
+          <rect class="box" x="232" y="358" width="160" height="56" rx="10"></rect>
+          <text class="t" x="312" y="380" text-anchor="middle">Team + queue</text>
+          <text class="s" x="312" y="397" text-anchor="middle">router, Mandate, outbox</text>
+          <rect class="box" x="408" y="358" width="176" height="56" rx="10"></rect>
+          <text class="t" x="496" y="380" text-anchor="middle">Tool gateway</text>
+          <text class="s" x="496" y="397" text-anchor="middle">MCP bridge, quarantine, traces</text>
+          <rect class="out" x="56" y="428" width="252" height="56" rx="10"></rect>
+          <text class="t" x="182" y="450" text-anchor="middle">Sandbox</text>
+          <text class="s" x="182" y="467" text-anchor="middle">microVM per task: commands, cloud ACP agents</text>
+          <rect class="box" x="324" y="428" width="260" height="56" rx="10"></rect>
+          <text class="t" x="454" y="450" text-anchor="middle">Task folders</text>
+          <text class="s" x="454" y="467" text-anchor="middle">on the volume, snapshotted to object storage</text>
+
+          <rect class="later" x="640" y="320" width="320" height="180" rx="12"></rect>
+          <text class="s" x="800" y="414" text-anchor="middle">Ben's cell · same binary, own data</text>
+
+          <path class="edge" d="M860 92 V130 H985 V380 H960" marker-end="url(#ar)"></path>
+          <path class="edge" d="M600 380 H640"></path>
+          <text class="s" x="608" y="372">keys</text>
+
+          <!-- Runner -->
+          <text class="cap" x="40" y="542">RUNNER · the person's own Mac, outbound only</text>
+          <rect class="home" x="40" y="554" width="560" height="56" rx="12"></rect>
+          <text class="t" x="56" y="578">Anna's Mac</text>
+          <text class="s" x="56" y="596">subscription agent (Claude Code, omp) · local files · commands on this machine</text>
+          <path class="edge hot" d="M594 500 V554" marker-end="url(#ar)"></path>
+          <text class="g" x="606" y="532">ACP over the tunnel</text>
+          <path class="edge dash" d="M320 554 V500" marker-end="url(#ar)"></path>
+          <text class="s" x="330" y="532">tool calls back to the cell's gateway</text>
+        </svg>
+      </div>
+      <figcaption>Everything a cell needs is inside it, so a cell is the same program as the Mac version. The control plane only routes and wakes. The runner is how subscriptions and local files stay on the person's own hardware while the always-on part lives in the cloud.</figcaption>
+    </figure>
+  </section>
+
+  <section class="prose" style="max-width: none">
+    <h2>2. Where each thing lives</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Thing</th><th>Where</th><th>Why there</th></tr></thead>
+        <tbody>
+          <tr><td>The team, tasks, memory</td><td>The cell's store</td><td>One SQLite per person keeps every Mandate check and approval a local transaction. No cross-tenant tables anywhere.</td></tr>
+          <tr><td>API keys, OAuth tokens</td><td>The cell's vault, wrapped by a per-person key in the provider's KMS</td><td>The cell unwraps at boot. The operator can still decrypt in principle; the page says so plainly, and bring-your-own-key is the honest upgrade.</td></tr>
+          <tr><td>Subscription agents</td><td>The runner, by default</td><td>A Claude Code or omp login is bound to a person and a device, and the subscription terms are written for a person using it. Moving the login to a server you don't own is a trust and terms question, not a technical one. Cloud-side ACP agents run only with API keys.</td></tr>
+          <tr><td>Bots</td><td>Ingress in the control plane, routed to the cell</td><td>Slack or Telegram need one stable public URL that answers within seconds. The cell may be asleep; ingress wakes it and holds the event until it answers.</td></tr>
+          <tr><td>Connected apps</td><td>Cell for polling and tool calls; ingress for push webhooks</td><td>Gmail push and calendar notifications arrive at a public URL. Everything else is the cell calling out, as on the Mac.</td></tr>
+          <tr><td>Local files</td><td>The runner</td><td>"Your files" means the folder on your Mac. The cell doesn't copy it; the runner serves read, search and write as tools when the Mac is online.</td></tr>
+          <tr><td>Commands</td><td>A microVM per task in the cloud, or the runner</td><td>Docker-in-a-container is not available in a cloud cell. Firecracker or gVisor gives each task a throwaway machine with an egress allowlist.</td></tr>
+          <tr><td>Approvals</td><td>Phone app, pushed by the relay</td><td>Unchanged. The outbox already waits; push is what makes the wait short.</td></tr>
+          <tr><td>Traces, costs</td><td>Per cell, exported to the person's own Langfuse or a tenant-keyed one</td><td>The cost ledger is already per person. The trace must not be the place where tenants mix.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="prose" style="max-width: none">
+    <h2>3. The technical problems</h2>
+    <div class="cards">
+      <div><b>Mostly idle, never done</b><p>A task waits three days for your OK. A job sleeps until Tuesday. Keeping a process up for that is waste; killing it loses nothing only if every wait is in the store. Each cell publishes its next wake time (earliest schedule, lease expiry or retry); the control plane holds a durable timer per cell and starts the cell when it fires or when an event arrives. Intake is idempotent, so a duplicate wake is harmless.</p></div>
+      <div><b>Resume after anything</b><p>Cloud machines get preempted. Every run must survive a restart mid-task: the lease expires, the next executor picks the task up, the ACP session id in the task folder lets the agent continue its own history. Task folders have to be on a volume that follows the cell, with snapshots to object storage. SQLite on a network volume is fine for one writer; the WAL must never be shared.</p></div>
+      <div><b>Sandboxing without Docker</b><p>On the Mac, commands run in a container. In a cell, nested containers aren't available. The sandbox becomes an interface with two backends: a microVM service (one VM per task, destroyed at the end, egress allowlist) and the runner. A cloud ACP agent is itself an untrusted process with tools, so it runs inside that microVM, and the MCP bridge token is the only way back into the cell.</p></div>
+      <div><b>Secrets and the subscription problem</b><p>API keys are easy: vault plus KMS. Subscription logins are not. They are device-bound OAuth refresh tokens meant for a person's own use. Holding them server-side means storing a credential that can act as the person anywhere, and it brushes against the provider's terms. The runner avoids the problem by leaving the login where it already is.</p></div>
+      <div><b>A public edge for bots and webhooks</b><p>Each bot needs a URL that answers in seconds; Slack retries after three. Ingress verifies the provider's signature, stores the event, wakes the cell, and acknowledges. The cell then reads it through the same intake as a chat message, so it goes through Eval, the router and the Mandate like everything else.</p></div>
+      <div><b>Quarantine still applies</b><p>Outside content read in the cloud is as untrusted as on the Mac. The guard, taint tracking and the outbox stay exactly where they are. What's new is network egress: a sandbox that can reach the whole internet can exfiltrate what it read, so the microVM's egress is an allowlist built from the task's toolset.</p></div>
+      <div><b>Offline runners</b><p>The Mac is closed, so the subscription agent and local files are gone. A task that needs them ends "blocked: your Mac is offline" and resumes when the runner reconnects. The cell must say which of its tools are remote so the router can pick a cloud agent for work that doesn't need the Mac.</p></div>
+      <div><b>Cold starts and cost</b><p>A Go binary opening a SQLite file starts in well under a second, which is what makes scale-to-zero realistic. The real cost is tokens, and that ledger exists. The operator's cost is volumes and microVM minutes; both are per task, so both can be shown to the person next to the token spend.</p></div>
+    </div>
+  </section>
+
+  <section class="prose" style="max-width: none">
+    <h2>4. Design considerations</h2>
+    <ul>
+      <li><b>The person is the cell.</b> Don't split the server into a router service, an executor service and an outbox service. They share one Mandate, one transaction and one trace per task; splitting them turns the Mandate into a distributed check and the trace into a join. Keep the monolith and run many of them.</li>
+      <li><b>The same binary everywhere.</b> A cell is the Mac version with a different data directory and three swapped backends: sandbox, secrets, and where files come from. Anyone can leave by copying their folder to a Mac, and the Mac version stays the reference that the cloud has to match.</li>
+      <li><b>The control plane holds nothing a person said.</b> Accounts, placement, timers, signed events in transit. No messages, no task bodies, no keys. If it is breached, the attacker learns who uses heyrobots, not what they asked for.</li>
+      <li><b>Be honest about trust.</b> The Mac version is trustworthy because it never leaves the Mac. A hosted cell is trustworthy only as far as the operator is. Say which secrets the operator could read, offer bring-your-own-key, and let the runner keep the most personal things home. The hybrid is a feature, not a stopgap.</li>
+      <li><b>Outbound only from devices.</b> Runners and phones dial the relay; nothing dials into a person's network. Pairing stays a code shown on one device and typed on another.</li>
+      <li><b>Every wait has an owner.</b> A task waits on the person, on a schedule, on a runner or on a lease, and the store says which. That is what lets a cell sleep and what the control plane's timer is built from.</li>
+      <li><b>Per-task budgets are the safety valve.</b> The limits that exist now (calls, run time, monthly spend) are what stop a sleeping system from waking up to a surprise bill. In the cloud they also cap the operator's exposure, so they stay mandatory.</li>
+    </ul>
+  </section>
+
+  <section class="prose" style="max-width: none">
+    <h2>5. How this differs from a normal microservice system</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Normal distributed system</th><th>heyrobots in the cloud</th></tr></thead>
+        <tbody>
+          <tr><td>Scales on request throughput; stateless replicas behind a balancer</td><td>Scales on number of people; each cell is tiny, serial and mostly asleep. No replica ever needs a second copy.</td></tr>
+          <tr><td>Request and response in milliseconds; state in a shared database</td><td>Work-in-progress that waits days on a human; the state is the product. Closer to a durable workflow engine with a person and a model in the loop.</td></tr>
+          <tr><td>Services trust each other inside the mesh</td><td>The model's output is untrusted, tool results carry taint, and the agent runtime is semi-trusted. The Mandate, quarantine and outbox are the architecture, not middleware.</td></tr>
+          <tr><td>Consistency across services needs sagas or consensus</td><td>One SQLite per person makes every check a local transaction. The only at-least-once edges are wake timers and ingress, both made safe by idempotent intake.</td></tr>
+          <tr><td>Failure means crashes, timeouts, bad deploys</td><td>Failure also means a refusal, a wrong action, a runaway loop. Budgets, human gates and "blocked" as a first-class state exist for that.</td></tr>
+          <tr><td>Compute is app servers</td><td>Compute is a throwaway machine per task, more like a CI runner, plus the person's own device as an optional worker.</td></tr>
+          <tr><td>Cost is CPU and memory</td><td>Cost is tokens, then sandbox minutes. The per-person ledger is a core feature, shown to the person, not an ops dashboard.</td></tr>
+          <tr><td>Multi-tenancy is rows with a tenant column</td><td>Multi-tenancy is a process boundary. A cell cannot form a query that touches another person's data because it has no connection to it.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="prose" style="max-width: none">
+    <h2>6. How to get there</h2>
+    <div class="cards">
+      <div class="phase"><span class="k">Phase 1 · hybrid</span><b>Cloud cell + Mac runner</b><p>The cell gives always-on inbox, bots, schedules and push. The Mac keeps the subscription agent, local files and commands. Code: a runner that dials the relay and serves ACP, file tools and a command sandbox over it; ACP sessions over a WebSocket instead of stdio; a wake endpoint on the cell; a sandbox backend interface.</p></div>
+      <div class="phase"><span class="k">Phase 2 · cloud-native</span><b>Cells without a runner</b><p>MicroVM sandbox, API-key models and cloud ACP agents with keys, file storage on the volume, SQLite streamed to object storage. Subscription logins stay on devices. Bring-your-own-key for the vault.</p></div>
+      <div class="phase"><span class="k">Phase 3 · leaving</span><b>Export and self-host</b><p>Download the folder, run the Mac version, point the phone at it. The product promise is that this always works.</p></div>
+    </div>
+  </section>
+
+  <section class="prose">
+    <h2>Open questions</h2>
+    <ul>
+      <li>Should a cloud cell ever hold a subscription login, even with the person's explicit consent, or is "subscriptions stay on your devices" the rule?</li>
+      <li>One cell per person, or one per household with several people inside it? The people table already has delegates; the question is who pays and who can read the store.</li>
+      <li>Is the runner a separate small program, or heyrobotsd itself in a "runner" mode so there is still only one binary?</li>
+      <li>Which sandbox first: Firecracker on our own hosts, or a hosted sandbox API that we rent per task?</li>
+    </ul>
+  </section>
+</main>

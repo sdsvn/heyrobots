@@ -1,0 +1,101 @@
+{
+  "doc": {
+    "slug": "index.markdown",
+    "title": "Give each agent its own standing jobs, and talk to agents and groups like chats",
+    "version": 1,
+    "markdown": "---\nco-review: design\n---\n# Give each agent its own standing jobs, and talk to agents and groups like chats\n\n## Context\n\nThe approved design (agents-tools-transport) gave us a standing team of agents, each with its own tools, skills, model, memory and queue. Three things changed since. heyrobots moved to ADK Go v2.7.1, whose graph workflow engine can run deterministic multi-step jobs with retries, and can pause for a person and resume after a restart. You asked that agents work on their own, not only in chats: a schedule or a trigger should belong to one agent and run a job with known steps. And you reviewed mockups where the app has three tabs, Chats, Team and Plans, with direct chats with an agent and groups of agents.\n\nToday a schedule speaks as the person who made it, and a rule is text the router reads; both belong to the assistant as a whole, so work from them goes to whichever agent the router picks, and the agent improvises the steps every time. A conversation belongs to a Source and a thread key, never to an agent, so there is no way to address one agent or a set of them.\n\n## Design\n\n- Each agent can own standing jobs: a job runs when its schedule fires or its trigger matches, with steps the owner can see (new table `jobs`, owner-only endpoints, the agent's profile in the app)\n  - A job has an owner agent, a name, what starts it, the toolsets it may use, and a plan: an ordered list of steps\n    - What starts it is a schedule, or a trigger: a label in an MCP server, a failed CI run, mail that matches a filter\n  - Each step is plain code (read the issue, run the tests, post to the channel), a model step with a short instruction, or another job; the agent's instructions and skills apply to model steps\n    - Plain steps run without a model call, so a job that only moves a ticket or sends a report costs nothing to think about\n    - A job used as a step runs as a sub-workflow inside the caller, under the caller's task and toolsets; a job can't call itself, directly or through another job, and that is refused at save time\n  - Jobs are defined in a jobs folder in the data folder, one file per job in the format of a skill's frontmatter; the app shows them and their runs but doesn't edit them yet\n  - The job's toolsets must be ones the agent may use; what a run may reach is the job's toolsets, the same way a task's Mandate caps it\n  - A job needs a matching enabled rule, exactly as proactive work does today, so accept mode and the rules still decide whether anything runs; the rule names the agent it may use\n  - Starting a job makes a task like any other: it has a Mandate, waits in the agent's queue, and its outward calls go through the outbox\n- A job runs as an ADK workflow (new package `internal/jobs`, built on ADK v2's `workflow` package)\n  - Each step becomes a node: a function node for plain steps, an agent node for model steps; a step can be marked repeatable, which wraps it in a retry with backoff and a timeout\n  - A step that needs the owner (your OK before a PR, an answer to a question) pauses the workflow with ADK's request-input event; the run state is written to the session, and the answer resumes it, after a restart too\n    - The pause shows in the app as a question or approval on the job's task, through the same attention feed as today\n  - A step's outward call still never runs inside the workflow: it becomes an outbox action, and the step waits for that action's outcome before the next step\n  - What can go wrong: a job whose plan can't be built (an unknown step, a toolset the agent lacks) fails at save time, not at run time\n- The schedule Source and rule triggers now start jobs, and today's schedules keep working\n  - A schedule names a job; the old schedules, which carry a note, keep speaking as the person who made them and go through the router as now, so nothing existing breaks\n  - Triggers from MCP servers (an issue labelled, a CI failure) come from a watcher that polls the server's read tools on an interval you set\n    - It starts the job's task when a new matching item appears, and remembers what it has seen\n    - Polling is opt-in per job: nothing is polled unless a job's trigger names the tool, and only tools you marked as reads; the watcher never writes\n- You can chat with one agent, or with a group of agents, the way you chat with people (new table `groups`, owner-only endpoints, the Chats tab)\n  - A direct chat is a conversation whose thread belongs to one agent: the router still decides what the message means, but the lead agent is fixed\n    - If the message needs a toolset that agent lacks, the router refuses it with the reason, instead of silently picking another agent\n  - A group is a named set of agents; a group's conversation gives the router only the group's members to choose the lead from\n    - An @mention of a member in your message fixes the lead to that member for that message's task\n    - Members hand work to each other inside the group's task with the message tools from the approved design; the side-talk shows in the group chat with each member's avatar\n  - A delegate may use a direct chat or a group only when every agent in it is one their requests may go to\n  - Conversations from mail, calendar and schedules stay as they are, led by whoever the router picks from the whole team\n- The app gets three tabs: Chats, Team and Plans, per the reviewed mockups\n  - Chats lists direct chats, groups and the other conversations, with the last message, the time and an unread count\n    - A chat shows \"typing…\" while an agent works on it, and a strip on top says how many agents are working outside any chat\n  - Team shows each agent's reach, what it is doing, what comes next, and its jobs\n    - An agent's profile has its running task with steps, its standing jobs, what it can reach, its recent activity, and the buttons Message, Give it a job, and Pause\n  - Plans shows, across the team, what needs you, what runs now, and what comes up today or this week, each item saying where it came from: a chat, a trigger or a schedule\n  - The steps shown for a running job are the workflow's nodes and their states, read from the job's run state\n  - Today's home screen and its waiting list become the Chats tab's strip and the Plans tab's \"needs you\" section\n- Agents' prompts are built so providers can cache them (changes to the executor and the message tools from the approved design)\n  - An agent's session on a task only grows: a teammate's message is appended as a new turn, and nothing earlier is rewritten\n  - What a teammate is doing comes from a tool call when the agent asks, never from the system prompt, so the cached prefix stays identical between calls\n  - The system prompt holds only what is fixed for the task: the base prompt, the agent's identity and the task section; memory and notes from the host go in the user turn, as they do now\n\n## Alternatives\n\n- Keep jobs as rules plus schedules, and let the agent improvise the steps: simplest, but every run spends model calls on steps that are the same every time, and nothing can wait for you across a restart without the whole task ending.\n- Use ADK's workflow engine for the whole pipeline (intake, routing, queues, outbox): one execution model, less code of ours, and retries and pauses for free. But it would replace stores built for days-long work (an outbox that never sends twice, leases, a budget stop, an immutable Mandate) with run state kept in a session's history; it has no queues or capacity, so a busy agent couldn't make work wait; and an ACP agent, a separate process, can't be a node in its graph. The engine pays off inside a job, where steps, retries and pauses are the point.\n- Groups as ADK sub-agents under a coordinator: they would run inside one call, so a busy member couldn't make work wait, and an ACP agent couldn't be a member.\n\n## Behaviour\n\n- **The server restarts while a job waits for you.** The task's Assignment lease expires; recovery reconstructs the workflow's run state from the session and the job stays paused at the same step until you answer.\n- **A step fails repeatedly.** After its retries the workflow fails, the task reports why, and the job shows the failed step in its profile; the next scheduled run starts fresh.\n- **A trigger fires while the agent is at capacity.** The task waits in the agent's queue; a trigger that fires again for the same item starts nothing, because the watcher remembers it.\n- **A group member is removed from the team.** Open tasks it leads keep running until they end; the group drops it, and the router picks from the members left.\n\n"
+  },
+  "threads": [
+    {
+      "id": "t1",
+      "target": "doc",
+      "anchor": {
+        "type": "text",
+        "exact": "Use ADK's workflow engine for the whole pipeline (intake, routing, queues, outbox): it would replace stores built for days-long work with run state kept in a session's history, and it has no queues or capacity.",
+        "prefix": " restart without the whole task ending.\n",
+        "suffix": "\nGroups as ADK sub-agents under a coordi",
+        "startOffsetHint": 6422,
+        "endOffsetHint": 6632
+      },
+      "status": "open",
+      "severity": "medium",
+      "labels": [],
+      "intent": "question",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "23:38",
+          "body": "DEBATE pros and cons"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "23:38",
+          "body": "Fair challenge. Here's the honest weighing.\n\n**For running the whole pipeline on ADK's workflow engine**\n- One execution model for everything: intake → gate → router → task → outbox would be nodes and edges, with routing, retries, timeouts and pauses from one place, and one span tree in traces.\n- Less code of ours. The gate, router and accept check are already a chain; the engine would give us the retry and the pause-for-a-person we built by hand (leases, interrupted state, recovery notes).\n- It's the direction ADK is going, so future features (modes, isolation scopes, cross-runtime resume with Python) come free.\n\n**Against**\n- Its durable state is the session's event history, reconstructed on resume. Ours is tables with the properties we rely on: an outbox that never sends twice, leases that expire on a crash, a budget stop, and a Mandate that's immutable once accepted. Rebuilding those on top of session events means re-deriving guarantees we already have, and auditing a history scan instead of a row.\n- No queues or capacity. A busy agent making work wait, one task at a time per ACP login, and the reserved follow-up slot are all scheduler policy ADK doesn't model; we'd be writing a scheduler around its scheduler.\n- It can't contain a non-ADK runtime. An ACP agent (Claude Code) is a process we talk to over JSON-RPC, not a node in ADK's graph; the outer pipeline has to be ours for it to be a teammate.\n- Blast radius. Everything built in releases 1–3 and every test would move, for a benefit that only shows inside long jobs.\n\nSo the design keeps the outer pipeline ours and uses the engine where it pays: inside an agent's job, where steps, retries and pauses are the whole point. If ADK later grows queues and capacity, the inner/outer line can move outward without redoing the stores.\n\nI've added the first two \"for\" points to the Alternatives entry so the trade-off is visible in the document."
+        }
+      ]
+    },
+    {
+      "id": "t2",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Should a job's plain steps be written in the app as a short list (pick a step ki",
+        "source": "Should a job's plain steps be written in the app as a short list (pick a step kind, fill its fields), or only in the server's config for now?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "23:41",
+          "body": "server config is enoguh , but job must be cmposable as well somehow"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "23:41",
+          "body": "Agreed. Jobs live in a jobs folder in the data folder, one file each, same frontmatter format as a skill. For composition, a step can name another job: it runs as a sub-workflow (ADK's workflow node) under the caller's task and toolsets, so a \"release\" job can call \"run tests\" and \"write release notes\" without repeating their steps. Self-reference, direct or through another job, is refused when the file is saved.\n\nChanged: the step kinds now include \"another job\", with the sub-workflow rule, and the jobs-folder step is in the design; the open question is gone."
+        }
+      ]
+    },
+    {
+      "id": "t3",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Should polling MCP servers for triggers be on by default for every reviewed read",
+        "source": "Should polling MCP servers for triggers be on by default for every reviewed read tool, or opt-in per job?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "23:43",
+          "body": "opt-in"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "23:43",
+          "body": "Opt-in. A server is only polled when one of its read tools is named in a job's trigger, with the interval set on that job. Changed: the polling step says so, and the open question is gone."
+        }
+      ]
+    }
+  ],
+  "seq": 3,
+  "review": {
+    "decision": "approve",
+    "summary": "",
+    "submittedAt": "23:44",
+    "count": 1
+  }
+}

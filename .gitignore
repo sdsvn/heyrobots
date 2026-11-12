@@ -1,0 +1,5 @@
+/bin/
+/service/internal/webapp/dist/*
+!/service/internal/webapp/dist/README.md
+/graphify-out/cache/
+.DS_Store

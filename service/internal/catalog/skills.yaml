@@ -1,0 +1,46 @@
+# Skills the owner can add from public GitHub repositories. source is
+# owner/repo/path to a folder with a SKILL.md.
+- source: anthropics/skills/skills/pdf
+  name: pdf
+  description: Read, merge, split, fill and create PDF files.
+  suggested_for: General
+- source: anthropics/skills/skills/docx
+  name: docx
+  description: Create, read and edit Word documents.
+  suggested_for: General
+- source: anthropics/skills/skills/xlsx
+  name: xlsx
+  description: Open, edit and build spreadsheets, formulas and charts.
+  suggested_for: General
+- source: anthropics/skills/skills/pptx
+  name: pptx
+  description: Build and read slide decks.
+  suggested_for: General
+- source: anthropics/skills/skills/doc-coauthoring
+  name: doc-coauthoring
+  description: Write proposals, specs and decision docs together, step by step.
+  suggested_for: Writer
+- source: anthropics/skills/skills/internal-comms
+  name: internal-comms
+  description: Status reports, leadership updates and newsletters in a house style.
+  suggested_for: Writer
+- source: anthropics/skills/skills/mcp-builder
+  name: mcp-builder
+  description: Design and build good MCP servers.
+  suggested_for: Coder
+- source: anthropics/skills/skills/webapp-testing
+  name: webapp-testing
+  description: Test local web apps with Playwright, with screenshots and logs.
+  suggested_for: Coder
+- source: anthropics/skills/skills/frontend-design
+  name: frontend-design
+  description: Distinctive visual design for new or reshaped UI.
+  suggested_for: Coder
+- source: obra/superpowers/skills/systematic-debugging
+  name: systematic-debugging
+  description: Find a bug's root cause before proposing a fix.
+  suggested_for: Coder
+- source: obra/superpowers/skills/test-driven-development
+  name: test-driven-development
+  description: Write the failing test first, then the code.
+  suggested_for: Coder

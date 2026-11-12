@@ -1,0 +1,181 @@
+# Builds every download and attaches it to a GitHub release when a version
+# tag is pushed (git tag v0.4.0 && git push origin v0.4.0). Run it by hand
+# from the Actions tab to get the builds as workflow artifacts without a
+# release.
+#
+#   Server (heyrobotsd, with the web app inside): macOS and Linux, arm64 and amd64
+#   App: macOS (.app in a zip), Linux (x64 bundle), Android (.apk)
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.47.9"
+
+jobs:
+  web:
+    name: Web app for the server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter build web --release
+        working-directory: app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: app/build/web
+          retention-days: 1
+
+  server:
+    name: Server · ${{ matrix.goos }}-${{ matrix.goarch }}
+    needs: web
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { goos: darwin, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: service/go.mod
+          cache-dependency-path: service/go.sum
+      - uses: actions/download-artifact@v4
+        with:
+          name: web
+          path: service/internal/webapp/dist
+      # Pure Go (the database is SQLite without cgo), so one Linux runner
+      # builds for every platform.
+      - name: Build
+        working-directory: service
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          name=heyrobotsd-${GITHUB_REF_NAME//\//-}-${GOOS}-${GOARCH}
+          mkdir -p ../dist/$name
+          go build -trimpath -ldflags "-s -w" -o ../dist/$name/heyrobotsd ./cmd/heyrobotsd
+          cp ../README.md ../dist/$name/
+          tar -C ../dist -czf ../dist/$name.tar.gz $name
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*.tar.gz
+
+  app-macos:
+    name: App · macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter build macos --release
+        working-directory: app
+      # Not signed or notarized: macOS asks once before opening it (see README).
+      - name: Package
+        run: |
+          name=heyrobots-app-${GITHUB_REF_NAME//\//-}-macos
+          mkdir -p dist
+          ditto -c -k --sequesterRsrc --keepParent app/build/macos/Build/Products/Release/heyrobots.app dist/$name.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-macos
+          path: dist/*.zip
+
+  app-linux:
+    name: App · Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux build tools and libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev libjsoncpp-dev liblzma-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter build linux --release
+        working-directory: app
+      - name: Package
+        run: |
+          name=heyrobots-app-${GITHUB_REF_NAME//\//-}-linux-x64
+          mkdir -p dist
+          cp -R app/build/linux/x64/release/bundle dist/$name
+          tar -C dist -czf dist/$name.tar.gz $name
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-linux
+          path: dist/*.tar.gz
+
+  app-android:
+    name: App · Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      # Signed with Flutter's debug key, so it installs directly but not
+      # from the Play Store (see README).
+      - run: flutter build apk --release
+        working-directory: app
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp app/build/app/outputs/flutter-apk/app-release.apk dist/heyrobots-app-${GITHUB_REF_NAME//\//-}-android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-android
+          path: dist/*.apk
+
+  release:
+    name: GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [server, app-macos, app-linux, app-android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Only the downloads; the web build is already inside each server.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: server-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: app-*
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

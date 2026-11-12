@@ -1,0 +1,140 @@
+# The apps the owner can connect. MCP entries are curated by their name in
+# the official registry (registry.modelcontextprotocol.io), noted as
+# registry:, which is only used to refresh their urls.
+# kind: google (the Google account),
+# mcp (a remote MCP server at url, or a local one started by command) or
+# local (found on this machine by probe). coming: shown greyed, not yet
+# connectable.
+- id: gmail
+  name: Gmail
+  category: email
+  kind: google
+  toolset: mail
+  mark: G
+  tint: rose
+  about: Reads and searches your mail; sends and replies after your OK.
+- id: google_calendar
+  name: Google Calendar
+  category: other
+  kind: google
+  toolset: calendar
+  mark: GC
+  tint: sky
+  about: Reads your calendar; adds events after your OK.
+- id: github
+  name: GitHub
+  category: code
+  kind: mcp
+  registry: io.github.github/github-mcp-server
+  url: https://api.githubcopilot.com/mcp/
+  mark: GH
+  tint: ink
+  about: Issues, pull requests and code in your repositories.
+- id: linear
+  name: Linear
+  category: code
+  kind: mcp
+  registry: app.linear/linear
+  url: https://mcp.linear.app/mcp
+  mark: L
+  tint: violet
+  about: Finds, creates and updates Linear issues and projects.
+- id: notion
+  name: Notion
+  category: docs
+  kind: mcp
+  registry: com.notion/mcp
+  url: https://mcp.notion.com/mcp
+  mark: N
+  tint: ink
+  about: Searches, reads and writes your Notion pages and databases.
+- id: slack
+  name: Slack
+  category: messaging
+  kind: mcp
+  url: https://mcp.slack.com/mcp
+  mark: S
+  tint: peach
+  coming: true
+  about: Searches and reads channels; posts messages after your OK.
+- id: atlassian
+  name: Jira & Confluence
+  category: code
+  kind: mcp
+  registry: com.atlassian/atlassian-mcp-server
+  url: https://mcp.atlassian.com/v2/mcp
+  mark: J
+  tint: sky
+  about: Jira issues and Confluence pages in your Atlassian site.
+- id: stripe
+  name: Stripe
+  category: other
+  kind: mcp
+  registry: com.stripe/mcp
+  url: https://mcp.stripe.com
+  mark: St
+  tint: violet
+  about: Customers, payments and invoices in your Stripe account.
+- id: google_drive
+  name: Google Drive
+  category: docs
+  kind: mcp
+  url: https://drivemcp.googleapis.com/mcp/v1
+  mark: D
+  tint: sun
+  coming: true
+  about: Finds and reads your Drive files.
+- id: outlook
+  name: Outlook
+  category: email
+  kind: mcp
+  mark: O
+  tint: sky
+  coming: true
+  about: Reads your Outlook mail and calendar.
+- id: whatsapp
+  name: WhatsApp
+  category: messaging
+  kind: mcp
+  mark: W
+  tint: mint
+  coming: true
+  about: Reads and answers your WhatsApp chats.
+- id: telegram
+  name: Telegram
+  category: messaging
+  kind: mcp
+  mark: T
+  tint: sky
+  coming: true
+  about: Reads and answers your Telegram chats.
+- id: imessage
+  name: iMessage
+  category: messaging
+  kind: local
+  probe: darwin
+  access: ~/Library/Messages/chat.db
+  steps:
+    - Grant Full Disk Access to heyrobotsd in System Settings → Privacy & Security, then connect again.
+  mark: iM
+  tint: mint
+  about: Your Messages on this Mac.
+- id: apple_calendar
+  name: Apple Calendar
+  category: other
+  kind: local
+  probe: darwin
+  access: ~/Library/Calendars
+  steps:
+    - Allow heyrobotsd to use your calendars in System Settings → Privacy & Security → Calendars (Full Access), then connect again.
+  mark: AC
+  tint: rose
+  about: The calendars on this Mac.
+- id: claude_code
+  name: Claude Code
+  category: code
+  kind: local
+  probe: claude_code
+  mark: CC
+  tint: peach
+  about: Claude Code on this machine.

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Plain http is allowed because a self-hosted server on a home network or
+     Tailscale often has no certificate. The app itself refuses http for any
+     address that isn't on this machine or a private network; see
+     lib/pairing.dart. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>

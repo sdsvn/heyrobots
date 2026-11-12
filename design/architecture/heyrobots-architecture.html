@@ -1,0 +1,424 @@
+<title>heyrobots Agent Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one reading column; diagrams break out wider and scroll sideways on phones. */
+:root {
+  --bg: #FAF9FE; --fg: #24213A; --muted: #5F5B78; --line: #CFCAE6; --panel: #FFFFFF;
+  --accent: #5848E0; --accent-soft: #ECE8FF; --warn: #B4501E; --warn-soft: #FFEADD; --ok: #1E7A62;
+  --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15131F; --fg: #ECEAF7; --muted: #A9A4C4; --line: #3B3656; --panel: #201D30;
+  --accent: #9D93FF; --accent-soft: #2B2650; --warn: #F2A77E; --warn-soft: #3A2620; --ok: #5FD0B0; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15131F; --fg: #ECEAF7; --muted: #A9A4C4; --line: #3B3656; --panel: #201D30;
+  --accent: #9D93FF; --accent-soft: #2B2650; --warn: #F2A77E; --warn-soft: #3A2620; --ok: #5FD0B0; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 16px/1.6 var(--body); }
+main { max-width: 1060px; margin: 0 auto; padding-block: 40px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 28px; }
+.prose { max-width: 68ch; }
+h1 { font: 700 clamp(30px, 5vw, 44px)/1.1 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+h2 { font: 700 24px/1.2 var(--display); margin: 0 0 6px; text-wrap: balance; }
+p { margin: 0 0 10px; }
+.lede { font-size: 18px; color: var(--muted); }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+code { font: 500 .88em var(--mono); background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+figure { margin: 0; }
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); padding: 12px; }
+.scroll svg { display: block; width: 100%; min-width: 760px; height: auto; color: var(--fg); }
+figcaption { font-size: 14px; color: var(--muted); margin-top: 10px; max-width: 80ch; }
+/* SVG parts, themed from the tokens */
+.box { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+.band { fill: var(--accent-soft); stroke: none; }
+.key { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.8; }
+.out { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 1.5; }
+.later { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 6 5; }
+.edge { fill: none; stroke: currentColor; stroke-width: 1.5; }
+.edge.dash { stroke-dasharray: 6 5; stroke: var(--muted); }
+.edge.hot { stroke: var(--accent); stroke-width: 2; }
+.t { fill: currentColor; font: 600 14px var(--body); }
+.s { fill: var(--muted); font: 500 12px var(--body); }
+.m { fill: var(--muted); font: 500 11.5px var(--mono); }
+.a { fill: var(--accent); font: 600 12px var(--body); }
+.w { fill: var(--warn); font: 600 12px var(--body); }
+.cap { fill: var(--accent); font: 700 12px var(--mono); letter-spacing: .06em; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.tablewrap { overflow-x: auto; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { font: 600 13px var(--body); color: var(--muted); }
+td:first-child { font-weight: 600; white-space: nowrap; }
+.legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.sw { width: 26px; height: 0; border-top: 2px solid currentColor; display: inline-block; color: var(--fg); }
+.sw.d { border-top: 2px dashed var(--muted); }
+.status { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.status div { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--panel); min-width: 0; }
+.status b { display: block; font-family: var(--display); }
+.status .done { color: var(--ok); font: 600 12px var(--mono); }
+.status .next { color: var(--warn); font: 600 12px var(--mono); }
+</style>
+
+<main>
+  <header class="prose">
+    <div class="eyebrow">heyrobots · how it fits together · <a href="https://claude.ai/artifact/Qc2mvKr3f86ZiEweEJkL5Q" style="color: inherit">cloud draft →</a></div>
+    <h1>Where ADK's root and sub-agents sit in heyrobots</h1>
+    <p class="lede">ADK is the agent engine: every model turn in heyrobots runs through an ADK Runner, with ADK's agent, session, tool dispatch, model adapters and the workflow engine that runs a standing job's steps, retries and pauses. heyrobots adds the parts ADK has no concept of: a queue with capacity per agent, a Mandate that caps every agent on a task, an outbox that waits for your OK, turns that resume days later across restarts, and members that aren't ADK at all. ADK's agent tree runs inside one call of one process, so it can't hold any of that. That is why each team agent is its own ADK root, run once per piece of work, and the agents talk through stored messages, not ADK's <code>transfer_to_agent</code>.</p>
+  </header>
+
+  <section>
+    <div class="prose">
+      <h2>1. The whole system</h2>
+      <p>Every message takes the same path: code decides who may ask, a small model decides what it means, code checks that decision, and the work runs as one agent with only the tools the task was granted. Nothing reaches another person without passing the outbox.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1000 690" role="img" aria-label="High-level flow: sources feed intake, Eval gates and routes, a task with its Mandate waits in the lead agent's queue, the agent runs through the tool gateway, outside content is read in quarantine, and outward actions wait in the outbox for your approval before senders deliver them. Every step is traced.">
+          <defs>
+            <marker id="ar1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"></path></marker>
+            <marker id="ar1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="a"></path></marker>
+          </defs>
+
+          <!-- Sources -->
+          <rect class="box" x="55" y="20" width="200" height="50" rx="10"></rect>
+          <text class="t" x="155" y="50" text-anchor="middle">Phone app chat</text>
+          <rect class="box" x="285" y="20" width="430" height="50" rx="10"></rect>
+          <text class="t" x="500" y="43" text-anchor="middle">Connected apps</text>
+          <text class="s" x="500" y="60" text-anchor="middle">any add-on or MCP server, Gmail and Calendar among them</text>
+          <rect class="box" x="745" y="20" width="160" height="50" rx="10"></rect>
+          <text class="t" x="825" y="50" text-anchor="middle">Schedules</text>
+          <path class="edge" d="M155 70 V108" marker-end="url(#ar1)"></path>
+          <path class="edge" d="M500 70 V108" marker-end="url(#ar1)"></path>
+          <path class="edge" d="M825 70 V108" marker-end="url(#ar1)"></path>
+
+          <!-- Intake -->
+          <rect class="box" x="55" y="110" width="850" height="46" rx="10"></rect>
+          <text class="t" x="80" y="138">Intake</text>
+          <text class="s" x="140" y="138">stores each message once, in its conversation (thread)</text>
+          <path class="edge" d="M480 156 V198" marker-end="url(#ar1)"></path>
+          <text class="s" x="490" y="182">new messages</text>
+
+          <!-- Eval -->
+          <rect class="band" x="55" y="200" width="850" height="96" rx="14"></rect>
+          <text class="cap" x="72" y="220">EVAL</text>
+          <rect class="box" x="95" y="230" width="220" height="50" rx="10"></rect>
+          <text class="t" x="205" y="252" text-anchor="middle">Gate</text>
+          <text class="s" x="205" y="270" text-anchor="middle">who may ask · plain code</text>
+          <rect class="key" x="390" y="230" width="220" height="50" rx="10"></rect>
+          <text class="t" x="500" y="252" text-anchor="middle">Router · ADK agent</text>
+          <text class="s" x="500" y="270" text-anchor="middle">picks work + lead agent</text>
+          <rect class="box" x="685" y="230" width="220" height="50" rx="10"></rect>
+          <text class="t" x="795" y="252" text-anchor="middle">Accept check</text>
+          <text class="s" x="795" y="270" text-anchor="middle">policy again · plain code</text>
+          <path class="edge" d="M315 255 H388" marker-end="url(#ar1)"></path>
+          <text class="s" x="322" y="247">admitted</text>
+          <path class="edge" d="M610 255 H683" marker-end="url(#ar1)"></path>
+          <text class="s" x="614" y="247">route_accept</text>
+
+          <!-- Task and queue -->
+          <path class="edge" d="M795 280 V328" marker-end="url(#ar1)"></path>
+          <text class="s" x="805" y="310">accepted</text>
+          <rect class="box" x="685" y="330" width="220" height="50" rx="10"></rect>
+          <text class="t" x="795" y="352" text-anchor="middle">Task + Mandate</text>
+          <text class="s" x="795" y="370" text-anchor="middle">scope, toolsets, lead agent</text>
+          <path class="edge" d="M685 355 H317" marker-end="url(#ar1)"></path>
+          <text class="s" x="440" y="347">waits in the lead agent's queue</text>
+          <rect class="box" x="95" y="330" width="220" height="50" rx="10"></rect>
+          <text class="t" x="205" y="352" text-anchor="middle">Agent's queue</text>
+          <text class="s" x="205" y="370" text-anchor="middle">capacity 1 by default</text>
+
+          <!-- Run -->
+          <path class="edge" d="M205 380 V428" marker-end="url(#ar1)"></path>
+          <text class="s" x="215" y="410">claimed when free</text>
+          <rect class="key" x="95" y="430" width="220" height="60" rx="10"></rect>
+          <text class="t" x="205" y="453" text-anchor="middle">Agent run</text>
+          <text class="s" x="205" y="471" text-anchor="middle">ADK Runner · its model,</text>
+          <text class="s" x="205" y="485" text-anchor="middle">skills, memory</text>
+          <path class="edge hot" d="M315 460 H388" marker-end="url(#ar1a)"></path>
+          <text class="a" x="320" y="452">every tool call</text>
+          <rect class="key" x="390" y="430" width="220" height="60" rx="10"></rect>
+          <text class="t" x="500" y="456" text-anchor="middle">Tool gateway</text>
+          <text class="s" x="500" y="474" text-anchor="middle">agent's tools ∩ Mandate</text>
+          <path class="edge" d="M610 460 H683" marker-end="url(#ar1)"></path>
+          <text class="s" x="618" y="452">reads run</text>
+          <rect class="box" x="685" y="430" width="220" height="60" rx="10"></rect>
+          <text class="t" x="795" y="453" text-anchor="middle">Tools</text>
+          <text class="s" x="795" y="471" text-anchor="middle">web, files, and every</text>
+          <text class="s" x="795" y="485" text-anchor="middle">connected app's MCP tools</text>
+
+          <!-- Quarantine and outbox -->
+          <path class="edge" d="M455 490 V538" marker-end="url(#ar1)"></path>
+          <text class="s" x="330" y="520">outside content</text>
+          <rect class="box" x="390" y="540" width="220" height="50" rx="10"></rect>
+          <text class="t" x="500" y="562" text-anchor="middle">Quarantine reader</text>
+          <text class="s" x="500" y="580" text-anchor="middle">a model with no tools</text>
+          <path class="edge" d="M545 490 V512 H795 V538" marker-end="url(#ar1)"></path>
+          <text class="w" x="640" y="506">outward call, never run</text>
+          <rect class="out" x="685" y="540" width="220" height="50" rx="10"></rect>
+          <text class="t" x="795" y="562" text-anchor="middle">Outbox</text>
+          <text class="s" x="795" y="580" text-anchor="middle">reach + taint checks</text>
+          <rect class="box" x="95" y="620" width="220" height="50" rx="10"></rect>
+          <text class="t" x="205" y="642" text-anchor="middle">You, on the phone</text>
+          <text class="s" x="205" y="660" text-anchor="middle">approve · fingerprint</text>
+          <path class="edge" d="M315 645 H760 V592" marker-end="url(#ar1)"></path>
+          <text class="w" x="460" y="637">approve or decline</text>
+          <path class="edge" d="M830 590 V618" marker-end="url(#ar1)"></path>
+          <rect class="box" x="685" y="620" width="220" height="50" rx="10"></rect>
+          <text class="t" x="795" y="642" text-anchor="middle">Senders</text>
+          <text class="s" x="795" y="660" text-anchor="middle">a connected app's tool · the phone app</text>
+
+          <!-- Telemetry -->
+          <rect class="later" x="935" y="20" width="44" height="650" rx="10"></rect>
+          <text class="m" transform="translate(963 345) rotate(-90)" text-anchor="middle">OpenTelemetry · one trace per task</text>
+        </svg>
+      </div>
+      <figcaption>The router is the only model that decides what work starts, and plain code checks its answer before any task exists. The agent never sends anything itself: an outward tool call becomes an outbox action, and outside content reaches it only through the quarantine reader.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="prose">
+      <h2>2. The agents, and where ADK's tree fits</h2>
+      <p>ADK has two shapes now: the agent tree, where a root agent lists sub-agents and can transfer the conversation to one of them inside the same run, and the <b>graph</b> workflow engine (ADK Go v2.7), where nodes with retries and pauses run inside one call. Both live inside one call of one process. heyrobots uses ADK for each agent's brain, and the graph for an agent's <b>standing jobs</b> (each job file becomes a workflow of steps, sub-jobs and "ask the owner" pauses), but builds the team above both: the <b>router</b> is a root agent of its own, each <b>team agent</b> is the root of its own run, and the task's <b>lead agent</b> is the root of the work. Teammates are separate runs that exchange messages stored on the task.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1000 610" role="img" aria-label="Agent architecture: the router, an ADK root agent, picks a lead agent for a task. The lead agent is the task's root, its own ADK Runner. It messages teammates through the gateway: the Coder is another ADK Runner, Claude Code joins over ACP. Every agent's tools go through the gateway. ADK sub-agents are allowed only inside one agent.">
+          <defs>
+            <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"></path></marker>
+          </defs>
+
+          <!-- Router -->
+          <rect class="key" x="330" y="20" width="340" height="66" rx="12"></rect>
+          <text class="t" x="500" y="45" text-anchor="middle">Router · ADK root agent, own Runner</text>
+          <text class="m" x="500" y="66" text-anchor="middle">tools: route_accept · attach · stop · ignore</text>
+          <text class="s" x="690" y="45">sees each agent's name, purpose,</text>
+          <text class="s" x="690" y="62">toolsets and load, never its</text>
+          <text class="s" x="690" y="79">instructions or memory</text>
+          <path class="edge" d="M470 86 V148" marker-end="url(#ar2)"></path>
+          <text class="s" x="350" y="122">picks the lead agent</text>
+          <path class="edge dash" d="M540 148 V88" marker-end="url(#ar2)"></path>
+          <text class="s" x="552" y="122">hand_back: beyond this task</text>
+
+          <!-- Task container -->
+          <rect class="band" x="30" y="140" width="940" height="330" rx="16"></rect>
+          <text class="cap" x="50" y="164">ONE TASK · its Mandate caps every agent on it</text>
+
+          <!-- Lead -->
+          <rect class="key" x="350" y="150" width="300" height="110" rx="12"></rect>
+          <text class="t" x="500" y="178" text-anchor="middle">Product engineer · lead (root)</text>
+          <text class="m" x="500" y="200" text-anchor="middle">ADK Runner → LlmAgent</text>
+          <text class="s" x="500" y="220" text-anchor="middle">its instructions, model, skills, memory</text>
+          <text class="s" x="500" y="238" text-anchor="middle">session: this task × this agent</text>
+
+          <!-- Optional sub-agents inside one agent -->
+          <rect class="later" x="700" y="176" width="250" height="68" rx="10"></rect>
+          <text class="t" x="825" y="200" text-anchor="middle">ADK sub-agents</text>
+          <text class="s" x="825" y="218" text-anchor="middle">only inside one agent,</text>
+          <text class="s" x="825" y="234" text-anchor="middle">same tools and limits</text>
+          <path class="edge dash" d="M650 210 H698" marker-end="url(#ar2)"></path>
+
+          <!-- Teammates -->
+          <rect class="box" x="90" y="340" width="280" height="100" rx="12"></rect>
+          <text class="t" x="230" y="368" text-anchor="middle">Coder · teammate</text>
+          <text class="m" x="230" y="390" text-anchor="middle">ADK Runner → LlmAgent</text>
+          <text class="s" x="230" y="410" text-anchor="middle">own queue, own session</text>
+          <text class="s" x="230" y="428" text-anchor="middle">codebase only</text>
+          <rect class="box" x="630" y="340" width="280" height="100" rx="12"></rect>
+          <text class="t" x="770" y="368" text-anchor="middle">Claude Code · teammate</text>
+          <text class="m" x="770" y="390" text-anchor="middle">ACP session, not ADK</text>
+          <text class="s" x="770" y="410" text-anchor="middle">your subscription, in the task folder</text>
+          <text class="s" x="770" y="428" text-anchor="middle">gateway is its only MCP server</text>
+
+          <path class="edge dash" d="M400 260 L300 338" marker-end="url(#ar2)"></path>
+          <path class="edge dash" d="M250 340 L360 262" marker-end="url(#ar2)"></path>
+          <text class="s" x="140" y="296">message_teammate</text>
+          <text class="s" x="330" y="318">reply / result</text>
+          <path class="edge dash" d="M600 260 L700 338" marker-end="url(#ar2)"></path>
+          <path class="edge dash" d="M750 340 L640 262" marker-end="url(#ar2)"></path>
+          <text class="s" x="705" y="296">message_teammate</text>
+          <text class="s" x="560" y="318">blocked / done</text>
+
+          <!-- Gateway -->
+          <rect class="key" x="30" y="500" width="940" height="50" rx="12"></rect>
+          <text class="t" x="500" y="522" text-anchor="middle">Tool gateway · each agent's tools ∩ the task's Mandate · outward calls → outbox</text>
+          <text class="m" x="500" y="540" text-anchor="middle">ADK tools for ADK agents · a loopback MCP bridge, one token per session, for ACP agents</text>
+          <path class="edge" d="M230 440 V498" marker-end="url(#ar2)"></path>
+          <path class="edge" d="M500 260 V498" marker-end="url(#ar2)"></path>
+          <path class="edge" d="M770 440 V498" marker-end="url(#ar2)"></path>
+          <text class="s" x="510" y="480">tools</text>
+
+          <text class="s" x="30" y="590">Every agent, message and tool call is a span in the task's trace.</text>
+        </svg>
+      </div>
+      <div class="legend" aria-hidden="true"><span><i class="sw"></i>built now</span><span><i class="sw d"></i>next releases: messages between agents (4), ACP agents (5), sub-agents inside one agent</span></div>
+      <figcaption>A teammate never runs inside the lead agent's call. A message to it is stored on the task, it starts when its queue frees up, and the sender's turn ends "waiting" and resumes when the reply arrives. That's why a busy Coder makes work wait instead of starting a second copy.</figcaption>
+    </figure>
+  </section>
+
+  <section class="prose" style="max-width: none">
+    <h2>3. Why not ADK sub-agents for the team</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th></th><th>ADK root + sub-agents</th><th>heyrobots team agents</th></tr></thead>
+        <tbody>
+          <tr><td>Runs in</td><td>one call, one session, one process</td><td>one run per agent per piece of work, each with its own session</td></tr>
+          <tr><td>Waiting</td><td>the parent waits while the child works</td><td>the sender's turn ends "waiting" and resumes on the reply, minutes or days later</td></tr>
+          <tr><td>Busy agents</td><td>no queues; every call gets its own copy</td><td>one queue per agent, capacity you set</td></tr>
+          <tr><td>Limits</td><td>each sub-agent has its own tools, nothing caps the tree</td><td>every agent gets its own tools ∩ the task's Mandate, checked in code</td></tr>
+          <tr><td>Restarts</td><td>a server restart loses the call in progress</td><td>leases expire and the run starts again with a note</td></tr>
+          <tr><td>Non-ADK agents</td><td>not possible</td><td>Claude Code, Codex and Gemini CLI join over ACP</td></tr>
+          <tr><td>Who decides</td><td>the parent model's transfer choice</td><td>the router picks the lead; only you widen what a task may do</td></tr>
+          <tr><td>Other machines</td><td>not possible</td><td>an agent on another heyrobots is a member with a network hop: out through the outbox, in through intake (section 6)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top: 12px">ADK's tree and graph still have a place: inside one agent. Its workflow agents (sequential, parallel, loop) and the graph engine split that agent's own work into steps with retries and pauses, all under the same tools and limits. That is what a standing job is. The graph can't be the team either: a busy member couldn't make work wait, a pause couldn't last days across restarts, and an ACP agent, a separate process, can't be a node in it.</p>
+  </section>
+
+  <section>
+    <div class="prose">
+      <h2>4. Groups: the router is the root, not a hidden agent</h2>
+      <p>A group is a scope, not an agent: a thread plus a member list. There is no coordinator model behind it. For each message the <b>router</b>, already an ADK root of its own, picks the lead from the members (an <code>@Name</code> fixes it), and that lead's task runs as its own ADK Runner, exactly like a direct chat. Members hand work to each other with stored messages; the side-talk shows in the group chat with each member's avatar. A hidden coordinator would add a model call and a prompt to cache on every message, hold everything in one session, and be one more thing that could widen a task; the router already makes that call for a few hundred tokens and plain code checks it.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1000 560" role="img" aria-label="Flow of one group message: intake stores it on the group's thread; the router sees only the members and picks a lead; the lead's ADK Runner runs with its own session and cached prompt blocks; it messages a teammate, whose own Runner answers; replies and cards return to the group chat through the outbox.">
+          <defs>
+            <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"></path></marker>
+          </defs>
+          <rect class="box" x="20" y="30" width="200" height="70" rx="12"></rect>
+          <text class="t" x="120" y="58" text-anchor="middle">You, in "Launch v2"</text>
+          <text class="s" x="120" y="78" text-anchor="middle">"@Coder fix the build"</text>
+          <path class="edge" d="M220 65 H268" marker-end="url(#ar4)"></path>
+          <rect class="box" x="270" y="30" width="190" height="70" rx="12"></rect>
+          <text class="t" x="365" y="58" text-anchor="middle">Intake</text>
+          <text class="s" x="365" y="78" text-anchor="middle">thread group:gr_1 · stored once</text>
+          <path class="edge" d="M460 65 H508" marker-end="url(#ar4)"></path>
+          <rect class="key" x="510" y="20" width="470" height="90" rx="12"></rect>
+          <text class="t" x="745" y="46" text-anchor="middle">Router · ADK root, one structured decision</text>
+          <text class="s" x="745" y="66" text-anchor="middle">candidate: this message, the group's members only, toolsets ∩ what the lead can use</text>
+          <text class="s" x="745" y="84" text-anchor="middle">@Coder → agents = [Coder] · route_accept(agent: Coder) · code re-checks the lead is a member</text>
+          <path class="edge" d="M745 110 V158" marker-end="url(#ar4)"></path>
+          <text class="s" x="760" y="140">a task with a Mandate, lead = Coder</text>
+
+          <rect class="band" x="20" y="160" width="960" height="300" rx="16"></rect>
+          <text class="cap" x="40" y="184">ONE TASK · lead Coder · session = task × Coder</text>
+          <rect class="key" x="40" y="200" width="420" height="150" rx="12"></rect>
+          <text class="t" x="250" y="226" text-anchor="middle">Coder · ADK Runner → LlmAgent</text>
+          <text class="m" x="60" y="250">system  [global prompt]⟂ [# You are Coder]⟂ [# Your task]</text>
+          <text class="m" x="60" y="268">user    [memory notes] [the message] [tool results…]</text>
+          <text class="s" x="60" y="290">⟂ = cache breakpoint: the global block hits for every agent,</text>
+          <text class="s" x="60" y="306">the agent block for every task of this agent; history only grows</text>
+          <text class="s" x="60" y="326">tools: sorted · gateway ∩ Mandate · message_teammate · make_job</text>
+          <rect class="box" x="560" y="200" width="400" height="110" rx="12"></rect>
+          <text class="t" x="760" y="226" text-anchor="middle">Researcher · teammate, own Runner</text>
+          <text class="s" x="760" y="246" text-anchor="middle">session = task × Researcher · its own cached blocks</text>
+          <text class="s" x="760" y="264" text-anchor="middle">starts when its queue frees; Coder's turn ends "waiting"</text>
+          <text class="s" x="760" y="282" text-anchor="middle">status of teammates comes from a tool call, never the prompt</text>
+          <path class="edge dash" d="M460 250 H558" marker-end="url(#ar4)"></path>
+          <text class="s" x="470" y="242">message_teammate</text>
+          <path class="edge dash" d="M560 290 H462" marker-end="url(#ar4)"></path>
+          <text class="s" x="490" y="305">reply resumes Coder</text>
+          <rect class="out" x="560" y="330" width="400" height="60" rx="12"></rect>
+          <text class="t" x="760" y="354" text-anchor="middle">Outbox · replies, cards, side-talk → the group chat</text>
+          <text class="s" x="760" y="374" text-anchor="middle">outward calls wait for your OK; make_job proposes, you confirm</text>
+          <path class="edge" d="M460 330 L558 360" marker-end="url(#ar4)"></path>
+          <text class="s" x="40" y="440">A new task in the same group may get another lead; it starts its own session with a short summary of the group chat so far, so each agent's cached prefix stays its own and never gets rewritten.</text>
+          <text class="s" x="40" y="530">Every box above is a span in the task's trace; the router's decision is linked to it.</text>
+        </svg>
+      </div>
+      <figcaption>One group message, end to end. The only "root" is the router's one decision; after that the lead is an ordinary task root and members are ordinary teammates. Nothing group-specific runs inside a model call.</figcaption>
+    </figure>
+  </section>
+
+  <section class="prose" style="max-width: none">
+    <h2>5. Prompt caching in groups</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>What</th><th>Rule</th><th>Why it holds in a group</th></tr></thead>
+        <tbody>
+          <tr><td>Prefix per agent</td><td>system = global prompt, then "# You are …", then "# Your task"; each block ends a cache breakpoint</td><td>the global block is byte-identical for every agent and task; the agent block for every task of that agent; only the task block is new</td></tr>
+          <tr><td>Nothing volatile up front</td><td>memory notes, the roster's load and who is busy go in the user turn or come from a tool call</td><td>a group's members change status every minute; in the system prompt that would miss the cache on every call</td></tr>
+          <tr><td>Append-only history</td><td>a session only grows; a new lead starts a new session with a summary, never a rewritten transcript</td><td>rewriting the shared chat for each member would invalidate every member's cache at once</td></tr>
+          <tr><td>Stable tools</td><td>tools sorted by name; the same toolset list for the whole task</td><td>tool definitions sit before the system prompt in the cached prefix</td></tr>
+          <tr><td>Router</td><td>static prompt and roster first, then the triggers</td><td>one decision per message; the roster rarely changes, the message always does</td></tr>
+          <tr><td>Other providers</td><td>Gemini and OpenAI-compatible cache any matching prefix on their own; DeepSeek too</td><td>the same ordering gives hits there without breakpoints</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top: 12px">A hidden group root would not help caching: a prompt is cached per exact prefix, and each agent's identity makes its prefix its own. What a group can share is the global block, which the breakpoints above already share across the whole team.</p>
+  </section>
+
+  <section>
+    <div class="prose">
+      <h2>6. One app, several machines, agents that talk across them</h2>
+      <p>The phone app can pair with more than one heyrobots: your Mac at home, a box at the office, a hosted cell. Each stays a whole system with its own intake, router, queues, store and outbox. Nothing is shared by default. When an agent on one machine needs an agent on another, the message takes the two paths that already exist: out through the sender's outbox, in through the receiver's intake. So a cross-machine message gets the sender's reach and taint checks and your OK where its Mandate requires it, and the receiver's gate and router decide whether and who handles it, like any message from a connected app.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1000 420" role="img" aria-label="One phone app paired with two heyrobots machines; a message from an agent on machine A leaves through A's outbox, crosses to machine B's intake, and B's router gives it to the right agent; the reply comes back the same way; the task id travels with it so both sides' spans share one trace.">
+          <defs>
+            <marker id="ar6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"></path></marker>
+          </defs>
+          <rect class="box" x="400" y="20" width="200" height="56" rx="10"></rect>
+          <text class="t" x="500" y="44" text-anchor="middle">Phone app</text>
+          <text class="s" x="500" y="62" text-anchor="middle">one pairing per machine</text>
+          <path class="edge dash" d="M400 48 H250 V110" marker-end="url(#ar6)"></path>
+          <path class="edge dash" d="M600 48 H750 V110" marker-end="url(#ar6)"></path>
+
+          <rect class="key" x="40" y="112" width="420" height="270" rx="12"></rect>
+          <text class="cap" x="56" y="136">MACHINE A · home Mac</text>
+          <rect class="box" x="56" y="150" width="180" height="50" rx="10"></rect>
+          <text class="t" x="146" y="172" text-anchor="middle">Intake → router</text>
+          <text class="s" x="146" y="190" text-anchor="middle">gate, lead, Mandate</text>
+          <rect class="box" x="56" y="216" width="180" height="50" rx="10"></rect>
+          <text class="t" x="146" y="238" text-anchor="middle">Researcher</text>
+          <text class="s" x="146" y="256" text-anchor="middle">asks Coder on B</text>
+          <rect class="out" x="56" y="300" width="180" height="56" rx="10"></rect>
+          <text class="t" x="146" y="322" text-anchor="middle">Outbox</text>
+          <text class="s" x="146" y="340" text-anchor="middle">reach + taint, your OK</text>
+          <rect class="box" x="260" y="216" width="180" height="50" rx="10"></rect>
+          <text class="t" x="350" y="238" text-anchor="middle">Team roster</text>
+          <text class="s" x="350" y="256" text-anchor="middle">B's agents listed as members</text>
+          <path class="edge" d="M146 200 V216" marker-end="url(#ar6)"></path>
+          <path class="edge" d="M146 266 V300" marker-end="url(#ar6)"></path>
+
+          <rect class="key" x="540" y="112" width="420" height="270" rx="12"></rect>
+          <text class="cap" x="556" y="136">MACHINE B · office box, or a cloud cell</text>
+          <rect class="box" x="556" y="150" width="180" height="50" rx="10"></rect>
+          <text class="t" x="646" y="172" text-anchor="middle">Intake → router</text>
+          <text class="s" x="646" y="190" text-anchor="middle">treats A like a connected app</text>
+          <rect class="box" x="556" y="216" width="180" height="50" rx="10"></rect>
+          <text class="t" x="646" y="238" text-anchor="middle">Coder</text>
+          <text class="s" x="646" y="256" text-anchor="middle">runs, replies</text>
+          <rect class="out" x="556" y="300" width="180" height="56" rx="10"></rect>
+          <text class="t" x="646" y="322" text-anchor="middle">Outbox</text>
+          <text class="s" x="646" y="340" text-anchor="middle">the reply is outward too</text>
+          <path class="edge" d="M646 200 V216" marker-end="url(#ar6)"></path>
+          <path class="edge" d="M646 266 V300" marker-end="url(#ar6)"></path>
+
+          <path class="edge hot" d="M236 328 H500 V175 H556" marker-end="url(#ar6)"></path>
+          <text class="a" x="300" y="318">message + task id, signed by A's pairing with B</text>
+          <path class="edge hot" d="M736 328 H900 V400 H100 V266" marker-end="url(#ar6)"></path>
+          <text class="a" x="420" y="392">reply; A's turn was "waiting" and resumes</text>
+        </svg>
+      </div>
+      <figcaption>Machines pair with each other the way a phone pairs with a machine: a code shown on one, typed on the other, once per pair. A remote agent appears in the roster with a name, purpose, toolsets and load, so a group can mix members from several machines and @Name still works. The sender's turn ends "waiting" and resumes on the reply, the same stored-message model as teammates on one machine, with a network hop. The task id crosses the link so both sides' spans sit on one trace. A cloud instance is one more paired machine, with the same parts and the least to hold: no local files, its own keys, and its outbox approvals land on your phone with that machine's fingerprint. Proposed answer to how machines reach each other: the cloud instance is the one always reachable, so the home Mac and the office box hold an outbound connection to it and it relays envelopes signed by their own pairing, which it can't read or alter. Without a cloud instance, the phone app's relay does the same job. Schedules that must fire while your laptop is closed live on the cloud instance, whose router can hand work to a Mac agent once the Mac is up.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Where each piece stands</h2>
+    <div class="status">
+      <div><span class="done">BUILT · RELEASE 1</span><b>Gateway, MCP tools, tracing</b>Every tool call goes through one place.</div>
+      <div><span class="done">BUILT · RELEASE 2</span><b>The team</b>Agents, queues, skills, memory, a lead agent per task.</div>
+      <div><span class="done">BUILT · RELEASE 3</span><b>Models per role and per agent</b>Gemini, Anthropic, OpenAI-compatible, local.</div>
+      <div><span class="done">BUILT · CHATS</span><b>Direct chats and groups</b>The router picks the lead from the members; @Name fixes it.</div>
+      <div><span class="done">BUILT · RELEASE 5, FIRST CUT</span><b>Your agent over ACP</b>Claude Code on your login, or any ACP agent you name (omp acp ran a live task). The task's tools reach it over a loopback MCP bridge.</div>
+      <div><span class="next">LATER · RELEASE 5, REST</span><b>Agent sandboxing and more agents</b>Codex and Gemini CLI tested the same way; the agent's own commands in the sandbox.</div>
+    </div>
+  </section>
+</main>

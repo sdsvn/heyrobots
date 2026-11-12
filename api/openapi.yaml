@@ -1,0 +1,1965 @@
+openapi: 3.0.3
+info:
+  title: heyrobots API
+  version: 0.1.0
+  description: |
+    The API the heyrobots companion app uses to talk to a heyrobots server.
+    Every endpoint except health and pair needs a device token.
+    In public mode, every request also needs a signed identity from the
+    configured access proxy.
+servers:
+  - url: http://127.0.0.1:7340
+security:
+  - deviceToken: []
+paths:
+  /api/v1/health:
+    get:
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: The server is running.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /api/v1/pair:
+    post:
+      operationId: pairDevice
+      security: []
+      description: Exchange a one-time pairing code for a device token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PairRequest" }
+      responses:
+        "200":
+          description: The device is paired. The token is shown only once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PairResponse" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /api/v1/me:
+    get:
+      operationId: getMe
+      responses:
+        "200":
+          description: The device making the request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Device" }
+        "401": { $ref: "#/components/responses/Error" }
+  /api/v1/devices:
+    get:
+      operationId: listDevices
+      description: List paired devices. Owner devices only.
+      responses:
+        "200":
+          description: Paired devices, including revoked ones.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeviceList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/devices/{deviceId}:
+    delete:
+      operationId: revokeDevice
+      description: Revoke a device. Owner devices only.
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: The device is revoked. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/pairing-codes:
+    post:
+      operationId: createPairingCode
+      description: Create a one-time code to pair another owner device or invite a delegate. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PairingCodeRequest" }
+      responses:
+        "201":
+          description: The code, valid once until it expires.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PairingCode" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/events:
+    get:
+      operationId: streamEvents
+      description: Server-sent events for live updates.
+      responses:
+        "200":
+          description: An event stream. Each event has a type and a JSON data line.
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Error" }
+  /api/v1/messages:
+    post:
+      operationId: sendMessage
+      description: |
+        Send a chat message to the assistant. Sending the same
+        client_message_id again from the same device is safe: the message is
+        stored once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SendMessageRequest" }
+      responses:
+        "202":
+          description: Stored. The assistant decides what to do with it shortly.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SendMessageResponse" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/threads:
+    get:
+      operationId: listThreads
+      description: Conversations, most recent first. Delegates see only their own.
+      responses:
+        "200":
+          description: Conversations.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ThreadList" }
+        "401": { $ref: "#/components/responses/Error" }
+  /api/v1/threads/{threadId}:
+    get:
+      operationId: getThread
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: A conversation with its messages, decisions, replies and tasks.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ThreadDetail" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/policy:
+    get:
+      operationId: getPolicy
+      description: The current policy. Owner devices only.
+      responses:
+        "200":
+          description: The current policy.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PolicyView" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    put:
+      operationId: updatePolicy
+      description: Replace the policy with a new version. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PolicyUpdate" }
+      responses:
+        "200":
+          description: The new policy version.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PolicyView" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/approvals:
+    get:
+      operationId: listApprovals
+      description: Actions waiting for the owner's approval, oldest first. Owner devices only.
+      responses:
+        "200":
+          description: Waiting actions.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApprovalList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/approvals/{approvalId}:
+    post:
+      operationId: decideApproval
+      description: |
+        Approve or reject a waiting action. Owner devices only. The app asks
+        for Face ID, Touch ID or a fingerprint before sending this. An
+        approved action is checked again just before it is sent.
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApprovalDecision" }
+      responses:
+        "200":
+          description: The action after the decision.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Approval" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/standing-approvals:
+    get:
+      operationId: listStandingApprovals
+      description: Standing approvals. Owner devices only.
+      responses:
+        "200":
+          description: Standing approvals.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StandingApprovalList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createStandingApproval
+      description: Add a standing approval as a new policy version. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StandingApproval" }
+      responses:
+        "201":
+          description: The standing approval was added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StandingApprovalList" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/standing-approvals/{name}:
+    delete:
+      operationId: deleteStandingApproval
+      description: Remove a standing approval as a new policy version. Owner devices only.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/digests:
+    get:
+      operationId: listDigests
+      description: Daily digests of proactive results, newest first. Owner devices only.
+      responses:
+        "200":
+          description: Digests.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DigestList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/usage:
+    get:
+      operationId: getUsage
+      description: This month's model spending against the budget. Owner devices only.
+      responses:
+        "200":
+          description: Spending.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UsageView" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/attention:
+    get:
+      operationId: listAttention
+      description: |
+        What waits on this person, oldest first: actions to approve,
+        questions from tasks, and sends that failed. Delegates see only
+        questions on their own conversations.
+      responses:
+        "200":
+          description: Waiting items.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttentionList" }
+        "401": { $ref: "#/components/responses/Error" }
+  /api/v1/attention/{itemId}/dismiss:
+    post:
+      operationId: dismissAttention
+      description: Dismiss a failed send after reading about it. Owner devices only.
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Dismissed. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/notifications:
+    get:
+      operationId: getNotifications
+      description: Push notification settings. Owner devices only.
+      responses:
+        "200":
+          description: The settings. The access token is never returned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotifySettings" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    put:
+      operationId: updateNotifications
+      description: Change push notification settings as a new policy version. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NotifyUpdate" }
+      responses:
+        "200":
+          description: The new settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotifySettings" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/notifications/test:
+    post:
+      operationId: testNotifications
+      description: Send a test push now, ignoring quiet hours. Owner devices only.
+      responses:
+        "204": { description: ntfy accepted the push. }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+  /api/v1/accounts:
+    get:
+      operationId: listAccounts
+      description: Connected accounts and whether the Google client is set up. Owner devices only.
+      responses:
+        "200":
+          description: Accounts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/accounts/google/client:
+    put:
+      operationId: setGoogleClient
+      description: Save the owner's own Google OAuth client (a Desktop app client). Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GoogleClient" }
+      responses:
+        "204": { description: Saved. }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/accounts/google/connect:
+    post:
+      operationId: startGoogleConnect
+      description: |
+        Start connecting a Google account. Open auth_url in a browser and
+        sign in. On the computer running heyrobots, the connection finishes
+        by itself. On any other device the browser ends on a page that
+        can't load; paste that page's address into finishGoogleConnect.
+        Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GoogleConnect" }
+      responses:
+        "200":
+          description: Where to sign in.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GoogleConnectStart" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/accounts/google/finish:
+    post:
+      operationId: finishGoogleConnect
+      description: Finish connecting with the address the browser ended on. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GoogleConnectFinish" }
+      responses:
+        "200":
+          description: The connected account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/accounts/google:
+    delete:
+      operationId: disconnectGoogle
+      description: Stop reading the account, revoke the token with Google and forget it. Owner devices only.
+      responses:
+        "204": { description: Disconnected. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/schedules:
+    get:
+      operationId: listSchedules
+      description: Schedules. Owner devices only.
+      responses:
+        "200":
+          description: Schedules.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScheduleList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createSchedule
+      description: |
+        Add a schedule. At each time it sends the note as the owner, without
+        addressing the Assistant, so work starts only under a matching
+        enabled rule and accept mode. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ScheduleRequest" }
+      responses:
+        "201":
+          description: The schedule.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Schedule" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/schedules/{scheduleId}:
+    delete:
+      operationId: deleteSchedule
+      parameters:
+        - name: scheduleId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/mcp-servers:
+    get:
+      operationId: listMcpServers
+      description: The owner's MCP servers and their tools. Owner devices only.
+      responses:
+        "200":
+          description: Servers.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpServerList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createMcpServer
+      description: |
+        Add an MCP server and read its tools. Every tool starts off until the
+        owner reviews it. A stdio server is a command this machine runs with
+        the owner's trust. Its credentials go to the vault and are never
+        returned. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McpServerRequest" }
+      responses:
+        "201":
+          description: The server. If its tools couldn't be read, status_error says why.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpServer" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/mcp-servers/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      operationId: updateMcpServer
+      description: |
+        Change what the server is for, whether its results skip quarantine,
+        and whether tasks may use it. Using it adds the toolset mcp:NAME to the
+        owner's enabled toolsets. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McpServerUpdate" }
+      responses:
+        "200":
+          description: The server.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpServer" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteMcpServer
+      description: Forget the server, its tools and its credentials. Owner devices only.
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/mcp-servers/{name}/refresh:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      operationId: refreshMcpServer
+      description: Read the server's tools again. New or changed tools are off until reviewed. Owner devices only.
+      responses:
+        "200":
+          description: The server. If its tools couldn't be read, status_error says why.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpServer" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/mcp-servers/{name}/tools/{tool}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+      - name: tool
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      operationId: reviewMcpTool
+      description: |
+        Review a tool as it is now: read (results are quarantined), outward
+        (calls go to the outbox with the chosen reach) or blocked. If the
+        server later changes the tool's description, it is off again until
+        reviewed. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/McpToolReview" }
+      responses:
+        "200":
+          description: The server.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/McpServer" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/models:
+    get:
+      operationId: listModels
+      description: The model each role uses. Owner devices only.
+      responses:
+        "200":
+          description: Roles.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModelList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+  /api/v1/models/{role}:
+    parameters:
+      - name: role
+        in: path
+        required: true
+        schema: { type: string, enum: [router, reader, worker] }
+    put:
+      operationId: setModel
+      description: |
+        Choose a role's model. The server first makes two small test calls
+        (a tool call and a JSON answer) and saves the choice only if both
+        work. A key goes to the vault and is never returned; leave it out to
+        keep the one saved for that provider or endpoint. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModelRoleUpdate" }
+      responses:
+        "200":
+          description: The role.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModelRole" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+  /api/v1/agents:
+    get:
+      operationId: listAgents
+      description: The team, with what each agent is doing. Owner devices only.
+      responses:
+        "200":
+          description: Agents.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createAgent
+      description: Add an agent to the team. An agent with its own model is tried before it is saved. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentRequest" }
+      responses:
+        "201":
+          description: The agent.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Agent" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/agents/{agentId}:
+    parameters:
+      - name: agentId
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      operationId: updateAgent
+      description: Change an agent. Its next Assignment uses the change, never beyond a task's Mandate. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentRequest" }
+      responses:
+        "200":
+          description: The agent.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Agent" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteAgent
+      description: Remove an agent with no open tasks. The General agent stays. Owner devices only.
+      responses:
+        "204": { description: Removed. }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/skills:
+    get:
+      operationId: listSkills
+      description: The skills library. Owner devices only.
+      responses:
+        "200":
+          description: Skills.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SkillList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/skills/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      operationId: saveSkill
+      description: Add or replace a one-file skill from its SKILL.md. Skills with more files go in the server's skills folder. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SkillRequest" }
+      responses:
+        "200":
+          description: The skill.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Skill" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteSkill
+      description: Remove a skill from the library and from every agent. Owner devices only.
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/jobs:
+    get:
+      operationId: listJobs
+      description: The standing jobs, as their files in the server's jobs folder define them. Owner devices only.
+      responses:
+        "200":
+          description: Jobs.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JobList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/jobs/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      operationId: saveJob
+      description: Add or replace a job from its file. A job that would run itself through other jobs is refused. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JobRequest" }
+      responses:
+        "200":
+          description: The job.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteJob
+      description: Remove a job. A job another job runs can't be removed. Owner devices only.
+      responses:
+        "204": { description: Removed. }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/rule-templates:
+    get:
+      operationId: listRuleTemplates
+      description: Starter rules the owner can add. Owner devices only.
+      responses:
+        "200":
+          description: Templates.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuleTemplateList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/rule-templates/{name}:
+    post:
+      operationId: addRuleTemplate
+      description: |
+        Add a starter rule as a new policy version, with its schedule if it
+        has one. Accept mode is unchanged, so in observe mode the rule only
+        notes what it would do. Owner devices only.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The new policy.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PolicyView" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/machines:
+    get:
+      operationId: listMachines
+      description: The owner's machines that share one team, this one first. Owner devices only.
+      responses:
+        "200":
+          description: Machines.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MachineList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: joinMachine
+      description: Join another machine using the code it shows. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JoinMachineRequest" }
+      responses:
+        "201":
+          description: The machine joined.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Machine" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+  /api/v1/machines/code:
+    post:
+      operationId: createMachineCode
+      description: Show a one-time code another machine types to join this one. Owner devices only.
+      responses:
+        "201":
+          description: The code, valid for ten minutes.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MachineCode" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/machines/{machineId}:
+    delete:
+      operationId: removeMachine
+      description: Remove a machine from the team. Owner devices only.
+      parameters:
+        - { name: machineId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/groups:
+    get:
+      operationId: listGroups
+      description: Groups of agents you chat with. Owner devices see all; a delegate sees the groups it may use.
+      responses:
+        "200":
+          description: Groups.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GroupList" }
+        "401": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createGroup
+      description: Make a group. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GroupRequest" }
+      responses:
+        "201":
+          description: The group.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Group" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/groups/{groupId}:
+    parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      operationId: updateGroup
+      description: Rename a group or change its members. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GroupRequest" }
+      responses:
+        "200":
+          description: The group.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Group" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteGroup
+      description: Remove a group; its chat stays readable. Owner devices only.
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/threads/{threadId}/read:
+    post:
+      operationId: markThreadRead
+      description: Records that this device has seen the conversation up to now, so its unread count resets.
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Marked. }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/apps:
+    get:
+      operationId: listApps
+      description: The app catalogue with what is connected. Owner devices only.
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Apps.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AppList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/apps/{appId}:
+    parameters:
+      - name: appId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getApp
+      description: One app with what it can do and who uses it. Owner devices only.
+      responses:
+        "200":
+          description: The app.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AppDetail" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: disconnectApp
+      description: Disconnect an app, or one of its accounts. Owner devices only.
+      parameters:
+        - name: account
+          in: query
+          schema: { type: string }
+      responses:
+        "204": { description: Disconnected. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/apps/{appId}/connect:
+    post:
+      operationId: connectApp
+      description: |
+        Connect an app. A Google app answers with a URL to open; an MCP app is registered and synced
+        and may answer with a URL to sign in; a local app is probed and switched on. An unknown id with
+        an MCP url in the body makes a new entry from the server's own name.
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConnectRequest" }
+      responses:
+        "200":
+          description: Connected, or what to open next.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConnectResult" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/apps/{appId}/connect/finish:
+    post:
+      operationId: finishAppConnect
+      description: |
+        Finish signing in to an MCP app with the address the browser ended on, when it couldn't come
+        back to this computer on its own. Owner devices only.
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GoogleConnectFinish" }
+      responses:
+        "200":
+          description: Connected.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConnectResult" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/apps/{appId}/tools/{toolName}:
+    put:
+      operationId: setAppTool
+      description: Change how one of an app's tools may be used. Owner devices only.
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: toolName
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AppToolUpdate" }
+      responses:
+        "200":
+          description: The tool.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AppTool" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/skills/catalog:
+    get:
+      operationId: searchSkills
+      description: Skills you can add, from the server's list and from a GitHub link. Owner devices only.
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Skills.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SkillCatalog" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/skills/add:
+    post:
+      operationId: addSkill
+      description: Fetch a skill from its source and install it. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddSkillRequest" }
+      responses:
+        "200":
+          description: The installed skill.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Skill" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/brains:
+    get:
+      operationId: listBrains
+      description: What can think for the assistant on this machine or with a key, and what is chosen. Owner devices only.
+      responses:
+        "200":
+          description: Brains.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BrainList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+components:
+  securitySchemes:
+    deviceToken:
+      type: http
+      scheme: bearer
+  responses:
+    Error:
+      description: An error.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ok] }
+    Role:
+      type: string
+      enum: [owner, delegate]
+    PairRequest:
+      type: object
+      required: [code, device_name]
+      properties:
+        code: { type: string }
+        device_name: { type: string, maxLength: 80 }
+        platform: { type: string, maxLength: 40 }
+    PairResponse:
+      type: object
+      required: [device, token]
+      properties:
+        device: { $ref: "#/components/schemas/Device" }
+        token: { type: string }
+    Device:
+      type: object
+      required: [id, name, role, created_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        platform: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        delegate_name: { type: string }
+        created_at: { type: string, format: date-time }
+        last_seen_at: { type: string, format: date-time }
+        revoked_at: { type: string, format: date-time }
+    DeviceList:
+      type: object
+      required: [devices]
+      properties:
+        devices:
+          type: array
+          items: { $ref: "#/components/schemas/Device" }
+    PairingCodeRequest:
+      type: object
+      required: [role]
+      properties:
+        role: { $ref: "#/components/schemas/Role" }
+        delegate_name: { type: string, maxLength: 80 }
+    PairingCode:
+      type: object
+      required: [code, role, expires_at, server_url]
+      properties:
+        code: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        delegate_name: { type: string }
+        expires_at: { type: string, format: date-time }
+        server_url: { type: string, description: The best address to pair with; the first of servers. }
+        servers:
+          type: array
+          items: { type: string }
+          description: Every address another device can reach this server at, best first (its public address, then its tailnet address, then its network ones). The pairing QR code carries them all.
+    SendMessageRequest:
+      type: object
+      required: [client_message_id, text]
+      properties:
+        client_message_id: { type: string, minLength: 1, maxLength: 64 }
+        thread_id: { type: string }
+        agent_id: { type: string, description: Start or continue the direct chat with this agent. }
+        group_id: { type: string, description: Start or continue this group's chat. }
+        text: { type: string, minLength: 1, maxLength: 8000 }
+    SendMessageResponse:
+      type: object
+      required: [trigger_id, thread_id, duplicate]
+      properties:
+        trigger_id: { type: string }
+        thread_id: { type: string }
+        duplicate: { type: boolean }
+    ThreadSummary:
+      type: object
+      required: [id, title, created_by, updated_at, unread, typing]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        created_by: { type: string }
+        updated_at: { type: string, format: date-time }
+        agent: { $ref: "#/components/schemas/AgentRef" }
+        group: { $ref: "#/components/schemas/Group" }
+        last: { $ref: "#/components/schemas/LastMessage" }
+        unread: { type: integer }
+        typing: { type: boolean, description: An agent is working on this chat right now. }
+        needs_you: { type: string, description: What waits on you here, if anything. }
+    LastMessage:
+      type: object
+      required: [from, text, at]
+      properties:
+        from: { type: string, description: "you, or the agent's name" }
+        text: { type: string }
+        at: { type: string, format: date-time }
+        seen: { type: boolean, description: For your own last message, an agent has read it. }
+    Group:
+      type: object
+      required: [id, name, members]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        members: { type: array, items: { $ref: "#/components/schemas/AgentRef" } }
+        thread_id: { type: string }
+    GroupList:
+      type: object
+      required: [groups]
+      properties:
+        groups: { type: array, items: { $ref: "#/components/schemas/Group" } }
+    GroupRequest:
+      type: object
+      required: [name, members]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 60 }
+        members: { type: array, minItems: 1, items: { type: string }, description: Agent ids. }
+    ThreadList:
+      type: object
+      required: [threads]
+      properties:
+        threads:
+          type: array
+          items: { $ref: "#/components/schemas/ThreadSummary" }
+    ThreadItem:
+      type: object
+      required: [kind, id, at]
+      properties:
+        kind: { type: string, enum: [message, decision, reply, action, card] }
+        id: { type: string }
+        at: { type: string, format: date-time }
+        from: { type: string }
+        agent: { $ref: "#/components/schemas/AgentRef" }
+        text: { type: string }
+        card: { $ref: "#/components/schemas/ChatCard" }
+        decision: { type: string }
+        reason: { type: string }
+        ticket_id: { type: string }
+        status: { type: string }
+        action: { type: string }
+        recipients: { type: string }
+        approval: { type: string }
+        last_error: { type: string }
+    TicketView:
+      type: object
+      required: [id, scope, open, stage, stopped]
+      properties:
+        id: { type: string }
+        scope: { type: string }
+        open: { type: boolean }
+        stage: { type: string }
+        stopped: { type: boolean }
+        spent_usd: { type: number, format: double }
+        choices: { type: array, items: { type: string }, description: "While the task asks a question, answers the person can tap. Tapping one sends it as the person's reply." }
+        agent: { $ref: "#/components/schemas/AgentRef" }
+    ChatCard:
+      type: object
+      required: [kind, title, subtitle]
+      properties:
+        kind: { type: string, enum: [job, rule, setting, email, event, connect, pr, link] }
+        title: { type: string }
+        subtitle: { type: string }
+        link: { type: string, description: "Where tapping goes: plans, app:<id>, a URL, or empty." }
+        action: { type: string, description: "A button, such as Connect; empty for none." }
+    ThreadDetail:
+      type: object
+      required: [id, created_by, items, tickets]
+      properties:
+        id: { type: string }
+        created_by: { type: string }
+        agent: { $ref: "#/components/schemas/AgentRef" }
+        group: { $ref: "#/components/schemas/Group" }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ThreadItem" }
+        tickets:
+          type: array
+          items: { $ref: "#/components/schemas/TicketView" }
+    AcceptMode:
+      type: string
+      enum: [off, observe, auto]
+    DelegatePolicy:
+      type: object
+      required: [name, toolsets]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        toolsets: { type: array, items: { type: string } }
+        agents: { type: array, items: { type: string }, description: "Ids of the agents the delegate's requests may go to; none means only the General agent. Left out on update, it stays as it was." }
+    RulePolicy:
+      type: object
+      required: [name, text, enabled]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 60 }
+        text: { type: string, minLength: 1, maxLength: 1000 }
+        enabled: { type: boolean }
+        agents: { type: array, items: { type: string }, description: "Ids of the agents work under this rule may go to; none means only the General agent. Left out on update, it stays as it was." }
+    PolicyUpdate:
+      type: object
+      required: [mode, toolsets, delegates, rules]
+      properties:
+        mode: { $ref: "#/components/schemas/AcceptMode" }
+        toolsets: { type: array, items: { type: string } }
+        delegates: { type: array, items: { $ref: "#/components/schemas/DelegatePolicy" } }
+        rules: { type: array, items: { $ref: "#/components/schemas/RulePolicy" } }
+        limits: { $ref: "#/components/schemas/Limits" }
+    PolicyView:
+      type: object
+      required: [version, mode, toolsets, delegates, rules]
+      properties:
+        version: { type: integer }
+        mode: { $ref: "#/components/schemas/AcceptMode" }
+        toolsets: { type: array, items: { type: string } }
+        delegates: { type: array, items: { $ref: "#/components/schemas/DelegatePolicy" } }
+        rules: { type: array, items: { $ref: "#/components/schemas/RulePolicy" } }
+        limits: { $ref: "#/components/schemas/Limits" }
+    Limits:
+      type: object
+      description: Caps on spending and sending. Omitted fields keep their defaults.
+      properties:
+        monthly_budget_usd: { type: number, format: double, minimum: 0.01, maximum: 100000 }
+        sends_per_hour: { type: integer, minimum: 1, maximum: 1000 }
+        sends_per_day: { type: integer, minimum: 1, maximum: 10000 }
+        digest_hour: { type: integer, minimum: 0, maximum: 23 }
+        timezone: { type: string, maxLength: 64 }
+    Approval:
+      type: object
+      required: [id, thread_id, source, action, reach, body, status, created_at, findings]
+      properties:
+        id: { type: string }
+        ticket_id: { type: string }
+        thread_id: { type: string }
+        scope: { type: string }
+        requested_by: { type: string }
+        source: { type: string }
+        action: { type: string }
+        reach: { type: string }
+        recipients: { type: array, items: { type: string } }
+        links: { type: array, items: { type: string } }
+        dates: { type: array, items: { type: string } }
+        amounts: { type: array, items: { type: string } }
+        body: { type: string }
+        subject: { type: string, description: "An email's subject line, when the action is an email." }
+        findings:
+          type: array
+          description: Details that appear in no trusted source, which is why approval is needed.
+          items: { type: string }
+        status: { type: string }
+        approval: { type: string }
+        created_at: { type: string, format: date-time }
+    ApprovalList:
+      type: object
+      required: [approvals]
+      properties:
+        approvals:
+          type: array
+          items: { $ref: "#/components/schemas/Approval" }
+    ApprovalDecision:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approve, reject] }
+        note: { type: string, maxLength: 2000 }
+        user_verified:
+          type: boolean
+          description: |
+            The app confirmed the person with Face ID, Touch ID or a
+            fingerprint just before sending. Approving an action that
+            reaches other people or can't be undone needs it.
+    StandingApproval:
+      type: object
+      required: [name, source, action, people]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        source: { type: string }
+        action: { type: string, minLength: 1, maxLength: 60 }
+        people:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { type: string, minLength: 1, maxLength: 200 }
+    StandingApprovalList:
+      type: object
+      required: [version, standing_approvals]
+      properties:
+        version: { type: integer }
+        standing_approvals:
+          type: array
+          items: { $ref: "#/components/schemas/StandingApproval" }
+    Digest:
+      type: object
+      required: [id, body, count, created_at]
+      properties:
+        id: { type: string }
+        body: { type: string }
+        count: { type: integer }
+        created_at: { type: string, format: date-time }
+    DigestList:
+      type: object
+      required: [digests]
+      properties:
+        digests:
+          type: array
+          items: { $ref: "#/components/schemas/Digest" }
+    TicketSpend:
+      type: object
+      required: [ticket_id, scope, spent_usd]
+      properties:
+        ticket_id: { type: string }
+        scope: { type: string }
+        spent_usd: { type: number, format: double }
+    UsageView:
+      type: object
+      required: [spent_usd, budget_usd, since, tickets]
+      properties:
+        spent_usd: { type: number, format: double }
+        budget_usd: { type: number, format: double }
+        since: { type: string, format: date-time }
+        tickets:
+          type: array
+          items: { $ref: "#/components/schemas/TicketSpend" }
+    AttentionItem:
+      type: object
+      required: [id, kind, thread_id, text, at, dismissable]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [approval, question, failure] }
+        thread_id: { type: string }
+        ticket_id: { type: string }
+        approval_id: { type: string }
+        text: { type: string }
+        at: { type: string, format: date-time }
+        dismissable: { type: boolean }
+        scope: { type: string, description: "The task's summary, when the item belongs to one." }
+        action: { type: string, description: For approvals, the kind of action, such as send_email. }
+        recipients: { type: array, items: { type: string }, description: For approvals, who the action reaches. }
+        reach: { type: string, description: For approvals, how far the action reaches. }
+        choices: { type: array, items: { type: string }, description: "For questions, answers the person can tap. Tapping one sends it as the person's reply." }
+    AttentionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AttentionItem" }
+    NotifySettings:
+      type: object
+      required: [enabled, server_url, topic, quiet_start, quiet_end, per_hour, has_token]
+      properties:
+        enabled: { type: boolean }
+        server_url: { type: string }
+        topic: { type: string }
+        quiet_start: { type: integer }
+        quiet_end: { type: integer }
+        per_hour: { type: integer }
+        has_token: { type: boolean }
+    NotifyUpdate:
+      type: object
+      required: [enabled, server_url, topic, quiet_start, quiet_end, per_hour]
+      properties:
+        enabled: { type: boolean }
+        server_url: { type: string, maxLength: 200 }
+        topic: { type: string, maxLength: 64 }
+        quiet_start: { type: integer, minimum: 0, maximum: 23 }
+        quiet_end: { type: integer, minimum: 0, maximum: 23 }
+        per_hour: { type: integer, minimum: 1, maximum: 60 }
+        token:
+          type: string
+          maxLength: 200
+          description: A new access token. Omit to keep the saved one; send an empty string to remove it.
+    Account:
+      type: object
+      required: [provider, email, assistant_address, status, can_send, connected_at]
+      properties:
+        provider: { type: string }
+        email: { type: string }
+        assistant_address: { type: string }
+        status: { type: string, enum: [connected, broken] }
+        status_error: { type: string }
+        can_send: { type: boolean, description: Sending mail and changing the calendar were allowed. }
+        connected_at: { type: string, format: date-time }
+        checked_at: { type: string, format: date-time }
+    AccountList:
+      type: object
+      required: [accounts, google_client_set, google_redirect_url]
+      properties:
+        accounts:
+          type: array
+          items: { $ref: "#/components/schemas/Account" }
+        google_client_set: { type: boolean }
+        google_redirect_url: { type: string }
+    GoogleClient:
+      type: object
+      required: [client_id, client_secret]
+      properties:
+        client_id: { type: string, maxLength: 200 }
+        client_secret: { type: string, maxLength: 200 }
+    GoogleConnect:
+      type: object
+      required: [allow_sending]
+      properties:
+        allow_sending: { type: boolean }
+        address_tag: { type: string, maxLength: 32, description: "The tag in the Assistant's address, you+TAG@gmail.com. Default: assistant." }
+    GoogleConnectStart:
+      type: object
+      required: [auth_url, redirect_url]
+      properties:
+        auth_url: { type: string }
+        redirect_url: { type: string }
+    GoogleConnectFinish:
+      type: object
+      required: [redirect_url]
+      properties:
+        redirect_url: { type: string, maxLength: 4000, description: The full address the browser ended on after signing in. }
+    Schedule:
+      type: object
+      required: [id, name, note, days, time, enabled, created_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        note: { type: string }
+        days: { type: string, description: "Days such as mon,tue; empty for every day." }
+        time: { type: string, description: Local time, HH:MM. }
+        enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+        last_run_at: { type: string, format: date-time }
+    ScheduleList:
+      type: object
+      required: [schedules, timezone]
+      properties:
+        schedules:
+          type: array
+          items: { $ref: "#/components/schemas/Schedule" }
+        timezone: { type: string }
+    ScheduleRequest:
+      type: object
+      required: [name, note, time]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 60 }
+        note: { type: string, minLength: 1, maxLength: 1000 }
+        days: { type: string, maxLength: 60, description: "mon,tue,…, or weekdays; empty for every day." }
+        time: { type: string, description: Local time, HH:MM. }
+    McpServerList:
+      type: object
+      required: [servers, to_review]
+      properties:
+        servers:
+          type: array
+          items: { $ref: "#/components/schemas/McpServer" }
+        to_review: { type: integer, description: Tools across all servers waiting for the owner's review. }
+    McpServer:
+      type: object
+      required: [name, toolset, purpose, transport, trusted, enabled, has_secrets, to_review, tools, created_at]
+      properties:
+        name: { type: string }
+        toolset: { type: string, description: "The toolset a rule or request grants, mcp:NAME." }
+        purpose: { type: string }
+        transport: { type: string, enum: [stdio, http] }
+        command: { type: array, items: { type: string } }
+        url: { type: string }
+        trusted: { type: boolean, description: Results reach the worker without quarantine. }
+        enabled: { type: boolean, description: Tasks may use the server. }
+        has_secrets: { type: boolean }
+        to_review: { type: integer }
+        checked_at: { type: string, format: date-time }
+        status_error: { type: string }
+        created_at: { type: string, format: date-time }
+        tools:
+          type: array
+          items: { $ref: "#/components/schemas/McpTool" }
+    McpTool:
+      type: object
+      required: [name, title, description, mode, needs_review, changed, read_only_hint, destructive_hint]
+      properties:
+        name: { type: string }
+        title: { type: string }
+        description: { type: string, description: What the server says the tool does, shortened. It goes into the model's prompt. }
+        mode: { type: string, enum: [unreviewed, read, outward, blocked] }
+        reach: { type: string, enum: [owner, others, irreversible] }
+        needs_review: { type: boolean }
+        changed: { type: boolean, description: The server changed the tool since the owner reviewed it. }
+        read_only_hint: { type: boolean, description: The server's own claim; not trusted. }
+        destructive_hint: { type: boolean, description: The server's own claim; not trusted. }
+    McpServerRequest:
+      type: object
+      required: [name, transport]
+      properties:
+        name: { type: string, pattern: "^[a-z][a-z0-9_]{0,23}$" }
+        purpose: { type: string, maxLength: 300 }
+        transport: { type: string, enum: [stdio, http] }
+        command: { type: array, maxItems: 40, items: { type: string, maxLength: 1000 } }
+        url: { type: string, maxLength: 2000 }
+        env: { type: object, additionalProperties: { type: string, maxLength: 4000 }, description: Variables for a stdio server, kept in the vault. }
+        token: { type: string, maxLength: 4000, description: Bearer token for an http server, kept in the vault. }
+        trusted: { type: boolean }
+    McpServerUpdate:
+      type: object
+      properties:
+        purpose: { type: string, maxLength: 300 }
+        trusted: { type: boolean }
+        enabled: { type: boolean }
+    McpToolReview:
+      type: object
+      required: [mode]
+      properties:
+        mode: { type: string, enum: [read, outward, blocked] }
+        reach: { type: string, enum: [owner, others, irreversible], description: Required for outward. }
+    ModelList:
+      type: object
+      required: [roles]
+      properties:
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/ModelRole" }
+    ModelRole:
+      type: object
+      required: [role, provider, model, has_key, local, is_default]
+      properties:
+        role: { type: string, enum: [router, reader, worker] }
+        provider: { type: string, enum: [gemini, anthropic, openai, claude_code] }
+        model: { type: string }
+        base_url: { type: string, description: An OpenAI-compatible endpoint's address. }
+        has_key: { type: boolean }
+        local: { type: boolean, description: The endpoint is on this machine or the owner's network, so calls cost nothing. }
+        is_default: { type: boolean, description: The owner hasn't chosen; the server's configured Gemini model is used. }
+        price_in: { type: number, format: double, description: Dollars per million input tokens, as the owner set it. }
+        price_out: { type: number, format: double, description: Dollars per million output tokens, as the owner set it. }
+    ModelRoleUpdate:
+      type: object
+      required: [provider, model]
+      properties:
+        provider: { type: string, enum: [gemini, anthropic, openai, claude_code] }
+        model: { type: string, minLength: 1, maxLength: 200 }
+        base_url: { type: string, maxLength: 2000, description: Required for openai, such as https://api.deepseek.com or http://localhost:11434/v1. }
+        key: { type: string, maxLength: 4000 }
+        price_in: { type: number, format: double, minimum: 0 }
+        price_out: { type: number, format: double, minimum: 0 }
+    AgentRef:
+      type: object
+      required: [id, name, color, badge]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        color: { type: string }
+        badge: { type: string }
+        presence: { $ref: "#/components/schemas/Presence" }
+    Presence:
+      type: string
+      enum: [available, busy, unavailable]
+      description: Whether the agent's machine is up, and whether it is working.
+    AgentList:
+      type: object
+      required: [agents]
+      properties:
+        agents:
+          type: array
+          items: { $ref: "#/components/schemas/Agent" }
+    AgentTask:
+      type: object
+      required: [ticket_id, thread_id, scope]
+      properties:
+        ticket_id: { type: string }
+        thread_id: { type: string }
+        scope: { type: string }
+    Agent:
+      type: object
+      required: [id, name, purpose, instructions, toolsets, any_toolset, skills, capacity, color, badge, builtin, enabled, delegates, rules, working, waiting]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        purpose: { type: string }
+        instructions: { type: string }
+        toolsets: { type: array, items: { type: string } }
+        any_toolset: { type: boolean, description: Uses whatever toolsets a task grants. }
+        skills: { type: array, items: { type: string } }
+        provider: { type: string, description: The agent's own model; left out, it uses the worker's. }
+        model: { type: string }
+        base_url: { type: string }
+        capacity: { type: integer }
+        color: { type: string, enum: [violet, peach, mint, sky, rose, sun] }
+        badge: { type: string, enum: [star, book, pen, mail, calendar, code, search, bolt] }
+        builtin: { type: boolean }
+        enabled: { type: boolean }
+        delegates: { type: array, items: { type: string }, description: Delegates whose requests may go to it. Your own requests may go to any agent. }
+        rules: { type: array, items: { type: string }, description: Rules whose proactive work may go to it. }
+        working:
+          type: array
+          items: { $ref: "#/components/schemas/AgentTask" }
+        waiting: { type: integer, description: Tasks with new messages waiting for it. }
+        presence: { $ref: "#/components/schemas/Presence" }
+        home: { type: string, description: The machine that runs it, when that isn't this one. Such an agent is read-only here. }
+        unavailable_since: { type: string, format: date-time, description: When its machine was last heard from, while unavailable. }
+    Machine:
+      type: object
+      required: [id, name, self, online, agents]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        address: { type: string, description: Where its link listens; left out when it only dials out. }
+        self: { type: boolean, description: This machine. }
+        online: { type: boolean }
+        last_seen: { type: string, format: date-time }
+        agents: { type: integer }
+    MachineList:
+      type: object
+      required: [machines]
+      properties:
+        machines:
+          type: array
+          items: { $ref: "#/components/schemas/Machine" }
+    MachineCode:
+      type: object
+      required: [code, expires_at]
+      properties:
+        code: { type: string, description: Type this on the other machine, with this machine's address. }
+        address: { type: string, description: This machine's link address, when it has one. }
+        expires_at: { type: string, format: date-time }
+    JoinMachineRequest:
+      type: object
+      required: [address, code]
+      properties:
+        address: { type: string, minLength: 1, maxLength: 300 }
+        code: { type: string, minLength: 1, maxLength: 20 }
+    AgentRequest:
+      type: object
+      required: [name, purpose, toolsets, skills, capacity, color, badge, enabled]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 40 }
+        purpose: { type: string, maxLength: 300 }
+        instructions: { type: string, maxLength: 4000 }
+        toolsets: { type: array, items: { type: string } }
+        any_toolset: { type: boolean }
+        skills: { type: array, items: { type: string } }
+        provider: { type: string, enum: [gemini, anthropic, openai, claude_code] }
+        model: { type: string, maxLength: 200 }
+        base_url: { type: string, maxLength: 2000 }
+        key: { type: string, maxLength: 4000 }
+        capacity: { type: integer, minimum: 1, maximum: 5 }
+        color: { type: string, enum: [violet, peach, mint, sky, rose, sun] }
+        badge: { type: string, enum: [star, book, pen, mail, calendar, code, search, bolt] }
+        enabled: { type: boolean }
+        delegates: { type: array, items: { type: string } }
+        rules: { type: array, items: { type: string } }
+    SkillList:
+      type: object
+      required: [skills]
+      properties:
+        skills:
+          type: array
+          items: { $ref: "#/components/schemas/Skill" }
+    Skill:
+      type: object
+      required: [name, description, has_scripts, files, used_by]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        has_scripts: { type: boolean, description: Its scripts are shown to agents as text; they never run outside the container sandbox. }
+        files: { type: integer }
+        used_by: { type: array, items: { type: string }, description: Names of the agents that have it. }
+    SkillRequest:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, maxLength: 262144, description: "The whole SKILL.md, with frontmatter naming the skill and describing it." }
+    JobList:
+      type: object
+      required: [jobs, problems]
+      properties:
+        jobs:
+          type: array
+          items: { $ref: "#/components/schemas/Job" }
+        problems: { type: array, items: { type: string }, description: Files in the jobs folder that don't load, with why. }
+    Job:
+      type: object
+      required: [name, description, agent, rule, toolsets, schedule, trigger, steps, content]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        agent: { type: string, description: The id of the agent that owns it. }
+        rule: { type: string, description: The rule that lets it run. }
+        toolsets: { type: array, items: { type: string } }
+        schedule: { type: string, description: "When it runs, such as weekdays 08:00; empty when it has no schedule." }
+        trigger: { type: string, description: "The tool it polls, such as linear/issues every 5m; empty when it has none." }
+        steps:
+          type: array
+          items: { $ref: "#/components/schemas/JobStep" }
+        content: { type: string, description: The whole file. }
+        last_run_at: { type: string, format: date-time }
+        planned_by: { type: string, description: The id of the agent that proposed this job; empty when you wrote it. }
+    JobStep:
+      type: object
+      required: [name, kind, detail]
+      properties:
+        name: { type: string }
+        kind: { type: string, enum: [model, ask, job, tool] }
+        detail: { type: string, description: "The instruction, question, job or tool, as fits the kind." }
+    JobRequest:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, maxLength: 262144, description: "The whole job file: YAML frontmatter, then what the job is for." }
+    AppList:
+      type: object
+      required: [apps]
+      properties:
+        apps: { type: array, items: { $ref: "#/components/schemas/App" } }
+    App:
+      type: object
+      required: [id, name, category, kind, mark, tint, connected, accounts, status, summary, new_tools, agents, toolset]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        category: { type: string, enum: [email, messaging, code, docs, other] }
+        kind: { type: string, enum: [google, mcp, local] }
+        toolset: { type: string, description: The toolset an agent needs to use this app, such as mail or mcp:github. }
+        mark: { type: string, description: One or two letters for the logo tile. }
+        tint: { type: string, enum: [violet, peach, mint, sky, rose, sun, ink] }
+        connected: { type: boolean }
+        accounts: { type: array, items: { type: string } }
+        status: { type: string, enum: [off, on, review, broken, found] }
+        summary: { type: string, description: "A short line under the name: the account, 'posts after your OK', 'On this Mac'." }
+        new_tools: { type: integer }
+        agents: { type: array, items: { $ref: "#/components/schemas/AgentRef" } }
+    AppDetail:
+      type: object
+      required: [app, tools, recent]
+      properties:
+        app: { $ref: "#/components/schemas/App" }
+        tools: { type: array, items: { $ref: "#/components/schemas/AppTool" } }
+        recent: { type: array, items: { $ref: "#/components/schemas/Recent" } }
+    AppTool:
+      type: object
+      required: [name, title, summary, mode, switchable]
+      properties:
+        name: { type: string }
+        title: { type: string }
+        summary: { type: string }
+        mode: { type: string, enum: [reads, after_ok, own, off], description: "reads: runs on its own; after_ok: waits for your approval; own: changes only your own data, on; off: never used." }
+        switchable: { type: boolean, description: May be set to own or off. }
+    AppToolUpdate:
+      type: object
+      required: [mode]
+      properties:
+        mode: { type: string, enum: [reads, after_ok, own, off] }
+    Recent:
+      type: object
+      required: [at, text]
+      properties:
+        at: { type: string, format: date-time }
+        text: { type: string }
+    ConnectRequest:
+      type: object
+      properties:
+        url: { type: string, description: An MCP server address, for an app not in the catalogue. }
+        token: { type: string, description: A token the server needs, when it asks for one. }
+    ConnectResult:
+      type: object
+      required: [app]
+      properties:
+        app: { $ref: "#/components/schemas/App" }
+        open_url: { type: string, description: Open this to sign in; the app connects when you come back. }
+        needs_token: { type: boolean, description: The server wants a token pasted. }
+        needs_client: { type: boolean, description: "Google only: the owner's own OAuth client isn't set yet; the app walks them through making one, then calls setGoogleClient and connects again." }
+        steps: { type: array, items: { type: string }, description: Short steps the person must take themselves, such as granting Full Disk Access, before connecting again. }
+    SkillCatalog:
+      type: object
+      required: [skills]
+      properties:
+        skills: { type: array, items: { $ref: "#/components/schemas/CatalogSkill" } }
+    CatalogSkill:
+      type: object
+      required: [source, name, description, installed]
+      properties:
+        source: { type: string, description: "owner/repo/path on GitHub." }
+        name: { type: string }
+        description: { type: string }
+        suggested_for: { type: string, description: The agent it suits, by name; empty for none. }
+        installed: { type: boolean }
+    AddSkillRequest:
+      type: object
+      required: [source]
+      properties:
+        source: { type: string, minLength: 1, maxLength: 300 }
+    BrainList:
+      type: object
+      required: [work, quick, chosen]
+      properties:
+        work: { type: array, items: { $ref: "#/components/schemas/Brain" } }
+        quick: { type: array, items: { $ref: "#/components/schemas/Brain" } }
+        chosen: { type: boolean, description: Both roles have a model that passed its test. }
+    Brain:
+      type: object
+      required: [id, name, detail, available, selected, needs_key, provider, model]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        detail: { type: string }
+        available: { type: boolean }
+        selected: { type: boolean }
+        needs_key: { type: boolean }
+        provider: { type: string, enum: [gemini, anthropic, openai, claude_code] }
+        model: { type: string }
+        base_url: { type: string }
+    RuleTemplate:
+      type: object
+      required: [name, text, added, available]
+      properties:
+        name: { type: string }
+        text: { type: string }
+        needs: { type: array, items: { type: string } }
+        schedule_days: { type: string }
+        schedule_time: { type: string }
+        added: { type: boolean }
+        available: { type: boolean, description: Everything it needs is connected. }
+    RuleTemplateList:
+      type: object
+      required: [templates, mode]
+      properties:
+        templates:
+          type: array
+          items: { $ref: "#/components/schemas/RuleTemplate" }
+        mode: { $ref: "#/components/schemas/AcceptMode" }

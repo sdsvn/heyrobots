@@ -1,0 +1,22 @@
+package main
+
+import (
+	"net/netip"
+	"slices"
+	"testing"
+)
+
+func TestPairingAddressesPutTheTailnetFirst(t *testing.T) {
+	listen := withTailnet([]string{"127.0.0.1:7340", "192.168.1.110:7340"}, []netip.Addr{netip.MustParseAddr("100.101.102.103")})
+	got := reachable("", listen, "http")
+	want := []string{"http://100.101.102.103:7340", "http://192.168.1.110:7340"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("reachable = %v, want %v", got, want)
+	}
+	if got := reachable("https://me.example", []string{"127.0.0.1:7340"}, "http"); !slices.Equal(got, []string{"https://me.example"}) {
+		t.Fatalf("with a server URL = %v", got)
+	}
+	if got := reachable("", []string{"127.0.0.1:7340"}, "http"); len(got) != 0 {
+		t.Fatalf("loopback only = %v, want none", got)
+	}
+}

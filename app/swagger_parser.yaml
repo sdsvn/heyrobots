@@ -1,0 +1,10 @@
+# Generates the API client from the server's OpenAPI file. Run:
+#   dart run swagger_parser
+swagger_parser:
+  schema_path: ../api/openapi.yaml
+  output_directory: lib/api/gen
+  generation:
+    root_api_class_name: HeyrobotsApi
+    http_client: http
+    serializer: plain
+    unknown_enum_values: preserve

@@ -1,0 +1,13 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    # Generated from api/openapi.yaml by swagger_parser.
+    - lib/api/gen/**
+    - linux/**

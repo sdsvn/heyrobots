@@ -1,0 +1,122 @@
+{
+  "doc": {
+    "slug": "index.markdown",
+    "title": "Make several heyrobots servers act as one team",
+    "version": 1,
+    "markdown": "---\nco-review: design\n---\n# Make several heyrobots servers act as one team\n\n## Context\nToday one heyrobotsd is the whole assistant: its agents, its lead agent (the router), its store and its phone pairing. The owner wants several of them, on a home Mac, an office box or a cloud machine, and wants them to feel like one team. Agents from every machine sit in the same chats. The app shows them all the same way; the only visible difference is whether an agent's machine is up. Every server keeps its own lead agent and still works alone. This replaces the cloud draft's split into a cloud cell and a Mac runner: a cloud server is one more member, not a different kind of thing.\n\nThe hard part is agreement. When two servers see the same message, which lead picks who answers? When the Mac is closed, who still knows what the chat said? A personal cluster is often two machines with one of them asleep, so anything that needs a majority stops working exactly when it matters. The design picks the weakest agreement that is still correct for each kind of decision. The work lives in a new package, `internal/cluster`, and a new table of chat events in each server's store.\n\n## Design\n- Servers join one cluster by pairing, the way a phone pairs today\n  - the owner shows a code on one server and types it on another; both keep each other's public key and address\n    - each server makes a key pair at first start; links between members use those keys both ways, never a shared password\n    - the phone pairs once with any member and learns the others from the member list, so one pairing reaches every server\n    - the phone is only a window onto the members; it runs no agents of its own\n  - members only dial out: to each other directly when one is reachable (the LAN, a cloud server's public address), else through a relay that any always-on member offers\n  - what can go wrong: a stolen server → the owner removes it from any other member\n    - the removal spreads like any other change; a member that was off learns it on reconnect and is refused from then on\n- The app shows one team, whatever machine an agent runs on\n  - each agent has one home server, the only one that runs it and holds its memory, jobs, skills and tools\n    - the other members keep a read-only card: name, avatar, what it's good at, home, last seen\n  - the Team tab and chat member lists show every agent from every member; the only difference on a card is presence: available, busy, or unavailable since a time\n  - presence comes from heartbeats: each member tells its links it's alive every few seconds\n    - it also passes on what it heard about the others; clusters are small, so everyone simply hears everyone\n    - a member silent for 15 seconds is unreachable, and its agents show unavailable; nothing else changes\n  - what can go wrong: a network split shows each side the other side's agents as unavailable; each side keeps working with its own agents, and they merge when the link returns\n- A chat is a log every member keeps a full copy of\n  - each message, card, approval answer and task status is an event, written once by the member where it happened\n    - it carries that member's id, a sequence number per member, and a hybrid logical clock: wall time plus a counter, so order survives clocks that drift\n  - on every reconnect members swap what the other is missing (\"I have up to 812 from you\"); events are never changed after they're written, so every copy ends up the same\n  - every member shows events in the same order: by clock, then by member id\n  - the phone reads from whichever member it reaches first, and sees everything that member has\n  - what can go wrong: an event arrives late and sorts above messages already shown → the app puts it in its place with an \"arrived late\" mark\n    - a long chat's log grows on every member → old events fold into a summary, as agent sessions already do\n- Exactly one lead decides who answers each message, without a vote\n  - a message is routed by the reachable member whose copy of the chat is newest, since its lead sees the most context\n    - heartbeats carry how far each member's copy of each chat has got, so every member can tell who that is; a tie goes to the lower member id\n    - that member's lead posts a \"routed to\" event, as the router does today\n    - an @mention needs no lead: the mentioned agent's home picks the message straight from the log\n  - when that member doesn't claim the message within a few seconds, the next newest one routes it and says so in the log\n    - if two members route the same message, every member keeps the claim that sorts first\n    - an agent starts only after its claim has sat in the log for those few seconds, so the losing agent stands down before it acts\n  - what can go wrong: during a split both sides route the same message → each side's agent answers on its own side\n    - after the merge the chat shows both answers, the later one marked as a duplicate; outward actions can't double, because of the next step\n- A task belongs to one server, so actions never need agreement\n  - the agent's home runs the task and holds its lease, its Mandate check and its outbox, exactly as today; no other member can run that agent, even with its card\n  - asking an agent on another machine is an assignment event in the log, and the answer comes back the same way: Release 4's agent-to-agent messages, carried across machines\n  - an approval is signed by the owner's device and reaches the effect's home through any member\n  - the owner's own memory notes live on one member the owner picks (the always-on one by default); the others read them over the link as a tool\n  - what can go wrong: the home is off → the task waits with \"this agent is unavailable\", and the owner can hand it to an available agent with one tap\n- Each server's lead can think with the owner's own ACP agent, so a machine needs no API key\n  - when \"Your agent\" (omp, Claude Code or another ACP agent) is chosen for the quick calls, the lead routes by asking it in a throwaway session\n    - it answers with the same routing calls as JSON, and they pass the same checks as tool calls\n  - what can go wrong: the agent answers in prose → the message fails routing and is retried, as when a model call fails; reading outside content in quarantine still needs a model\n- Settings that must match everywhere change rarely, so the owner decides them\n  - the member list and the cluster-wide rules (spending caps, outward rules) are versioned documents\n    - a change is signed by the owner's device, every member applies it on receipt, and the higher version wins\n  - there is no quorum: the owner is the authority, and two members that disagree about a rule only means one hasn't heard yet\n\n- Other people join a chat by invite, with their own agents\n  - the owner invites a person to one chat; they accept on their own phone, and their servers start receiving that chat's log and nothing else\n    - the invited person and their agents show in the chat like anyone else, with the same presence states\n  - guest servers route only messages that @mention one of their agents; the owner's servers route everything else\n  - a guest's agents act only through their own home's outbox and Mandate, under the guest's rules, never the owner's\n  - what can go wrong: a guest's server sends events about someone else's agent → events are signed by their home server and anything signed by a server outside that chat's members is dropped\n    - the owner removes a guest → their servers stop receiving new events; what they already copied stays with them, and the invite screen says so\n\n## Alternatives\n- Raft or Paxos across the cluster: every decision would need a majority. With two members, the Mac and the cloud, the majority is both, so closing the laptop would stop the cloud from answering; a third machine would exist only to vote. It buys strict agreement on everything, and the only decision that needs it is who routes, which the newest-copy rule plus a short claim window already covers.\n- One leader for the whole cluster, the always-on member: the simplest, but the Mac alone stops working when the internet drops, and it breaks \"every server still works alone\".\n- CRDTs for everything (Automerge-style documents): the chat log is already the simplest CRDT, a grow-only set in clock order; extending that to settings and memory adds a library for data that rarely changes and has one person who can decide.\n- Matrix-style event graphs with state resolution: the closest existing model, built for servers that don't trust each other. Ours share an owner, so owner-signed settings replace state resolution. It becomes the right tool if two different people's clusters ever share a chat.\n- Byzantine fault-tolerant protocols (PBFT, Tendermint): they guard against members that lie. All members are the owner's; a compromised one is removed, not outvoted.\n- Total-order broadcast: every member sees the same order before anything shows. It costs a round trip per message and needs the members up, the same problem as Raft.\n\n## Behaviour\n- The laptop closes mid-chat: the cloud member routes the next message to one of its agents; the laptop's agents show unavailable and their tasks wait. The laptop opens: it pulls the events it missed, its agents show available, and waiting tasks carry on.\n- The home internet drops while the phone is on home wifi: the phone talks to the Mac, which routes once the cloud's claim doesn't arrive; the cloud keeps the chat for anyone else. When the link returns the logs merge, and any double answer is marked.\n\n## Open Questions\n- In the app, should the cluster have a name at all, or appear only as \"Your machines\" in Settings?\n"
+  },
+  "threads": [
+    {
+      "id": "t1",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Should another person's cluster be able to join one chat as guests, such as a fr",
+        "source": "Should another person's cluster be able to join one chat as guests, such as a friend's agents in a planning chat? It needs per-chat sharing, and it would bring the Matrix-style approach back."
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "16:41",
+          "body": "On invite yes , infact that would be a way to have others join in normal conversations as well. PEople can also join"
+        },
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "16:42",
+          "body": "Maybe not ?"
+        },
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "16:44",
+          "body": ".."
+        },
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "16:45",
+          "body": "there ?"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "16:47",
+          "body": "I read \"there?\" as \"keep it as a later step\". Guests from another person's servers stay out of the first build, and the question stays open here. If you meant they should be in the first build, say so and I'll add per-chat sharing to the design."
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "16:47",
+          "body": "Sorry, I missed your earlier replies. I've added a step for this: you invite a person to one chat, and their servers receive only that chat. Guest agents show like anyone else's and act only under the guest's own rules. Guest servers route only messages that @mention their agents. I'll build your own machines first and invites second."
+        }
+      ]
+    },
+    {
+      "id": "t2",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Should the first cut let the phone run agents, or only be a window onto the othe",
+        "source": "Should the first cut let the phone run agents, or only be a window onto the others?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "16:45",
+          "body": "only window"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "16:47",
+          "body": "Done. The phone is now only a window onto the servers and runs no agents. I removed the phone-as-member scenario and this question."
+        }
+      ]
+    },
+    {
+      "id": "t3",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Which member should be a new chat's first steward: the always-on one, or the one",
+        "source": "Which member should be a new chat's first steward: the always-on one, or the one where the chat was started?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "16:46",
+          "body": "The one with latest update"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "16:47",
+          "body": "Done. There's no fixed steward any more. Each message is routed by the reachable server whose copy of the chat is newest, since its lead has the most context. Heartbeats say how far each copy has got, and a tie goes to the lower server id. If that server doesn't claim the message within a few seconds, the next newest one routes it."
+        }
+      ]
+    }
+  ],
+  "seq": 3,
+  "review": {
+    "decision": "approve",
+    "summary": "",
+    "submittedAt": "16:46",
+    "count": 1
+  }
+}

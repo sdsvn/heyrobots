@@ -1,0 +1,360 @@
+{
+  "doc": {
+    "slug": "index.markdown",
+    "title": "Let tasks use MCP, skills, other models and subscription agents, and stream them live",
+    "version": 1,
+    "markdown": "---\nco-review: design\n---\n# Let tasks use MCP, skills, other models and subscription agents, and stream them live\n\n## Context\n\nToday every task runs in the built-in ADK worker on Gemini, with a fixed set of toolsets (research, writing, mail, calendar). A rule or request grants toolsets in the task's Mandate. Calls to outward tools (sending mail, inviting people) are caught by name and become actions in the outbox that may need your approval. Outside content (web pages, mail) is read in quarantine. The app talks to the server over REST, and one event stream only says \"this thread changed\", after which the app reloads it.\n\nYou want tasks to use your MCP servers and skills, to run on other model providers, and to run in Claude Code, Codex or Gemini CLI under your own subscription. You also want the conversation to show Bit working live. All of this has to keep today's rule: nothing reaches other people without passing the outbox checks.\n\n## Design\n\n- Every tool a task can use goes through one tool gateway (new package `internal/gateway`), whichever worker runs the task\n  - It holds the tools the task's Mandate grants: the built-in toolsets, the MCP servers you added, and the control tools (report, ack, hand_back)\n  - It serves them two ways: as ADK tools for the built-in worker, and as an MCP endpoint for agents that run outside the server\n    - The MCP endpoint is per Assignment, with a token that only works for that task's granted tools and expires when the Assignment's lease ends\n    - A leaked token reaches only that task's tools, for minutes, and outward calls still wait in the outbox\n  - Every call takes the path the executor uses today: an outward call becomes an action in the outbox with reach, taint and approval checks, and outside content goes through quarantine\n  - The executor's outward-tool check and its proposal step move into the gateway unchanged, so the built-in worker behaves exactly as it does now\n\n- You can add MCP servers, and each one becomes a toolset a rule can grant (new table `mcp_servers`, owner-only endpoints, a Tools screen in the app)\n  - A server is a command the server starts (stdio) or an https address; its tokens live in the vault and never reach a task\n  - Each tool on a server is one of: read, outward (with the reach you pick: you only, other people, or can't be undone), or blocked\n    - A tool's own read-only hint can't be trusted, so a tool you haven't reviewed is off: agents don't see it, and the Tools screen shows a \"new tools to review\" badge\n    - Tool descriptions come from the server and go into the model's prompt, so they are capped in length, shown to you when you review the tool, and a changed description turns the tool off again until you review it\n  - Results from read tools go through quarantine: the gateway adds a \"question\" argument, and the worker gets the quarantined answer, as with web_fetch\n    - You can mark a server you control (say, your own Linear) as trusted; its results then reach the worker directly, still marked as outside content for the taint check\n  - An approved outward MCP call is run by a new outbox sender that calls the tool with the stored arguments\n    - MCP gives no idempotency, so a timeout marks the action \"may or may not have happened\", as with mail today\n  - The server is called `mcp:<name>`; an agent gets it only when its profile lists it\n  - A stdio server runs on your machine with your trust, like in any MCP client; heyrobots starts it, gives it only its own tokens, and stops it when idle\n\n- You have a standing team of agents that share the work: each is one persistent teammate with its own tools, MCP servers, skills and worker, not a copy started per task (new table `agents`, owner-only endpoints, an Agents screen in the app)\n  - An agent has a name and purpose (\"Researcher\", \"Coder\", \"Inbox helper\"), its instructions, its toolsets and MCP servers, its skills, and its worker: the built-in worker with a chosen model, or a registered ACP agent\n  - Work is handed to agents, not agents to work: each agent has one queue and works on one task at a time by default, with a capacity you can raise\n    - Each Assignment now names the agent doing it; an agent picks the next one from its queue when it's free, so a busy agent means waiting, never a second copy\n    - An ACP agent's capacity stays at one, since subscriptions have rate limits\n  - The router picks the lead agent for a task, the way it picks toolsets today: only from the agents the request's sender or matching rule may use, which code works out first\n    - Your own requests may use any agent; a delegate's request or a proactive rule may use only the agents that rule names\n    - The router sees each agent's name, purpose and how busy it is, never its tools or instructions, so it can't widen what a task can do\n  - Agents talk to each other and to the task's root through messages on the task, in the first version (gateway tools to message a teammate or the root)\n    - The root is the task's lead agent; above it sits the router, which still alone decides whether work is accepted, stopped or routed elsewhere\n    - An agent can ask a teammate for a piece of work, ask it a question, or send it a result; the message goes into the teammate's queue as input on the same task\n    - An agent can tell the root it is blocked, done with its part, or that the task needs a teammate it can't reach; the root decides what happens next, and only you can widen what the task may do\n    - Sending a message never waits: the sender's turn ends \"waiting\" and resumes when a reply arrives, like a follow-up today, so no agent ever blocks on another\n    - Messages stay on the task: they're stored with it, shown in the conversation as the team's side-talk, and traced, so you can see every exchange\n    - A task has a limit on messages between agents, so they can't pass work back and forth forever\n    - Every outward call still goes to the same outbox under the task, and all spending counts toward the task\n  - What an agent may do on a task is what both its own setup and the task's Mandate allow, so joining a task never adds powers the task wasn't given\n    - The Mandate fixes which agents may work on the task when it is accepted; editing an agent changes what it can reach on its next Assignment, but never beyond the Mandate\n  - An agent keeps its own memory between tasks, kept apart per person it works for\n    - What it learned on your tasks is used on your tasks only; a delegate's tasks get memory of that delegate's tasks only, so nothing leaks between people\n  - Every agent is easy to see in the app\n    - Each agent has its own color and a Bit wearing its own small badge, so you can tell at a glance who is working\n    - The Agents screen lists the team as cards: what each is for, its worker and model, what it can reach, and what it's doing now (\"working on Trip to Lisbon\", \"2 waiting\", \"idle\")\n    - Conversations, waiting items and the digest show which agents are on a task; each agent's avatar sits beside its messages\n    - Hand-offs show in the live stream as steps (\"Coder asked Researcher to check flights\"), using AG-UI's sub-agent events, with the teammate's tool calls under it\n    - What an agent can reach is shown as plain chips (\"Sends email · needs your approval\"), so the card doubles as a permission summary\n  - Today's setup becomes a team of one, a built-in \"General\" agent with today's toolsets, so existing rules keep working\n\n- You can keep a library of skills that tasks can use (a skills folder in the data directory, owner-only endpoints, a Skills section in the app)\n  - A skill is a folder with SKILL.md in the format Claude Code uses; you add one by putting it in the folder or uploading it from the app, never from a task\n  - A task sees only the skills its agent's profile lists\n  - The built-in worker loads them with ADK's skill toolset: names and descriptions in the prompt, the full text when the worker opens one\n  - Scripts in a skill run only in the container sandbox; without Docker or OrbStack, skills with scripts are unavailable\n  - A skill only gives instructions: it can't add tools, so what a task can do still comes from the Mandate\n\n- Each role can use a different model provider (router, quarantine reader, built-in worker; new model adapters next to the current Gemini one)\n  - Providers: Gemini (today), the Anthropic API, and any OpenAI-compatible endpoint (DeepSeek, OpenRouter, Ollama, LM Studio, vLLM)\n  - A coding harness reached over ACP (Claude Code, Codex, Gemini CLI) can be an agent's worker, but not the router's or the quarantine reader's model\n    - ACP runs a whole agent with its own tools and system prompt, not a single model call, so it can't give the router's strict structured decision, and starting a session per message is slow and eats subscription limits\n    - The quarantine reader must be a model with no tools, so a page that says \"run this command\" has nothing to run; a harness always has a shell\n    - So subscriptions power the agents that do the work, and the router and quarantine reader stay on a plain model API, which can be a cheap or local model\n    - This needs two new `model.LLM` adapters, one for the Anthropic Messages API and one for OpenAI-compatible chat completions; ADK Go only ships Gemini\n  - You pick provider, model and key per role in settings; keys live in the vault; a test call checks function calling and structured output before saving\n  - Prices extend the existing price table; a local model costs nothing and its endpoint may be on your own network, which only you can set\n  - Weaker models may handle tools badly; the router keeps its strict output checks, so a bad answer is refused, not acted on\n\n- A task can run in an agent you already pay for, over ACP (new worker backend in the executor, using an ACP client library)\n  - You register an agent once, with the command to start it; you install it and sign in yourself\n    - The first version supports Claude Code, Codex and Gemini CLI together, and any other agent that speaks ACP through the same generic path\n    - Each needs a small adapter for its quirks: where it reads skills, where its login lives, which API hosts it calls\n    - DeepSeek runs either as an API provider for the built-in worker, or as the model behind an ACP agent that can be pointed at DeepSeek's API\n  - An agent profile can name a registered ACP agent as its worker; the Mandate's snapshot fixes it for the task\n    - The router stays on an API model, because it runs on every message\n    - The agent never asks you anything directly: its permission requests are answered by heyrobots in code, and its questions reach you only through the report tool's one question\n  - The agent runs only in the container sandbox; without a container runtime, agent workers are off\n    - It sees the task's folder and nothing else; its network goes through the egress proxy, allowed only to its vendor's API hosts and the gateway\n    - It runs with its own settings folder inside the container, not your personal one, so your hooks, MCP servers and permissions don't apply\n    - Its login is mounted read-only (you've accepted this); anything it runs could read it, but the network allowlist only reaches the vendor and the gateway\n  - heyrobots is the ACP client: the session's working folder is the task folder, and its only MCP server is the gateway\n    - Allowed skills are copied read-only into the folder the agent reads (for Claude Code, `.claude/skills`)\n    - Permission requests are allowed for edits and commands inside the container, and refused for anything else\n    - The agent's own web tools hit the proxy's allowlist, so web reading goes through the gateway's quarantined tools\n  - The task ends when the agent calls the gateway's report tool; if the session ends without one, the host writes the failure report as it does today\n  - Stopping a task cancels the ACP session and removes the container\n  - Spending can't be measured, so these tasks have limits on time and turns instead of dollars, and the app shows \"on your subscription\"\n\n- The app keeps REST and its event stream, and gains a live stream per conversation in AG-UI's event shapes (new endpoint for a thread's live events)\n  - Events: a run started and finished per Assignment, Bit's text as it's written, tool calls by name with short arguments, the task's stage, and a custom event when a question or approval appears\n  - Built-in worker events come from the ADK runner; agent events come from ACP session updates; both map to the same events\n  - The stream is live only: on connect it sends a snapshot of the conversation, and history still comes from the existing thread endpoint\n  - Same access rules as the thread: device login, and delegates see only their own conversations\n  - Outward actions' bodies aren't streamed; the app shows \"proposed an email\", and the approval screen shows the details\n  - Approvals stay on their REST endpoint with the fingerprint flag, and answers stay ordinary messages; there's no AG-UI \"start a run\" endpoint\n  - The app decodes the few event types itself, rather than taking the community Dart SDK; web keeps reloading as today\n\n- Everything every agent does is traced with OpenTelemetry, using its GenAI conventions, so any standard tool can show it (new package `internal/telemetry`)\n  - ADK Go already emits spans in these conventions for agent runs, model calls and tool calls; heyrobots turns them on and adds its own around them\n    - One trace per task: intake, the router's decision, each Assignment with the agent's name, every gateway tool call, approval waits and outbox sends\n    - A hand-off is a span link from the asking agent's Assignment to the teammate's, so the trace shows who asked whom\n    - ACP agents run outside ADK, so their session updates (messages, tool calls, permission requests) become spans with the same names and attributes\n  - Attributes follow the conventions (agent name, model, tool name, token counts, finish reason) plus ours: task, Mandate, requester, reach, approval outcome, queued or sent\n  - Content is off by default: spans carry names, ids, counts, timings and outcomes, never message bodies, tool arguments or anything from the vault; you can turn content on for your own debugging\n  - Export is your choice over OTLP, to anything that reads it (Jaeger, Grafana Tempo, Langfuse, Phoenix); with nothing set, nothing leaves the machine\n  - The server also keeps a short local activity log built from the same spans, so the Agents screen can show what each agent did, hour by hour, without an outside tool\n  - The live stream and the activity log come from the same source, so what you watch live and what you look back at always agree\n\n- It ships in five releases, each one you can install and use on its own; every release adds its telemetry, so each is traceable from day one\n  - Release 1, MCP tools: the gateway (no change for today's tasks), MCP servers with the Tools screen and tool review, and OpenTelemetry tracing with OTLP export\n    - Try it: add an MCP server you use, review its tools, ask Bit for something that needs it, and see the trace in Jaeger or Langfuse\n  - Release 2, the team: agents with their own tools, MCP servers and skills, the skills library, per-agent queues, and the Agents screen; one agent per task\n    - Try it: set up a Researcher and an Inbox helper with different tools, and watch tasks go to the right one\n  - Release 3, models: Anthropic, DeepSeek and OpenAI-compatible providers, chosen per agent and per role\n    - Try it: run the router on a cheap or local model and an agent on Claude or DeepSeek, and compare cost in the app\n  - Release 4, working together and live: messages between agents and to the root, the live stream in AG-UI's shapes, and the activity log\n    - Try it: give a task that needs two agents, and watch them hand work back and forth in the conversation\n  - Release 5, subscriptions: the ACP worker for Claude Code, Codex and Gemini CLI, in the container sandbox\n    - Try it: make a Coder agent that runs on your Claude Code login and give it a small job in its folder\n  - Each release keeps the earlier ones working; migrations only add tables and columns, so going back a release leaves the data readable\n\n## Alternatives\n\n- AG-UI as the whole API: its runs always start from the client, so it can't describe tasks that start from mail or schedules and run while the app is closed. It also has nothing for pairing, settings or approvals, and its pause fields are still draft.\n- JSON-RPC between the app and the server: its real strength is that either side can call the other over one connection, which is why ACP and MCP use it. The server only ever needs to notify the app, which the event stream already does. We'd also lose what plain HTTP gives per path: status codes, safe retries, the auth guard and per-endpoint logs, and the spec that validates every request on the server. It would win only if the phone had to serve tools to agents (say, its location), which nothing here needs.\n- Giving ACP agents your MCP servers directly: simpler, but every outward call would skip the outbox and your approval.\n- Using a subscription's login as a model provider: generally not allowed by the vendors; ACP runs their own agent instead.\n- Running ACP agents on your machine without a container: they have their own shell, and only the container and proxy keep them inside the task.\n\n## Behaviour\n\n- **The server restarts during an agent task.** The container is removed with the session; the Assignment's lease expires and recovery starts it again with a note, as today. The old gateway token has expired.\n- **An MCP server is down.** Its tools return a failure the worker can report; if its tool list can't be read, the toolset is unavailable and the task reports itself blocked.\n- **An MCP server changes its tools.** New tools arrive off until you review them; removed tools disappear from tasks at their next Assignment.\n- **An agent ignores the gateway and tries the internet directly.** The proxy refuses it and logs the attempt.\n\n## Open Questions\n\n- Should a delegate's task ever run on your subscription, or only your own tasks?\n"
+  },
+  "threads": [
+    {
+      "id": "t1",
+      "target": "doc",
+      "anchor": {
+        "type": "text",
+        "exact": "Today every task runs in the built-in ADK worker on Gemini, with a fixed set of toolsets (research, writing, mail, calendar). A rule or request grants toolsets in the task's Mandate. Calls to outward tools (sending mail, inviting people) are caught by name and become actions in the outbox that may need your approval. Outside content (web pages, mail) is read in quarantine. The app talks to the server over REST, and one event stream only says \"this thread changed\", after which the app reloads it.\nYou want tasks to use your MCP servers and skills, to run on other model providers, and to run in Claude Code, Codex or Gemini CLI under your own subscription. You also want the conversation to show Bit working live. All of this has to keep today's rule: nothing reaches other people without passing the outbox checks.",
+        "prefix": "tion agents, and stream them liveContext",
+        "suffix": "\nDesign L1L2L3Every tool a task can use ",
+        "startOffsetHint": 92,
+        "endOffsetHint": 911
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "question",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "17:39",
+          "body": "What pricnples from https://github.com/deepseek-ai/dsh-superagent-prototype is followed here ?"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "17:39",
+          "body": "All of the prototype's rules in design.md still hold. This design adds no new authority path, and here is how each rule carries over:\n\n- **Code decides authority, never the model.** The gateway makes every check in code. You classify MCP tools as read, outward or blocked; the model never does. An ACP agent's permission requests are answered by heyrobots in code.\n- **Outside text is data.** MCP results and web reads go through quarantine. MCP tool descriptions are capped and reviewed by you. Only you can add skills, and a skill can't add tools.\n- **Transactional outbox.** An outward MCP call becomes an outbox action. A new sender runs it later, with \"may or may not have happened\" on a timeout.\n- **Immutable Mandate.** The worker choice, MCP toolsets and skills are fixed when the task is accepted. I added that line to the ACP step.\n- **A Ticket is not a session.** One ACP session is one Assignment, exactly like an ADK session today.\n- **Executors never ask people directly.** I added this explicitly too: an agent's prompts never reach you, only the report tool's one question does.\n- **Least attention.** Agent permission prompts never reach you. The live stream is something you open, not a push."
+        }
+      ]
+    },
+    {
+      "id": "t2",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "You can keep a library of skills that tasks can use (a skills folder in the data",
+        "source": "You can keep a library of skills that tasks can use (a skills folder in the data directory, owner-only endpoints, a Skills section in the app)"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "17:41",
+          "body": "There must be different sub agents and different agenrts have different skills, tools, MCP access"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "17:41",
+          "body": "Agreed, and I've added it as its own step, \"Each task runs as one of your agents\", placed before skills.\n\n- **Agent profiles.** You define agents such as Researcher, Coder or Inbox helper. Each has its own instructions, toolsets, MCP servers, skills and worker (built-in with a chosen model, or Claude Code and the like).\n- **The router picks the agent** the way it picks toolsets today: only from the agents code says the sender or rule may use. It sees names and purposes, never tools. The Mandate keeps a snapshot of the chosen profile.\n- **Sub-agents.** An agent can call another one through the gateway, but only with what both profiles allow. Its actions go through the same outbox and count toward the same task, and it can't call further sub-agents.\n- **Existing rules keep working.** Today's toolset-only rules become one built-in \"General\" agent.\n\nSkills and MCP access now come from the profile instead of the rule. I also added an open question: do you want sub-agents in the first version, or after?"
+        },
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "17:41",
+          "body": "Each agent must be easily visible in UI as well"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "17:41",
+          "body": "Added under the agents step as \"Every agent is easy to see in the app\".\n\n- **Its own look.** Each agent has a color and a Bit with its own badge.\n- **An Agents screen.** One card per agent shows what it's for, its worker and model, what it can reach and its tasks right now. The \"can reach\" chips, such as \"Sends email · needs your approval\", double as a permission summary.\n- **Shown wherever tasks appear.** The agent is named on conversations, waiting items, the digest and a task's header, and its avatar sits beside its messages.\n- **Sub-agents show as nested steps** in the live stream, using AG-UI's sub-agent events.\n\nOnce you approve, I'd mock the Agents screen in the design canvas before building it."
+        },
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "17:42",
+          "body": "Does not mean we add one agent per task , we add a set of agents and they share and do tasks . We don't normally spawn a different instance of an agent ."
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "17:43",
+          "body": "You're right, and I've rewritten the step around a standing team. Agents are persistent teammates, not copies started per task.\n\n- **One queue per agent.** Each agent works on one task at a time by default, with a capacity you can raise; ACP agents stay at one. A busy agent means the task waits, never a second copy.\n- **The router picks a lead agent** from the ones code allows, and can now see how busy each one is.\n- **Hand-offs instead of sub-agents.** An agent passes part of a task to a teammate, which lands in that teammate's queue. The asking agent's turn ends \"waiting\" and picks up again when the result arrives, the same way follow-ups work today, so no agent blocks on another. A per-task limit stops endless back-and-forth.\n- **Powers stay tied to the task.** On any task, an agent can do only what both its own setup and the task's Mandate allow.\n- **Memory between tasks, kept apart per person.** This is new because agents are persistent: what an agent learned on your tasks never shows up on a delegate's.\n- **The Agents screen** shows what each teammate is doing now (\"working on Trip to Lisbon\", \"2 waiting\", \"idle\")."
+        }
+      ]
+    },
+    {
+      "id": "t3",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Providers: Gemini (today), the Anthropic API, and any OpenAI-compatible endpoint",
+        "source": "Providers: Gemini (today), the Anthropic API, and any OpenAI-compatible endpoint (OpenRouter, Ollama, LM Studio, vLLM)"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "17:43",
+          "body": "See If I can use  ACP so I can use coding harnesses also to get agent models."
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "17:44",
+          "body": "Partly. A coding harness over ACP can be the model behind any agent that does the work, but it can't replace the two small models that read every message. I've added that as a line under providers.\n\n- **The router** needs one fast, strictly structured decision per incoming message. ACP runs a whole agent session with its own tools and system prompt, so it's slow, can't guarantee the structured output, and would eat your subscription's limits on every email.\n- **The quarantine reader** is safe only because its model has no tools, so a web page saying \"run this\" has nothing to run. Every harness has a shell.\n\nYour subscriptions would power the agents doing the real work. The router and reader stay on a plain API model, which can be a cheap one like flash-lite or a local Ollama model, so their cost stays tiny."
+        }
+      ]
+    },
+    {
+      "id": "t4",
+      "target": "doc",
+      "anchor": {
+        "type": "document"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "17:44",
+          "body": "It is important to have a well defined telemetry , preferably use something already existing or follow some conventioins so one can see exacly what each agent is doing and done"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "17:45",
+          "body": "Agreed. I've added a telemetry step built on OpenTelemetry and its GenAI conventions, the emerging standard for agent tracing. ADK Go v1.9.0 already emits spans in that format for agent runs, model calls and tool calls, so we turn those on and add ours around them.\n\n- **One trace per task:** intake, the router's decision, each agent's Assignment, every tool call, approval waits and sends. Hand-offs are span links, so you can see who asked whom.\n- **ACP agents are traced the same way.** Their session updates become spans with the same names.\n- **No content by default.** Spans carry names, counts, timings and outcomes, never bodies or secrets. You can turn content on for debugging.\n- **Export is up to you.** Send OTLP to Jaeger, Tempo, Langfuse or Phoenix. If you set nothing, nothing leaves the machine.\n- **The same data feeds the app.** It powers a per-agent activity log on the Agents screen and the live stream, so the live view and the history always agree."
+        }
+      ]
+    },
+    {
+      "id": "t5",
+      "target": "doc",
+      "anchor": {
+        "type": "text",
+        "exact": "JSON-RPC between the app and the server: it suits two programs in one live session, which is why ACP and MCP use it. Over mobile networks we'd rebuild reconnecting, and lose the clients generated from the API spec.",
+        "prefix": ", and its pause fields are still draft.\n",
+        "suffix": "\nGiving ACP agents your MCP servers dire",
+        "startOffsetHint": 13496,
+        "endOffsetHint": 13710
+      },
+      "status": "open",
+      "severity": "medium",
+      "labels": [],
+      "intent": "question",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "17:46",
+          "body": "Is this in anyway better than REST ? If so then we can use it as the clients generated from API spec is used only by our UI"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "17:46",
+          "body": "Not for us. JSON-RPC's real advantage is that either side can call the other over one connection. Our server only needs to notify the app, and the event stream already does that.\n\nThe API spec isn't only for the app's generated client. It also validates every request on the server, through oapi-codegen. Plain HTTP gives us status codes, safe retries, the auth guard and per-endpoint logs (approvals especially), and JSON-RPC puts everything behind one endpoint. Switching would mean rewriting about 40 endpoints for no gain.\n\nIt would start to make sense if the phone had to serve tools to agents, say its location or an on-device check during a task. I've reworded the alternative to say exactly that."
+        }
+      ]
+    },
+    {
+      "id": "t6",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Should new MCP tools need approval each time until you review them, or be off un",
+        "source": "Should new MCP tools need approval each time until you review them, or be off until you review them?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "17:48",
+          "body": "explain the question please ?"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "17:48",
+          "body": "When you add an MCP server, or it later gains a tool, heyrobots can't know what that tool does. Its read-only label is set by whoever wrote the server, so it can't be trusted. Until you mark the tool as read, outward or blocked in the Tools screen, there are two safe defaults:\n\n- **Approval every time.** Agents can use the tool right away, but each call waits for your approval, with the arguments shown. It works immediately, but a chatty tool such as \"search issues\" may ask you often.\n- **Off until reviewed.** Agents can't see the tool at all until you classify it. Nothing interrupts you, but a new server does nothing until you've gone through its list.\n\nMy pick is **off until reviewed**, with the Tools screen showing a \"3 new tools to review\" badge. It fits \"least attention\": you sort tools once, instead of being asked again and again."
+        },
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "17:58",
+          "body": "off is good"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "17:58",
+          "body": "Done. Tools you haven't reviewed are now off: agents don't see them, and the Tools screen shows a \"new tools to review\" badge. A changed description also turns a tool off again until you've looked at it. I updated the MCP step and the Behaviour section, and removed the open question."
+        }
+      ]
+    },
+    {
+      "id": "t7",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Is mounting an agent's subscription login read-only into its container acceptabl",
+        "source": "Is mounting an agent's subscription login read-only into its container acceptable to you?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "17:58",
+          "body": "yes"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "17:58",
+          "body": "Noted. The ACP step now records that the login is mounted read-only, with your OK, and I've removed the open question."
+        }
+      ]
+    },
+    {
+      "id": "t8",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Which agent should come first: Claude Code only, or Claude Code, Codex and Gemin",
+        "source": "Which agent should come first: Claude Code only, or Claude Code, Codex and Gemini CLI together?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "17:58",
+          "body": "together and I want to support deepseek  as well"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "17:59",
+          "body": "Done: Claude Code, Codex and Gemini CLI all come in the first version. Any other agent that speaks ACP works through the same generic path, with a small adapter per agent for where it reads skills, where its login lives and which hosts it calls.\n\nDeepSeek fits in two places:\n- **API provider.** DeepSeek's API is OpenAI-compatible, so it's now listed under providers. It can serve the built-in worker, and even the router or reader.\n- **Model behind an ACP agent.** An agent that can be pointed at DeepSeek's API can run with it. I don't know of a first-party DeepSeek coding agent that speaks ACP, so I'll check before building that part."
+        }
+      ]
+    },
+    {
+      "id": "t9",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Should a delegate's task ever run on your subscription, or only your own tasks?",
+        "source": "Should a delegate's task ever run on your subscription, or only your own tasks?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "17:59",
+          "body": "I don't understand"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "17:59",
+          "body": "Delegates are the people you've paired with heyrobots, like Sam. They can ask Bit for things in their own conversations. If a rule lets one of Sam's requests go to an agent that runs on Claude Code, that work uses your Claude subscription: your rate limits, under your account.\n\nThe options:\n- **Only your own tasks.** Agents that run on a subscription never pick up a delegate's request, and Sam's work goes to agents on API models.\n- **Allowed when a rule names that agent.** Same as other tools, with you deciding per rule.\n\nMy pick is **only when a rule names it**. It reuses the rule check that's already in the design, and nothing is shared by default."
+        },
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "18:00",
+          "body": "ok"
+        }
+      ]
+    },
+    {
+      "id": "t10",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Do you want hand-offs between agents in the first version, or the team with one ",
+        "source": "Do you want hand-offs between agents in the first version, or the team with one agent per task first and hand-offs after?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "17:59",
+          "body": "Agents must be able to communicate or communicate to root ."
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "17:59",
+          "body": "Both are in the first version now. The step reads \"Agents talk to each other and to the task's root through messages on the task\".\n\n- **Teammate to teammate.** An agent can ask a teammate for work, ask it a question, or send a result. The message lands in that teammate's queue on the same task.\n- **Up to the root.** The root is the task's lead agent. Any agent can tell it \"I'm blocked\", \"my part is done\" or \"this needs a teammate I can't reach\", and the root decides the next step. Above the root, the router still alone accepts, stops or reroutes work, and only you can widen what a task may do.\n- **Nobody waits on a call.** The sender's turn ends \"waiting\" and picks up when the reply arrives.\n- **You can see all of it.** Messages are stored with the task, shown in the conversation as the team's side-talk, and traced. A per-task cap stops endless back-and-forth."
+        }
+      ]
+    },
+    {
+      "id": "t11",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Build order: gateway and MCP, then skills, model providers, the live stream, and",
+        "source": "Build order: gateway and MCP, then skills, model providers, the live stream, and the ACP worker last. Is that the order you want?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "18:00",
+          "body": "Yes. Must follow a MVP , MLP style so I can start using and testing"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "18:00",
+          "body": "Done. The last Design step now splits the work into five releases, each one you can install and try on its own, in your order:\n\n1. **MCP tools.** Gateway, MCP servers with tool review, and OpenTelemetry tracing.\n2. **The team.** Agents, skills, per-agent queues and the Agents screen.\n3. **Models.** Anthropic, DeepSeek and OpenAI-compatible providers, per agent and per role.\n4. **Working together and live.** Agent messaging, the live stream and the activity log.\n5. **Subscriptions.** The ACP worker for Claude Code, Codex and Gemini CLI.\n\nEach release has a \"Try it\" line saying what you can test. Tracing ships from the first release, so every later release is traceable from the start. Migrations only add tables and columns, so earlier releases keep working."
+        }
+      ]
+    }
+  ],
+  "seq": 11,
+  "review": {
+    "decision": "approve",
+    "summary": "",
+    "submittedAt": "20:31",
+    "count": 1
+  }
+}

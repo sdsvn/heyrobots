@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>heyrobots setup</title>
+<style>
+  :root { --bg: #f7f7f5; --fg: #1b1b1a; --muted: #5f5e5a; --card: #fff; --line: #dcdbd6; --accent: #2f5bd3; --error: #b42318; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --fg: #ecebe6; --muted: #a3a29c; --card: #201f1e; --line: #383734; --accent: #8aa8ff; --error: #ff8a7a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, sans-serif; }
+  main { max-width: 34rem; margin: 0 auto; padding: 2.5rem 1rem; }
+  h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+  p { margin: .5rem 0; }
+  .muted { color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.25rem; margin-top: 1.5rem; }
+  label { display: block; font-weight: 600; margin-top: 1rem; }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; margin-top: 1rem; padding: 0 .9rem .9rem; }
+  legend { color: var(--muted); font-size: .875rem; padding: 0 .3rem; }
+  input, select { width: 100%; font: inherit; padding: .6rem .7rem; margin-top: .35rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); }
+  .hint { font-size: .875rem; color: var(--muted); margin-top: .25rem; }
+  button { margin-top: 1.25rem; font: inherit; font-weight: 600; padding: .6rem 1rem; border: 0; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; }
+  .error { color: var(--error); font-weight: 600; }
+  .code { font: 600 1.75rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; }
+  .qr { display: block; width: 100%; max-width: 288px; height: auto; margin: 1rem auto; border-radius: 8px; background: #fff; padding: 8px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Set up heyrobots</h1>
+{{if .PairingCode}}
+  <p class="muted">Pair your first device. The app then helps you choose who does the work.</p>
+  <section class="card">
+    <p>Open the heyrobots app and scan this code.</p>
+    <img class="qr" src="{{.QRDataURI}}" alt="QR code for pairing">
+    <p>Or enter it by hand:</p>
+    <p class="code" id="pairing-code">{{.PairingCode}}</p>
+    <p>Server address: <code>{{.ServerURL}}</code></p>
+    <p class="hint">The code works once and expires at {{.ExpiresAt}}. This page closes for good once a device is paired. To get a new code, enter the setup code again.</p>
+  </section>
+{{else}}
+  <p class="muted">This page needs the setup code that heyrobotsd printed in its terminal and log.</p>
+  <form class="card" method="post" action="/setup" autocomplete="off">
+{{if .Error}}    <p class="error" role="alert">{{.Error}}</p>
+{{end}}    <label for="setup_code">Setup code</label>
+    <input id="setup_code" name="setup_code" required autocapitalize="characters" spellcheck="false" placeholder="XXXXX-XXXXX">
+    <button type="submit">Continue</button>
+  </form>
+{{end}}
+</main>
+</body>
+</html>
