@@ -30,7 +30,36 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 
 ## Install the server
 
-### On a Mac
+One line installs the latest server for your Mac or Linux machine:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sdsvn/heyrobots/main/install.sh | bash
+```
+
+It picks the build for your system and checks it against the release's checksums. It puts `heyrobotsd` in `~/.local/bin`, and on a Mac it clears the "downloaded from the internet" mark.
+
+While the repository is private, an anonymous download can't reach it. Sign in with the GitHub CLI and run the script through it:
+
+```bash
+gh api repos/sdsvn/heyrobots/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
+```
+
+Or use a token that can read the repository:
+
+```bash
+curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" https://raw.githubusercontent.com/sdsvn/heyrobots/main/install.sh | bash
+```
+
+| Setting | What it does |
+|---|---|
+| `HEYROBOTS_VERSION` | Install a given release, such as `v0.1.0`, instead of the latest |
+| `HEYROBOTS_INSTALL_DIR` | Install somewhere else, such as `/usr/local/bin` |
+
+For example, `curl -fsSL … | HEYROBOTS_VERSION=v0.1.0 bash`.
+
+To install by hand instead, follow the steps below.
+
+### On a Mac, by hand
 
 ```bash
 tar -xzf heyrobotsd-*-darwin-arm64.tar.gz
@@ -41,7 +70,7 @@ xattr -c heyrobotsd
 
 The `xattr` line clears the "downloaded from the internet" mark, which macOS puts on unsigned programs and then refuses to start. It does nothing if the mark isn't there. On a Mac, the server keeps its vault key in your login Keychain.
 
-### On Linux
+### On Linux, by hand
 
 ```bash
 tar -xzf heyrobotsd-*-linux-amd64.tar.gz
@@ -51,7 +80,9 @@ cd heyrobotsd-*-linux-amd64
 
 On Linux the vault key is kept in a file in the data folder, readable only by your user.
 
-To keep it running after you log out, put the binary in `~/.local/bin` and run it as a systemd user service:
+### Keep it running on Linux
+
+To keep it running after you log out, run it as a systemd user service. The install script already puts the binary in `~/.local/bin`; by hand, copy it there:
 
 ```bash
 mkdir -p ~/.local/bin && cp heyrobotsd ~/.local/bin/
