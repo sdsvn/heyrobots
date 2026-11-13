@@ -140,6 +140,12 @@ class AppState extends ChangeNotifier {
     _notify();
   }
 
+  /// Shows why signing in from a link didn't work, on the pairing screen.
+  void signInFailed(Object e) {
+    error = "Couldn't sign in automatically: ${describeError(e)} Enter the code from the server's terminal instead.";
+    _notify();
+  }
+
   Future<void> _failed(Object e) async {
     if (e is ApiError && e.unauthorized) {
       // The device was revoked: forget the token and pair again.

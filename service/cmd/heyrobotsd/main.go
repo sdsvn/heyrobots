@@ -55,6 +55,15 @@ import (
 )
 
 func main() {
+	run := run
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "pair":
+			run = func() error { return pairCommand(os.Args[2:]) }
+		case "status":
+			run = statusCommand
+		}
+	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "heyrobotsd:", err)
 		os.Exit(1)
@@ -88,6 +97,9 @@ func run() error {
 		log.Info("exporting traces over OTLP", "endpoint", firstSet(os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"), os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")))
 	}
 
+	if err := lockData(cfg.DataDir); err != nil {
+		return err
+	}
 	st, err := store.Open(cfg.DataDir)
 	if err != nil {
 		return err

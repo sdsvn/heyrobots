@@ -102,3 +102,28 @@ bool isPrivateHost(String host) {
     return false;
   }
 }
+
+/// Whether a host is this machine. Only such a server may sign the app in
+/// from a link without asking: a web page can open heyrobots:// links too,
+/// and must never be able to point the app at a server of its own.
+bool isLoopbackHost(String host) {
+  var h = host.toLowerCase();
+  if (h.startsWith('[') && h.endsWith(']')) h = h.substring(1, h.length - 1);
+  if (h == 'localhost' || h == '::1') return true;
+  try {
+    return Uri.parseIPv4Address(h)[0] == 127;
+  } on FormatException {
+    return false;
+  }
+}
+
+/// Reads a sign-in link the installer opens on this machine:
+/// heyrobots://pair?server=http://127.0.0.1:7340&code=ABCDE-FGHJK. Null
+/// when it isn't one, or names a server on another machine.
+PairingPayload? localPairingLink(Uri uri) {
+  if (uri.scheme != 'heyrobots' || uri.host != 'pair') return null;
+  final code = uri.queryParameters['code'] ?? '';
+  final server = Uri.tryParse(uri.queryParameters['server'] ?? '');
+  if (code.isEmpty || server == null || !isLoopbackHost(server.host) || (server.scheme != 'http' && server.scheme != 'https')) return null;
+  return PairingPayload(server.replace(path: ''), code);
+}

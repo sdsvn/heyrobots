@@ -31,3 +31,16 @@ func TestThePairingBlockOffersEveryAddressAndTheCode(t *testing.T) {
 		}
 	}
 }
+
+func TestOneServerPerDataFolder(t *testing.T) {
+	dir := t.TempDir()
+	if dataInUse(dir) {
+		t.Fatal("an unused folder reads as in use")
+	}
+	if err := lockData(dir); err != nil {
+		t.Fatal(err)
+	}
+	if !dataInUse(dir) {
+		t.Fatal("a locked folder reads as free")
+	}
+}

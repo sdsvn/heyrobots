@@ -168,8 +168,8 @@ class _PairScreenState extends State<PairScreen> {
                       onSubmitted: (_) => _pairByHand(),
                     ),
                     const SizedBox(height: 12),
-                    if (_error != null) ...[
-                      Text(_error!, style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.w700)),
+                    if ((_error ?? widget.state.error) case final err?) ...[
+                      Text(err, style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 12),
                     ],
                     _canScan

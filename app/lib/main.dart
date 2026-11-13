@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'pairing.dart';
 import 'platform.dart';
 import 'state.dart';
 import 'ui/approval_screen.dart';
@@ -33,7 +34,19 @@ void main() {
   // Push notifications open heyrobots:// links.
   final links = kIsWeb ? null : AppLinks().uriLinkStream;
   runApp(HeyrobotsApp(state: state, links: links));
-  unawaited(state.start());
+  unawaited(state.start().then((_) => signInFromPage(state)));
+}
+
+/// In a browser on the server's own machine, `/?pair=CODE` signs in
+/// without asking: the installer opens it on the first start.
+Future<void> signInFromPage(AppState state) async {
+  final code = kIsWeb ? Uri.base.queryParameters['pair'] : null;
+  if (code == null || code.isEmpty || state.paired || !isLoopbackHost(Uri.base.host)) return;
+  try {
+    await state.pair(PairingPayload(Uri.parse(Uri.base.origin), code), 'Browser on this machine');
+  } catch (e) {
+    state.signInFailed(e);
+  }
 }
 
 class HeyrobotsApp extends StatefulWidget {
@@ -50,6 +63,7 @@ class _HeyrobotsAppState extends State<HeyrobotsApp> {
   final _navigator = GlobalKey<NavigatorState>();
   StreamSubscription<Uri>? _links;
   Uri? _pendingLink;
+  Uri? _pendingSignIn;
 
   @override
   void initState() {
@@ -65,7 +79,30 @@ class _HeyrobotsAppState extends State<HeyrobotsApp> {
     super.dispose();
   }
 
+  /// Signs in from the installer's link, once, when this device isn't
+  /// paired yet and the link names a server on this machine.
+  Future<void> _signIn(Uri uri) async {
+    final p = localPairingLink(uri);
+    final s = widget.state;
+    if (p == null || s.paired) return;
+    if (s.loading) {
+      _pendingSignIn = uri;
+      return;
+    }
+    try {
+      await s.pair(p, 'This ${platformName() == 'macOS' ? 'Mac' : 'computer'}');
+    } catch (e) {
+      // Such as an expired code, or a Keychain that refused the token.
+      s.signInFailed(e);
+    }
+  }
+
   void _onState() {
+    final signIn = _pendingSignIn;
+    if (signIn != null && !widget.state.loading) {
+      _pendingSignIn = null;
+      _signIn(signIn);
+    }
     final link = _pendingLink;
     if (link != null && widget.state.paired && !widget.state.loading) {
       _pendingLink = null;
@@ -77,6 +114,10 @@ class _HeyrobotsAppState extends State<HeyrobotsApp> {
   /// `heyrobots://digest` or `heyrobots://home`.
   void _openLink(Uri uri) {
     if (uri.scheme != 'heyrobots') return;
+    if (uri.host == 'pair') {
+      unawaited(_signIn(uri));
+      return;
+    }
     final nav = _navigator.currentState;
     if (nav == null || !widget.state.paired || widget.state.loading) {
       _pendingLink = uri;
