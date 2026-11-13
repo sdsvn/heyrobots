@@ -1486,6 +1486,7 @@ components:
         description: { type: string }
         suggested_for: { type: string, description: The agent it suits, by name; empty for none. }
         installed: { type: boolean }
+        installs: { type: integer, description: "How many times people installed it, from skills.sh." }
     AddSkillRequest:
       type: object
       required: [source]

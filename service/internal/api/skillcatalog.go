@@ -9,8 +9,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,6 +31,12 @@ var (
 	githubSource = regexp.MustCompile(`^(?:https?://github\.com/)?([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:/tree/([^/]+))?(?:/(.*?))?/?$`)
 	commitSHA    = regexp.MustCompile(`^[0-9a-f]{40}$`)
 )
+
+// treeEntry is one file or folder in a GitHub tree.
+type treeEntry struct {
+	Path, Mode, Type string
+	Size             int64
+}
 
 // ghSource is a folder in a GitHub repository.
 type ghSource struct{ owner, repo, ref, dir string }
@@ -76,7 +84,10 @@ func (s *Server) ghGet(ctx context.Context, u, accept string, limit int64) ([]by
 // fetchSkill reads a skill folder at one commit: the commit, its tree in
 // one call, then the files from raw.githubusercontent.com. With all false
 // it reads only SKILL.md. Links and submodules are refused.
-func (s *Server) fetchSkill(ctx context.Context, src ghSource, all bool) (map[string][]byte, string, error) {
+// fetchSkill reads a skill folder at one commit. When src names a folder
+// that has no SKILL.md, as a skills.sh id does (owner/repo/name), it finds
+// the skill's folder by that name, and src is updated to it.
+func (s *Server) fetchSkill(ctx context.Context, src *ghSource, all bool) (map[string][]byte, string, error) {
 	api := fmt.Sprintf("%s/repos/%s/%s", s.opts.Probe.GitHubAPI, url.PathEscape(src.owner), url.PathEscape(src.repo))
 	ref := src.ref
 	if ref == "" {
@@ -94,14 +105,23 @@ func (s *Server) fetchSkill(ctx context.Context, src ghSource, all bool) (map[st
 	if err != nil {
 		return nil, "", fmt.Errorf("can't read %s: %w", src, err)
 	}
-	var tree struct {
-		Tree []struct {
-			Path, Mode, Type string
-			Size             int64
-		}
-	}
+	var tree struct{ Tree []treeEntry }
 	if err := json.Unmarshal(b, &tree); err != nil {
 		return nil, "", err
+	}
+	if src.dir != "" && !slices.ContainsFunc(tree.Tree, func(e treeEntry) bool {
+		return e.Path == src.dir+"/SKILL.md"
+	}) {
+		base := path.Base(src.dir)
+		best := ""
+		for _, e := range tree.Tree {
+			if dir, ok := strings.CutSuffix(e.Path, "/SKILL.md"); ok && path.Base(dir) == base && (best == "" || len(dir) < len(best)) {
+				best = dir
+			}
+		}
+		if best != "" {
+			src.dir = best
+		}
 	}
 	prefix := ""
 	if src.dir != "" {
@@ -165,7 +185,7 @@ func (s *Server) SearchSkills(w http.ResponseWriter, r *http.Request, p gen.Sear
 		}
 	}
 	if src, ok := parseSource(q); ok {
-		files, _, err := s.fetchSkill(r.Context(), src, false)
+		files, _, err := s.fetchSkill(r.Context(), &src, false)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
@@ -189,7 +209,57 @@ func (s *Server) SearchSkills(w http.ResponseWriter, r *http.Request, p gen.Sear
 		}
 		out.Skills = append(out.Skills, v)
 	}
+	if q != "" {
+		for _, f := range s.skillsSH(r.Context(), q) {
+			if !installed[f.Name] && !slices.ContainsFunc(out.Skills, func(c gen.CatalogSkill) bool { return c.Source == f.Source }) {
+				out.Skills = append(out.Skills, f)
+			}
+		}
+	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// shSkill is one skill in skills.sh's search.
+type shSkill struct {
+	ID       string `json:"id"`
+	Source   string `json:"source"`
+	Name     string `json:"name"`
+	Installs int    `json:"installs"`
+}
+
+// SkillsSHURL is skills.sh's search; tests point it at a fake.
+var SkillsSHURL = "https://skills.sh/api/search"
+
+// skillsSH searches skills.sh, the public directory of skills, most
+// installed first. Its ids are owner/repo/name; adding one finds the
+// skill's folder by that name.
+func (s *Server) skillsSH(ctx context.Context, q string) []gen.CatalogSkill {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	b, err := s.ghGet(ctx, SkillsSHURL+"?q="+url.QueryEscape(q), "application/json", 2<<20)
+	if err != nil {
+		s.opts.Log.Warn("search skills.sh", "err", err)
+		return nil
+	}
+	var res struct {
+		Skills []shSkill `json:"skills"`
+	}
+	if err := json.Unmarshal(b, &res); err != nil {
+		s.opts.Log.Warn("read skills.sh", "err", err)
+		return nil
+	}
+	slices.SortStableFunc(res.Skills, func(a, b shSkill) int {
+		return b.Installs - a.Installs
+	})
+	var out []gen.CatalogSkill
+	for _, k := range res.Skills {
+		if _, ok := parseSource(k.ID); !ok || len(out) == 20 {
+			continue
+		}
+		n := k.Installs
+		out = append(out, gen.CatalogSkill{Source: k.ID, Name: k.Name, Description: "From " + k.Source + " on skills.sh", Installs: &n})
+	}
+	return out
 }
 
 func matches(q string, fields ...string) bool {
@@ -221,7 +291,7 @@ func (s *Server) AddSkill(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "give a GitHub folder as owner/repo/path or a github.com link")
 		return
 	}
-	files, sha, err := s.fetchSkill(r.Context(), src, true)
+	files, sha, err := s.fetchSkill(r.Context(), &src, true)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

@@ -942,7 +942,10 @@ type BrainList struct {
 type CatalogSkill struct {
 	Description string `json:"description"`
 	Installed   bool   `json:"installed"`
-	Name        string `json:"name"`
+
+	// Installs How many times people installed it, from skills.sh.
+	Installs *int   `json:"installs,omitempty"`
+	Name     string `json:"name"`
 
 	// Source owner/repo/path on GitHub.
 	Source string `json:"source"`

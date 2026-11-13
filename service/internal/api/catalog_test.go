@@ -27,6 +27,8 @@ import (
 
 func newCatalogHarness(t *testing.T, more func(h *harness, o *Options)) (*harness, string) {
 	t.Helper()
+	// No test reaches the real skills.sh.
+	SkillsSHURL = "http://127.0.0.1:1/api/search"
 	h := newHarnessWith(t, nil, func(h *harness, o *Options) {
 		o.Probe = Probe{LookPath: func(string) (string, error) { return "", exec.ErrNotFound }, GOOS: "linux",
 			OllamaURL: "http://127.0.0.1:1", LMStudioURL: "http://127.0.0.1:1"}
@@ -158,6 +160,8 @@ func TestAddSkillFromGitHubInstallsIt(t *testing.T) {
 			fmt.Fprint(w, "---\nname: hello\ndescription: Says hello nicely.\n---\nBe kind.\n")
 		case "/acme/kit/" + sha + "/skills/hello/scripts/run.sh":
 			fmt.Fprint(w, "echo hi\n")
+		case "/api/search":
+			fmt.Fprint(w, `{"skills":[{"id":"acme/kit/rare","source":"acme/kit","name":"rare","installs":3},{"id":"acme/kit/hello","source":"acme/kit","name":"hello","installs":900}]}`)
 		default:
 			http.NotFound(w, r)
 		}
@@ -169,12 +173,20 @@ func TestAddSkillFromGitHubInstallsIt(t *testing.T) {
 	if len(found) != 1 || found[0].Name != "hello" || found[0].Source != "acme/kit/skills/hello" {
 		t.Fatalf("resolve = %+v", found)
 	}
-	rec := h.postJSON("/api/v1/skills/add", owner, gen.AddSkillRequest{Source: "acme/kit/skills/hello"})
+	// skills.sh lists it by owner/repo/name, most installed first; adding
+	// it finds the skill's folder by that name.
+	SkillsSHURL = gh.URL + "/api/search"
+	sh := getJSON[gen.SkillCatalog](t, h, "/api/v1/skills/catalog?q=hel", owner).Skills
+	if len(sh) != 2 || sh[0].Source != "acme/kit/hello" || sh[0].Installs == nil || *sh[0].Installs != 900 {
+		t.Fatalf("skills.sh = %+v", sh)
+	}
+	rec := h.postJSON("/api/v1/skills/add", owner, gen.AddSkillRequest{Source: "acme/kit/hello"})
 	var sk gen.Skill
 	json.Unmarshal(rec.Body.Bytes(), &sk)
 	if rec.Code != http.StatusOK || sk.Name != "hello" || !sk.HasScripts || sk.Files != 2 {
 		t.Fatalf("add = %d %s", rec.Code, rec.Body)
 	}
+	SkillsSHURL = "http://127.0.0.1:1/api/search"
 	got := getJSON[gen.SkillCatalog](t, h, "/api/v1/skills/catalog?q=hello", owner).Skills
 	if len(got) != 1 || !got[0].Installed || got[0].Source != "acme/kit/skills/hello" {
 		t.Fatalf("installed = %+v", got)
