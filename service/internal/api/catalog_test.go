@@ -28,7 +28,7 @@ import (
 func newCatalogHarness(t *testing.T, more func(h *harness, o *Options)) (*harness, string) {
 	t.Helper()
 	// No test reaches the real skills.sh.
-	SkillsSHURL = "http://127.0.0.1:1/api/search"
+	skills.SHURL = "http://127.0.0.1:1/api/search"
 	h := newHarnessWith(t, nil, func(h *harness, o *Options) {
 		o.Probe = Probe{LookPath: func(string) (string, error) { return "", exec.ErrNotFound }, GOOS: "linux",
 			OllamaURL: "http://127.0.0.1:1", LMStudioURL: "http://127.0.0.1:1"}
@@ -175,7 +175,7 @@ func TestAddSkillFromGitHubInstallsIt(t *testing.T) {
 	}
 	// skills.sh lists it by owner/repo/name, most installed first; adding
 	// it finds the skill's folder by that name.
-	SkillsSHURL = gh.URL + "/api/search"
+	skills.SHURL = gh.URL + "/api/search"
 	sh := getJSON[gen.SkillCatalog](t, h, "/api/v1/skills/catalog?q=hel", owner).Skills
 	if len(sh) != 2 || sh[0].Source != "acme/kit/hello" || sh[0].Installs == nil || *sh[0].Installs != 900 {
 		t.Fatalf("skills.sh = %+v", sh)
@@ -186,7 +186,7 @@ func TestAddSkillFromGitHubInstallsIt(t *testing.T) {
 	if rec.Code != http.StatusOK || sk.Name != "hello" || !sk.HasScripts || sk.Files != 2 {
 		t.Fatalf("add = %d %s", rec.Code, rec.Body)
 	}
-	SkillsSHURL = "http://127.0.0.1:1/api/search"
+	skills.SHURL = "http://127.0.0.1:1/api/search"
 	got := getJSON[gen.SkillCatalog](t, h, "/api/v1/skills/catalog?q=hello", owner).Skills
 	if len(got) != 1 || !got[0].Installed || got[0].Source != "acme/kit/skills/hello" {
 		t.Fatalf("installed = %+v", got)

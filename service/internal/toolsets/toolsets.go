@@ -79,6 +79,9 @@ func For(ts core.Toolset, env Env) ([]tool.Tool, error) {
 		return mailTools(env)
 	case core.ToolsetCalendar:
 		return calendarTools(env)
+	case core.ToolsetSetup:
+		// Its tools come from the executor, which reaches the team's setup.
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("toolset %q is not available yet", ts)
 	}

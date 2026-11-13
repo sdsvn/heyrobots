@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -38,6 +39,7 @@ import (
 	"heyrobots/service/internal/jobs"
 	"heyrobots/service/internal/policy"
 	"heyrobots/service/internal/quarantine"
+	"heyrobots/service/internal/registry"
 	"heyrobots/service/internal/skills"
 	"heyrobots/service/internal/store"
 	"heyrobots/service/internal/taint"
@@ -95,6 +97,8 @@ type Engine struct {
 	AgentModel func(ctx context.Context, a store.Agent) (model.LLM, error)
 	// Jobs is the owner's standing jobs.
 	Jobs *jobs.Library
+	// Registry finds MCP servers for the setup toolset.
+	Registry *registry.Client
 	// BudgetStop is checked before every model call. When it returns a
 	// message, the turn stops and the task asks the owner to raise the
 	// budget.
@@ -370,6 +374,13 @@ func (r *run) work(ctx context.Context) (report, error) {
 		return report{State: "failed", Summary: "The worker couldn't start."}, err
 	}
 	tools = append(tools, team)
+	if slices.Contains(r.toolsets, core.ToolsetSetup) {
+		setup, err := r.setupTools()
+		if err != nil {
+			return report{State: "failed", Summary: "The worker couldn't start."}, err
+		}
+		tools = append(tools, setup...)
+	}
 	if e.Memory != "" {
 		mem, err := r.memoryTool()
 		if err != nil {

@@ -107,12 +107,15 @@ const (
 	ToolsetMail     Toolset = "mail"
 	ToolsetData     Toolset = "data"
 	ToolsetCode     Toolset = "code"
+	// ToolsetSetup sets up the team: finds and connects add-ons, adds
+	// skills and gives them to agents, each change after the owner's OK.
+	ToolsetSetup Toolset = "setup"
 )
 
 // KnownToolsets lists every built-in toolset the service can run.
 var KnownToolsets = []Toolset{
 	ToolsetResearch, ToolsetWriting, ToolsetCalendar,
-	ToolsetMail, ToolsetData, ToolsetCode,
+	ToolsetMail, ToolsetData, ToolsetCode, ToolsetSetup,
 }
 
 // MCPPrefix starts the name of a toolset that is one of the owner's MCP

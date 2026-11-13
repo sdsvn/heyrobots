@@ -164,6 +164,8 @@ func run() error {
 			return err == nil && c.Provider == models.ClaudeCode
 		},
 	}
+	mcpRegistry := &registry.Client{}
+	var srv *api.Server
 	workers := &executor.Engine{
 		ACP: claude,
 		UsesACP: func(a store.Agent) bool {
@@ -187,6 +189,7 @@ func run() error {
 		OnHandBack: engine.Kick,
 		Skills:     skillLib,
 		Jobs:       jobLib,
+		Registry:   mcpRegistry,
 		Memory:     filepath.Join(cfg.DataDir, "memory"),
 		// An agent with its own model runs on it, metered like the rest.
 		AgentModel: func(ctx context.Context, a store.Agent) (model.LLM, error) {
@@ -225,11 +228,14 @@ func run() error {
 	ob := &outbox.Outbox{
 		Store: st,
 		Senders: map[string]outbox.Sender{
-			"app":          outbox.AppSender{},
-			"mail":         &mail.Sender{Google: gg, Store: st},
-			"calendar":     &calendar.Sender{Google: gg},
-			"mcp":          gateway.Sender{MCP: mcpServers},
-			changes.Source: changes.Sender{Store: st, Jobs: jobLib, Now: time.Now},
+			"app":      outbox.AppSender{},
+			"mail":     &mail.Sender{Google: gg, Store: st},
+			"calendar": &calendar.Sender{Google: gg},
+			"mcp":      gateway.Sender{MCP: mcpServers},
+			changes.Source: changes.Sender{Store: st, Jobs: jobLib, Now: time.Now,
+				// The API server is made below; approved setup changes run its steps.
+				Connect:  func(ctx context.Context, id string) (string, string, error) { return srv.ConnectAddOn(ctx, id) },
+				AddSkill: func(ctx context.Context, source string) (string, error) { return srv.InstallSkill(ctx, source) }},
 		},
 		Log: log,
 	}
@@ -270,7 +276,7 @@ func run() error {
 		Devices:   devices.New(st, time.Now),
 		Vault:     v,
 		MCP:       mcpServers,
-		Registry:  &registry.Client{},
+		Registry:  mcpRegistry,
 		Models:    resolver,
 		ACP:       claude,
 		Skills:    skillLib,
@@ -308,7 +314,7 @@ func run() error {
 		opts.Web = webapp.Handler(web)
 		log.Info("serving the web app", "from", firstSet(cfg.WebDir, "embedded build"))
 	}
-	srv := api.New(opts)
+	srv = api.New(opts)
 	srv.SetOnDecided(func() {
 		ob.Kick()
 		workers.Kick()

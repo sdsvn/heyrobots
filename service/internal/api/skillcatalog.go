@@ -219,40 +219,16 @@ func (s *Server) SearchSkills(w http.ResponseWriter, r *http.Request, p gen.Sear
 	writeJSON(w, http.StatusOK, out)
 }
 
-// shSkill is one skill in skills.sh's search.
-type shSkill struct {
-	ID       string `json:"id"`
-	Source   string `json:"source"`
-	Name     string `json:"name"`
-	Installs int    `json:"installs"`
-}
-
-// SkillsSHURL is skills.sh's search; tests point it at a fake.
-var SkillsSHURL = "https://skills.sh/api/search"
-
-// skillsSH searches skills.sh, the public directory of skills, most
-// installed first. Its ids are owner/repo/name; adding one finds the
-// skill's folder by that name.
+// skillsSH searches skills.sh. Its ids are owner/repo/name; adding one
+// finds the skill's folder by that name.
 func (s *Server) skillsSH(ctx context.Context, q string) []gen.CatalogSkill {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	b, err := s.ghGet(ctx, SkillsSHURL+"?q="+url.QueryEscape(q), "application/json", 2<<20)
+	found, err := skills.SearchSH(ctx, q)
 	if err != nil {
 		s.opts.Log.Warn("search skills.sh", "err", err)
 		return nil
 	}
-	var res struct {
-		Skills []shSkill `json:"skills"`
-	}
-	if err := json.Unmarshal(b, &res); err != nil {
-		s.opts.Log.Warn("read skills.sh", "err", err)
-		return nil
-	}
-	slices.SortStableFunc(res.Skills, func(a, b shSkill) int {
-		return b.Installs - a.Installs
-	})
 	var out []gen.CatalogSkill
-	for _, k := range res.Skills {
+	for _, k := range found {
 		if _, ok := parseSource(k.ID); !ok || len(out) == 20 {
 			continue
 		}
@@ -278,40 +254,50 @@ func (s *Server) AddSkill(w http.ResponseWriter, r *http.Request) {
 	if _, ok := requireOwner(w, r); !ok {
 		return
 	}
-	if s.opts.Skills == nil {
-		writeError(w, http.StatusBadRequest, "there is no skills library on this server")
-		return
-	}
 	var req gen.AddSkillRequest
 	if !decode(w, r, &req) {
 		return
 	}
-	src, ok := parseSource(req.Source)
+	sk, err := s.installSkill(r.Context(), req.Source)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, gen.Skill{Name: sk.Name, Description: sk.Description, HasScripts: sk.HasScripts, Files: sk.Files, UsedBy: []string{}})
+}
+
+// InstallSkill installs a skill from GitHub or skills.sh, for an approved
+// change, and answers its name.
+func (s *Server) InstallSkill(ctx context.Context, source string) (string, error) {
+	sk, err := s.installSkill(ctx, source)
+	return sk.Name, err
+}
+
+func (s *Server) installSkill(ctx context.Context, source string) (skills.Skill, error) {
+	if s.opts.Skills == nil {
+		return skills.Skill{}, errors.New("there is no skills library on this server")
+	}
+	src, ok := parseSource(source)
 	if !ok {
-		writeError(w, http.StatusBadRequest, "give a GitHub folder as owner/repo/path or a github.com link")
-		return
+		return skills.Skill{}, errors.New("give a GitHub folder as owner/repo/path or a github.com link")
 	}
-	files, sha, err := s.fetchSkill(r.Context(), &src, true)
+	files, sha, err := s.fetchSkill(ctx, &src, true)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
+		return skills.Skill{}, err
 	}
-	name, err := s.opts.Skills.SaveDir(r.Context(), files, src.String()+"@"+sha)
+	name, err := s.opts.Skills.SaveDir(ctx, files, src.String()+"@"+sha)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
+		return skills.Skill{}, err
 	}
-	lib, err := s.opts.Skills.List(r.Context())
+	lib, err := s.opts.Skills.List(ctx)
 	if err != nil {
-		s.internal(w, "list skills", err)
-		return
+		return skills.Skill{}, err
 	}
 	for _, sk := range lib {
 		if sk.Name == name {
 			s.opts.Log.Info("skill added", "skill", name, "source", src.String(), "commit", sha)
-			writeJSON(w, http.StatusOK, gen.Skill{Name: sk.Name, Description: sk.Description, HasScripts: sk.HasScripts, Files: sk.Files, UsedBy: []string{}})
-			return
+			return sk, nil
 		}
 	}
-	s.internal(w, "find added skill", errors.New("missing after save"))
+	return skills.Skill{}, errors.New("the skill went missing after it was saved")
 }

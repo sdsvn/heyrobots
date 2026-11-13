@@ -25,6 +25,19 @@ const (
 	ActionJob     = "make_job"
 	ActionRule    = "make_rule"
 	ActionSetting = "set_setting"
+	// Setup: connect an add-on, change its tools' access, add a skill,
+	// give an add-on or a skill to an agent.
+	ActionConnect = "connect_add_on"
+	ActionAccess  = "set_tool_access"
+	ActionSkill   = "add_skill"
+	ActionGive    = "give_to_agent"
+)
+
+// The access an add-on's tools can have, all at once.
+const (
+	AccessReads = "reads_on_own"
+	AccessAsks  = "everything_asks"
+	AccessOff   = "off"
 )
 
 // Change is an action's payload: what to write, and how its card reads.
@@ -40,6 +53,16 @@ type Change struct {
 	// when it doesn't exist yet.
 	Rule    *policy.Rule `json:"rule,omitempty"`
 	Setting *Setting     `json:"setting,omitempty"`
+	// AddOn is an add-on's app id; Server is its MCP server, for access.
+	AddOn  string `json:"add_on,omitempty"`
+	Server string `json:"server,omitempty"`
+	Access string `json:"access,omitempty"`
+	// SkillSource is a skill to add, as owner/repo/path on GitHub.
+	SkillSource string `json:"skill_source,omitempty"`
+	// Agent gets Toolset or Skill.
+	Agent   string `json:"agent,omitempty"`
+	Toolset string `json:"toolset,omitempty"`
+	Skill   string `json:"skill,omitempty"`
 }
 
 // Setting holds the settings to change; nil leaves one as it is.
@@ -98,13 +121,22 @@ type Sender struct {
 	Store *store.Store
 	Jobs  *jobs.Library
 	Now   func() time.Time
+	// Connect connects an add-on by its app id. It answers a sign-in link
+	// when the owner must sign in, or what the owner still has to do.
+	Connect func(ctx context.Context, addOn string) (signIn, todo string, err error)
+	// AddSkill installs a skill from GitHub and answers its name.
+	AddSkill func(ctx context.Context, source string) (string, error)
 }
 
 // Send makes the change an approved action describes.
-func (s Sender) Send(_ context.Context, e store.Effect) (string, error) {
+func (s Sender) Send(ctx context.Context, e store.Effect) (string, error) {
 	c, ok := Of(e)
 	if !ok {
 		return "", outbox.Permanent(errors.New("the change is damaged"))
+	}
+	switch e.Action {
+	case ActionConnect, ActionAccess, ActionSkill, ActionGive:
+		return s.setup(ctx, e, c)
 	}
 	if c.JobFile != "" {
 		if s.Jobs == nil {

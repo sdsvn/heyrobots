@@ -28,10 +28,11 @@ func TestTheTeamCanBeBuiltAndShown(t *testing.T) {
 		t.Fatalf("bad skill = %d", c)
 	}
 
-	// The General agent is there from the start.
+	// General and IT are there from the start; IT does the setting up.
 	var list gen.AgentList
 	json.Unmarshal(h.do("GET", "/api/v1/agents", owner, nil, "").Body.Bytes(), &list)
-	if len(list.Agents) != 1 || list.Agents[0].Id != core.GeneralAgent || !list.Agents[0].AnyToolset || !slices.Contains(list.Agents[0].Delegates, "sam") {
+	if len(list.Agents) != 2 || list.Agents[0].Id != core.GeneralAgent || !list.Agents[0].AnyToolset || !slices.Contains(list.Agents[0].Delegates, "sam") ||
+		list.Agents[1].Name != "IT" || !slices.Equal(list.Agents[1].Toolsets, []string{"setup"}) {
 		t.Fatalf("team = %+v", list)
 	}
 	if c := h.do("GET", "/api/v1/agents", sam, nil, "").Code; c != http.StatusForbidden {

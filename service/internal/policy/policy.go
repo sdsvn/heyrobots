@@ -185,13 +185,13 @@ func AppDelegate(name string) core.Identity {
 }
 
 // Default is the policy a new Assistant starts with: the owner on the app,
-// research and writing enabled, and proactive work only observed.
+// research, writing and setup enabled, and proactive work only observed.
 func Default() Policy {
 	return Policy{
 		Version:  1,
 		Mode:     ModeObserve,
 		Owner:    []core.Identity{AppOwner},
-		Toolsets: []core.Toolset{core.ToolsetResearch, core.ToolsetWriting},
+		Toolsets: []core.Toolset{core.ToolsetResearch, core.ToolsetWriting, core.ToolsetSetup},
 	}
 }
 

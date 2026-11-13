@@ -3,7 +3,9 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"slices"
 	"strings"
@@ -11,6 +13,7 @@ import (
 
 	"heyrobots/service/internal/api/gen"
 	"heyrobots/service/internal/core"
+	"heyrobots/service/internal/devices"
 	"heyrobots/service/internal/gateway"
 	"heyrobots/service/internal/registry"
 	"heyrobots/service/internal/store"
@@ -197,3 +200,28 @@ func brandOf(publisher string) string {
 
 // envName is a setting's name: an environment variable.
 var envName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`)
+
+// ConnectAddOn connects an add-on for a change the owner approved. It runs
+// the same steps as the app's Connect, as the owner, and answers a sign-in
+// link when the owner must sign in, or what the owner still has to do.
+func (s *Server) ConnectAddOn(ctx context.Context, id string) (signIn, todo string, err error) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(context.WithValue(ctx, ctxKey{}, store.Device{Role: devices.RoleOwner}), http.MethodPost, "/", http.NoBody)
+	s.ConnectApp(rec, req, id)
+	var res gen.ConnectResult
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &res) != nil {
+		var e gen.Error
+		_ = json.Unmarshal(rec.Body.Bytes(), &e)
+		return "", "", errors.New(orName(e.Error, "the add-on couldn't be connected"))
+	}
+	name := res.App.Name
+	switch {
+	case res.OpenUrl != nil:
+		return *res.OpenUrl, "", nil
+	case res.NeedsSettings != nil, res.NeedsToken != nil && *res.NeedsToken, res.NeedsClient != nil && *res.NeedsClient:
+		return "", name + " needs something only you can give it, such as a token. Open Settings, then Add-ons, then " + name + ", and connect it there.", nil
+	case res.Steps != nil && len(*res.Steps) > 0:
+		return "", strings.Join(*res.Steps, " "), nil
+	}
+	return "", "", nil
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"gorm.io/gorm"
@@ -442,6 +443,39 @@ var migrations = []migration{
 			return err
 		}
 		return tx.AutoMigrate(&Member{}, &ChatEvent{})
+	}},
+	{17, "an IT agent that sets up the team", func(tx *gorm.DB) error {
+		now := time.Now().UTC()
+		// Only when no agent here is called IT already.
+		if err := tx.Exec(`INSERT INTO agents (id, name, purpose, instructions, toolsets, any_toolset, skills, provider, model, base_url,
+			capacity, color, badge, builtin, enabled, created_at, updated_at, home)
+			SELECT 'ag_it', 'IT', 'Sets up the team: finds and connects apps, adds skills and gives them to the agents who need them.', '',
+				'["setup"]', false, '[]', '', '', '', 1, 'sky', 'bolt', true, true, ?, ?, ''
+			WHERE NOT EXISTS (SELECT 1 FROM agents WHERE id = 'ag_it' OR (name = 'IT' AND home = ''))`, now, now).Error; err != nil {
+			return err
+		}
+		// The owner's settings let setup work, as a new install's do.
+		var last struct {
+			Version int
+			Body    string
+		}
+		if err := tx.Raw("SELECT version, body FROM policy_versions ORDER BY version DESC LIMIT 1").Scan(&last).Error; err != nil || last.Version == 0 {
+			return err
+		}
+		var p map[string]any
+		if err := json.Unmarshal([]byte(last.Body), &p); err != nil {
+			return err
+		}
+		ts, _ := p["toolsets"].([]any)
+		if slices.Contains(ts, any("setup")) {
+			return nil
+		}
+		p["toolsets"], p["version"] = append(ts, "setup"), last.Version+1
+		body, err := json.Marshal(p)
+		if err != nil {
+			return err
+		}
+		return tx.Exec("INSERT INTO policy_versions (version, body, created_at) VALUES (?, ?, ?)", last.Version+1, string(body), now).Error
 	}},
 }
 
