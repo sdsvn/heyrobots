@@ -18,10 +18,11 @@
   --bg: #15131F; --fg: #ECEAF7; --muted: #A9A4C4; --line: #3B3656; --panel: #201D30;
   --accent: #9D93FF; --accent-soft: #2B2650; --warn: #F2A77E; --warn-soft: #3A2620; --ok: #5FD0B0; --ok-soft: #1E3A33; color-scheme: dark }
 body { background: var(--bg); color: var(--fg); font: 16px/1.6 var(--body); }
-main { max-width: 1060px; margin: 0 auto; padding-block: 40px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 32px; }
+main { max-width: 1060px; margin: 0 auto; padding-block: 40px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 36px; }
 .prose { max-width: 68ch; }
 h1 { font: 700 clamp(30px, 5vw, 44px)/1.1 var(--display); letter-spacing: -0.02em; margin: 0 0 12px; text-wrap: balance; }
 h2 { font: 700 24px/1.2 var(--display); margin: 0 0 8px; text-wrap: balance; }
+h3 { font: 700 17px/1.3 var(--display); margin: 18px 0 6px; }
 p { margin: 0 0 10px; }
 ul { margin: 0 0 10px; padding-left: 20px; }
 li { margin-bottom: 6px; }
@@ -31,7 +32,7 @@ code { font: 500 .88em var(--mono); background: var(--accent-soft); padding: 1px
 a { color: var(--accent); }
 figure { margin: 0; }
 .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); padding: 12px; }
-.scroll svg { display: block; width: 100%; min-width: 760px; height: auto; color: var(--fg); }
+.scroll svg { display: block; width: 100%; min-width: 820px; height: auto; color: var(--fg); }
 figcaption { font-size: 14px; color: var(--muted); margin-top: 10px; max-width: 80ch; }
 .box { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
 .key { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.8; }
@@ -63,114 +64,133 @@ ol.steps b { font-family: var(--display); }
 
 <main>
   <header class="prose">
-    <div class="eyebrow">heyrobots · communication</div>
+    <div class="eyebrow">heyrobots · communication · v0.2</div>
     <h1>How heyrobots talks</h1>
-    <p class="lede">You talk to a team of agents. The agents live on one or more of your machines, and a cloud server can be one of them. Your phone talks to one machine, the machines talk to each other, and each machine talks to the agents it runs. This page explains the ideas behind those conversations and how each one works.</p>
+    <p class="lede">You talk to a team of agents that runs on your own machines. Each machine runs one server, <code>heyrobotsd</code>. Your devices talk to one server, the servers talk to each other, each server talks to the agents it runs and to the model providers you chose, and the agents reach your apps through it. This page explains the ideas behind those conversations and how each one works today.</p>
   </header>
 
   <section>
     <h2>The philosophy</h2>
-    <p class="prose">Six rules decide every design choice below. When two of them pull apart, the earlier one wins.</p>
+    <p class="prose">Seven rules decide every choice below. When two of them pull apart, the earlier one wins.</p>
     <div class="rules">
-      <div><b>You are the authority</b><p>Anything that reaches other people waits for your OK, given on your own device. Machines and agents propose; only you approve. Rules that every machine shares are changed by you, never by a vote between machines.</p></div>
+      <div><b>You are the authority</b><p>Anything that reaches other people waits for your OK, given on your own device. Machines and agents propose; only you approve. Rules every machine shares are changed by you, never by a vote between machines.</p></div>
+      <div><b>Your machine trusts you</b><p>Whoever sits at the server's own machine is you. Its terminal prints a pairing code at every start, and the installer signs the app on that machine in by itself. Anything arriving from elsewhere has to prove itself with a code or a token.</p></div>
       <div><b>One team, wherever it runs</b><p>An agent on the cloud, the home Mac or the office box looks and behaves the same in the app. The only visible difference is whether its machine is up: available, working, or away since a time.</p></div>
-      <div><b>Every fact has one writer</b><p>Each message, reply and decision is written once, by the machine where it happened, and never edited. Other machines keep copies, which always end up identical. This is why no machine ever needs a majority to carry on.</p></div>
-      <div><b>Work happens at the agent's home</b><p>Only the machine an agent lives on runs it, holds its memory and sends what it writes. A task can never run twice, because only one machine is allowed to run it.</p></div>
-      <div><b>Fast by default</b><p>You see the agent thinking the moment you send. Steps that aren't needed are skipped: a direct chat goes straight to its agent, with no routing and no agreement step. Agents stay started and ready, and chat turns use a quick model.</p></div>
+      <div><b>Every fact has one writer</b><p>Each message, reply and decision is written once, by the machine where it happened, and never edited. Others keep copies that always end up identical. A data folder has one server too, enforced by a lock. No machine ever needs a majority to carry on.</p></div>
+      <div><b>Work happens at the agent's home</b><p>Only the machine an agent lives on runs it, holds its memory and sends what it writes. A task can never run twice, because only one machine may run it.</p></div>
+      <div><b>Fast, and never jammed</b><p>You see the agent thinking the moment you send. Steps that aren't needed are skipped. One broken app or one missing machine never stops a chat: the agent carries on without it and says what's missing.</p></div>
       <div><b>Reach out, never in</b><p>Phones and machines only dial out. Links between machines use each machine's own key, checked both ways. Content from outside, such as an email or a web page, is treated as untrusted wherever it is read.</p></div>
     </div>
   </section>
 
   <section>
-    <h2>Four links</h2>
-    <p class="prose">Everything heyrobots says travels over one of four links. Each has one job, and none of them needs to know how the others work.</p>
+    <h2>Five links</h2>
+    <p class="prose">Everything heyrobots says travels over one of five links. Each has one job, and none of them needs to know how the others work.</p>
     <figure>
       <div class="scroll">
-        <svg viewBox="0 0 1000 420" role="img" aria-label="The phone talks to one machine over HTTPS. The machines exchange log entries over a mutual TLS link every second. Each machine talks to its agents over ACP, and agents reach their tools through a local MCP bridge.">
+        <svg viewBox="0 0 1060 470" role="img" aria-label="Your device talks to one server over HTTPS. Servers exchange log entries over a mutual TLS link. Each server runs its agents over ACP, reaches model providers over HTTPS, and gives agents their tools through a local MCP bridge to your apps.">
           <defs>
             <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"></path></marker>
             <marker id="arh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"></path></marker>
           </defs>
-          <text class="cap" x="20" y="28">YOUR DEVICE</text>
-          <rect class="box" x="20" y="44" width="180" height="96" rx="12"></rect>
-          <text class="t" x="40" y="74">Phone or browser</text>
-          <text class="s" x="40" y="96">chats, approvals,</text>
-          <text class="s" x="40" y="114">"thinking…" shown at once</text>
+          <text class="cap" x="20" y="28">YOUR DEVICES</text>
+          <rect class="box" x="20" y="44" width="200" height="112" rx="12"></rect>
+          <text class="t" x="40" y="72">Mac app · browser · phone</text>
+          <text class="s" x="40" y="94">chats, approvals, model picker</text>
+          <text class="s" x="40" y="112">"thinking…" shown at once</text>
+          <text class="m" x="40" y="136">paired: QR, code or local link</text>
 
-          <text class="cap" x="300" y="28">MACHINE A · HOME MAC</text>
-          <rect class="key" x="300" y="44" width="300" height="150" rx="12"></rect>
-          <text class="t" x="320" y="74">heyrobotsd</text>
-          <text class="s" x="320" y="96">intake · lead (router) · tasks</text>
-          <text class="s" x="320" y="114">outbox · shared chat log</text>
-          <text class="m" x="320" y="140">a copy of every chat</text>
+          <text class="cap" x="320" y="28">MACHINE A · YOUR MAC</text>
+          <rect class="key" x="320" y="44" width="320" height="170" rx="12"></rect>
+          <text class="t" x="340" y="72">heyrobotsd (launchd service)</text>
+          <text class="s" x="340" y="94">intake · lead · tasks · outbox</text>
+          <text class="s" x="340" y="112">shared chat log · vault</text>
+          <text class="m" x="340" y="138">127.0.0.1 always · tailnet · LAN</text>
+          <text class="m" x="340" y="158">one server per data folder (lock)</text>
+          <text class="m" x="340" y="178">QR + pairing code at every start</text>
 
-          <text class="cap" x="700" y="28">MACHINE B · CLOUD OR OFFICE</text>
-          <rect class="key" x="700" y="44" width="280" height="150" rx="12"></rect>
-          <text class="t" x="720" y="74">heyrobotsd</text>
-          <text class="s" x="720" y="96">the same program,</text>
-          <text class="s" x="720" y="114">its own agents and keys</text>
-          <text class="m" x="720" y="140">a copy of every chat</text>
+          <text class="cap" x="740" y="28">MACHINE B · CLOUD OR OFFICE</text>
+          <rect class="key" x="740" y="44" width="300" height="170" rx="12"></rect>
+          <text class="t" x="760" y="72">heyrobotsd</text>
+          <text class="s" x="760" y="94">the same program,</text>
+          <text class="s" x="760" y="112">its own agents and keys</text>
+          <text class="m" x="760" y="138">a copy of every chat</text>
 
-          <path class="edge hot" d="M200 92 L298 92" marker-end="url(#arh)"></path>
-          <text class="a" x="214" y="84">1 · HTTPS</text>
-          <text class="s" x="210" y="114">REST + live</text>
-          <text class="s" x="210" y="130">events</text>
+          <path class="edge hot" d="M220 100 L318 100" marker-end="url(#arh)"></path>
+          <text class="a" x="232" y="90">1 · app</text>
+          <text class="s" x="230" y="124">HTTPS, events</text>
 
-          <path class="edge hot" d="M600 100 L698 100" marker-end="url(#arh)" marker-start="url(#arh)"></path>
-          <text class="a" x="612" y="90">2 · machine link</text>
-          <text class="s" x="610" y="124">mutual TLS, keys</text>
-          <text class="s" x="610" y="140">pinned, every 1 s</text>
+          <path class="edge hot" d="M640 110 L738 110" marker-end="url(#arh)" marker-start="url(#arh)"></path>
+          <text class="a" x="650" y="100">2 · machines</text>
+          <text class="s" x="648" y="134">mutual TLS, 1 s</text>
 
-          <rect class="home" x="300" y="250" width="140" height="70" rx="12"></rect>
-          <text class="t" x="318" y="280">Your agent</text>
-          <text class="m" x="318" y="302">omp · Claude Code</text>
-          <rect class="home" x="460" y="250" width="140" height="70" rx="12"></rect>
-          <text class="t" x="478" y="280">Warm spare</text>
-          <text class="m" x="478" y="302">started, waiting</text>
-          <path class="edge" d="M370 194 L370 248" marker-end="url(#ar)" marker-start="url(#ar)"></path>
-          <text class="a" x="380" y="226">3 · ACP over stdio</text>
+          <rect class="home" x="320" y="270" width="150" height="70" rx="12"></rect>
+          <text class="t" x="338" y="298">Your agent</text>
+          <text class="m" x="338" y="320">omp · Claude Code</text>
+          <rect class="home" x="490" y="270" width="150" height="70" rx="12"></rect>
+          <text class="t" x="508" y="298">Warm spare</text>
+          <text class="m" x="508" y="320">started, waiting</text>
+          <path class="edge" d="M395 214 L395 268" marker-end="url(#ar)" marker-start="url(#ar)"></path>
+          <text class="a" x="405" y="246">3 · ACP over stdio</text>
 
-          <rect class="out" x="300" y="350" width="300" height="56" rx="12"></rect>
-          <text class="t" x="318" y="376">MCP bridge on loopback</text>
-          <text class="s" x="318" y="396">one token per task · guard, taint, outbox</text>
-          <path class="edge" d="M370 320 L370 348" marker-end="url(#ar)"></path>
-          <text class="a" x="380" y="338">4 · tools</text>
+          <rect class="out" x="320" y="384" width="320" height="64" rx="12"></rect>
+          <text class="t" x="338" y="410">MCP bridge → your apps</text>
+          <text class="s" x="338" y="430">Notion, Gmail… · guard, taint, outbox</text>
+          <path class="edge" d="M395 340 L395 382" marker-end="url(#ar)"></path>
+          <text class="a" x="405" y="366">4 · tools</text>
 
-          <rect class="home" x="770" y="250" width="160" height="70" rx="12"></rect>
-          <text class="t" x="788" y="280">B's agents</text>
-          <text class="m" x="788" y="302">run only on B</text>
-          <path class="edge" d="M840 194 L840 248" marker-end="url(#ar)" marker-start="url(#ar)"></path>
+          <rect class="box" x="740" y="270" width="300" height="70" rx="12"></rect>
+          <text class="t" x="758" y="298">Model providers</text>
+          <text class="m" x="758" y="320">Anthropic · DeepSeek · Gemini · local</text>
+          <path class="edge" d="M640 190 C700 230 720 290 738 300" marker-end="url(#ar)"></path>
+          <text class="a" x="660" y="250">5 · models</text>
 
-          <path class="edge dash" d="M110 140 C110 330 230 380 298 378"></path>
-          <text class="s" x="40" y="250">an approval you give</text>
-          <text class="s" x="40" y="266">reaches the action's</text>
-          <text class="s" x="40" y="282">home through any machine</text>
+          <path class="edge dash" d="M120 156 C120 390 230 420 318 416"></path>
+          <text class="s" x="40" y="300">app sign-ins return to</text>
+          <text class="s" x="40" y="316">127.0.0.1 on the server,</text>
+          <text class="s" x="40" y="332">so they start on that machine</text>
         </svg>
       </div>
-      <figcaption>Each machine runs the same program. Links 1 and 2 carry what people and agents say. Links 3 and 4 stay inside one machine. A machine without a public address only dials out, and the machine it dials answers in the same exchange.</figcaption>
+      <figcaption>Every machine runs the same program. Links 1 and 2 carry what people and agents say. Links 3, 4 and 5 start at one machine and stay its business. A machine without a public address only dials out, and the machine it dials answers in the same exchange.</figcaption>
     </figure>
     <div class="tablewrap">
       <table>
         <thead><tr><th>Link</th><th>Between</th><th>What it carries</th><th>How it works</th></tr></thead>
         <tbody>
-          <tr><td>1 · App</td><td>Your device and one machine</td><td>Messages you send, chats, approvals, live updates</td><td>HTTPS with a device token from pairing. A stream of events tells the app the moment a chat changes.</td></tr>
-          <tr><td>2 · Machine link</td><td>Your machines</td><td>Who is up, each machine's agent cards, and log entries the other side is missing</td><td>Mutual TLS, pinned to each machine's ed25519 key. Every second, or at once when something new happens, each side says how far it has read from every machine and gets what it lacks. Entries pass through any machine, so two machines that can't reach each other still meet through a third.</td></tr>
-          <tr><td>3 · Agent</td><td>A machine and the agent it runs</td><td>One task: instructions in the task folder, the user turn, and the agent's progress</td><td>The Agent Client Protocol (ACP) over stdio. One process per task, started ahead of time as a warm spare.</td></tr>
-          <tr><td>4 · Tools</td><td>An agent and its task's tools</td><td>Tool calls: notes, memory, connected apps, the final report</td><td>An MCP server on loopback with one token per task. Every call passes the same outward guard and taint check as the built-in agent.</td></tr>
+          <tr><td>1 · App</td><td>Your device and one server</td><td>Messages, chats, approvals, model choices, live updates</td><td>HTTPS with a device token from pairing. A stream of events tells the app the moment a chat changes.</td></tr>
+          <tr><td>2 · Machines</td><td>Your servers</td><td>Who is up, each machine's agent cards, and log entries the other side is missing</td><td>Mutual TLS, pinned to each machine's ed25519 key. Every second, or at once when something new happens, each side says how far it has read from every machine and gets what it lacks. Entries pass through any machine, so two that can't reach each other still meet through a third.</td></tr>
+          <tr><td>3 · Agent</td><td>A server and the agent it runs</td><td>One task: instructions in the task folder, the user turn, the agent's progress</td><td>The Agent Client Protocol (ACP) over stdio. One process per task, taken from a warm spare that was started ahead of time. With no model key at all, your agent also routes: it answers the lead's question as JSON.</td></tr>
+          <tr><td>4 · Tools</td><td>An agent and its task's tools</td><td>Tool calls: notes, memory, your apps, the final report</td><td>An MCP server on loopback with one token per task. Every call passes the same outward guard and taint check. Each app's tools are set to run on their own, wait for your OK, or stay off.</td></tr>
+          <tr><td>5 · Models</td><td>A server and your model providers</td><td>Model calls, and the list of models a provider offers</td><td>Each provider's own API with your saved key. The chat's model picker asks the provider for its models and switches the agent's own model, or the default.</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
   <section>
+    <h2>Getting connected</h2>
+    <div class="prose">
+      <h3>Installing</h3>
+      <p>One command installs the server, runs it as a service that starts at login (launchd on a Mac, systemd on Linux) and installs the Mac app. It then asks the server for a one-time code with <code>heyrobotsd pair --link</code> and opens the app with a <code>heyrobots://pair</code> link. The app signs in by itself, because the link names a server on this machine. It refuses such a link for any other address, so a web page can never point the app at a server of its own.</p>
+      <h3>Pairing another device</h3>
+      <p>Every start prints a QR code, the addresses to open and a one-time owner code in the server's terminal or log. The QR code lists every address that works, best first: the public one if set, the tailnet one, then the network ones. The app tries them in order and keeps the first that answers. A paired device can make more codes, and <code>heyrobotsd pair</code> makes one at any time.</p>
+      <h3>Addresses</h3>
+      <p>The server always listens on <code>127.0.0.1</code>, also on its tailnet address when the machine is on Tailscale, and on any network address you add. Sign-ins to your apps, such as Notion or Google, come back to <code>127.0.0.1</code>, so they start from a browser or the app on the server's machine; the phone shows apps but never starts a sign-in. Listening on <code>0.0.0.0</code> is refused outside public mode.</p>
+      <h3>One server per data folder</h3>
+      <p>The running server holds a lock on its data folder, so a second one refuses to start instead of sharing the database. <code>heyrobotsd status</code> says whether one is running, and the installer uses it before starting the service.</p>
+    </div>
+  </section>
+
+  <section>
     <h2>A message's journey</h2>
-    <p class="prose">This is what happens between pressing Send and seeing the answer. The times were measured on this Mac with two servers, both using omp with Claude Sonnet 5.5.</p>
+    <p class="prose">What happens between pressing Send and seeing the answer. Times were measured with two servers using omp on Claude Sonnet 5.5.</p>
     <ol class="steps">
-      <li><b>Stored and shown thinking.</b> The machine your device talks to stores the message once. A retry with the same message id is ignored. The app shows the agent thinking straight away, before anything else happens.</li>
-      <li><b>Is there anything to decide?</b> In a direct chat or with an @mention, the answer is no: the message goes straight to that agent. In a group or a new open chat, the lead picks who answers.</li>
-      <li><b>Agreeing who decides, in shared chats only.</b> Every machine holds a copy, so only one may route each message. The reachable machine with the newest copy claims it and routes as soon as every other machine has seen the claim. If two claims ever cross, every machine keeps the earliest one, and the other machine stands down before acting.</li>
-      <li><b>Handing over.</b> If the chosen agent lives on another machine, a hand-off entry goes into the log. That machine starts the task under its own rules.</li>
-      <li><b>The work.</b> The agent's home gives the task a warm process, sends the turn and gates its tools. A finished task in a chat stays finished. A new message starts new work, unless the agent is still waiting on your answer.</li>
+      <li><b>Stored and shown thinking.</b> The server your device talks to stores the message once; a retry with the same id is ignored. The app shows the agent thinking at once, and keeps showing it until the reply lands.</li>
+      <li><b>Does an open task take it?</b> If the chat has a task still waiting on you, the message goes to that task. A finished task stays finished: in a chat, a new message is new work.</li>
+      <li><b>Is there anything to decide?</b> In a direct chat or with an @mention, no: the message goes straight to that agent. In a group or a new open chat, the lead picks who answers.</li>
+      <li><b>Agreeing who decides, in shared chats only.</b> Every machine holds a copy, so only one may route each message. The reachable machine with the newest copy claims it and routes as soon as every other machine has seen the claim. If two claims cross, every machine keeps the earliest, and the other stands down before acting.</li>
+      <li><b>Handing over.</b> If the chosen agent lives on another machine, a hand-off entry goes into the log, and that machine starts the task under its own rules.</li>
+      <li><b>The work.</b> The agent's home opens the task's tools, takes a warm agent process and sends the turn. An app that can't be reached is left out, and the agent is told to ask you to reconnect it, so the chat keeps working.</li>
       <li><b>The answer travels back.</b> The reply is stored on the agent's machine, copied to the others within a second, and pushed to your app by the event stream.</li>
     </ol>
     <div class="tablewrap" style="margin-top: 14px">
@@ -179,7 +199,7 @@ ol.steps b { font-family: var(--display); }
         <tbody>
           <tr><td>Thinking shown</td><td class="num">at once</td><td class="num">at once</td><td>The app draws it when you send</td></tr>
           <tr><td>Agreement</td><td class="num">0 s</td><td class="num">about 1 s</td><td>One exchange to show the claim to the other machines</td></tr>
-          <tr><td>Routing</td><td class="num">0 s</td><td class="num">about 3 s</td><td>A turn of the lead, run by your agent</td></tr>
+          <tr><td>Routing</td><td class="num">0 s</td><td class="num">about 3 s</td><td>A turn of the lead</td></tr>
           <tr><td>The agent's turn</td><td class="num">3–5 s</td><td class="num">3–5 s</td><td>The model; Opus took about 8 s for the same turn</td></tr>
           <tr><td>Copy to other machines</td><td class="num">under 1 s</td><td class="num">under 1 s</td><td>The next exchange</td></tr>
           <tr><td>Measured end to end</td><td class="num">3.2–5.3 s</td><td class="num">about 8 s</td><td>Same machine or across two machines</td></tr>
@@ -196,7 +216,7 @@ ol.steps b { font-family: var(--display); }
         <thead><tr><th>Entry</th><th>Written by</th><th>What the others do with it</th></tr></thead>
         <tbody>
           <tr><td>chat</td><td>The machine where a chat or group was made or changed</td><td>Create or update their copy, with the same id</td></tr>
-          <tr><td>message</td><td>The machine your device sent it to</td><td>Store a copy. If it is still waiting to be routed, join the agreement; if its own machine already handled it, never route it again</td></tr>
+          <tr><td>message</td><td>The machine your device sent it to</td><td>Store a copy. If it still waits to be routed, join the agreement; if its own machine already handled it, never route it again</td></tr>
           <tr><td>claim</td><td>A machine that will route a message, or whose task already took it</td><td>Stand down unless their own claim came earlier. A task's claim beats any other</td></tr>
           <tr><td>routed</td><td>The machine whose lead handed work to another machine's agent</td><td>The agent's home starts the task with that agent as lead; everyone else only shows it</td></tr>
           <tr><td>reply</td><td>The agent's home</td><td>Show it, signed by the agent. A copied action can't be sent or decided anywhere else</td></tr>
@@ -210,7 +230,7 @@ ol.steps b { font-family: var(--display); }
     <h2>Why there is no voting</h2>
     <div class="prose">
       <p>Raft and Paxos need a majority of machines to agree before anything happens. With a laptop and a cloud server, a majority means both, so closing the laptop would stop the cloud from answering. A personal cluster is often exactly that: two machines, one of them asleep.</p>
-      <p>heyrobots needs agreement on one question only: who routes this message. Everything else has a single writer by construction. A message has one sender, a task has one home, and a setting has one authority, you. The routing question is settled by the newest-copy claim, and the worst case is visible and harmless: during a network split, two agents might each answer once, and the chat marks the second answer as a duplicate. Outward actions can never double, because only the agent's home can send them.</p>
+      <p>heyrobots needs agreement on one question only: who routes this message. Everything else has a single writer by construction. A message has one sender, a task has one home, a data folder has one server, and a setting has one authority, you. The routing question is settled by the newest-copy claim, and the worst case is visible and harmless: during a network split, two agents might each answer once, and the chat marks the second answer as a duplicate. Outward actions can never double, because only the agent's home can send them.</p>
     </div>
   </section>
 
@@ -220,15 +240,22 @@ ol.steps b { font-family: var(--display); }
       <table>
         <thead><tr><th>What happens</th><th>What you see</th><th>What the system does</th></tr></thead>
         <tbody>
+          <tr><td>An app's sign-in ends or never finished</td><td>The agent answers without it and asks you to reconnect it</td><td>The task goes on without that app's tools. Its status shows the error under Add-ons until you sign in again.</td></tr>
           <tr><td>A machine is off</td><td>Its agents show "away since 17:24"</td><td>After 15 seconds of silence it is unreachable. Routing skips its agents, and work already handed to it waits until it is back.</td></tr>
           <tr><td>The network splits</td><td>Each side keeps working with its own agents</td><td>Logs merge when the link returns; a double answer is marked.</td></tr>
+          <tr><td>A server is already running</td><td>The second one stops with a clear message</td><td>The data folder's lock refuses it; the installer checks first.</td></tr>
+          <tr><td>A device lost its pairing</td><td>The pairing screen</td><td>Restart the server for a fresh code, or run <code>heyrobotsd pair</code>.</td></tr>
           <tr><td>A machine restarts mid-hand-off</td><td>A short delay</td><td>Recent hand-offs are rescanned every half second, so none is lost.</td></tr>
           <tr><td>A new machine joins</td><td>Your old chats appear on it</td><td>History arrives as already handled and is never routed or worked on again.</td></tr>
           <tr><td>A machine is removed</td><td>Its agents leave the team</td><td>The removal spreads to every machine, and its key is refused from then on.</td></tr>
-          <tr><td>The agent stops answering</td><td>The task says why, in the chat</td><td>The process is ended. Each task has its own process, so no other task is affected.</td></tr>
         </tbody>
       </table>
     </div>
+  </section>
+
+  <section class="prose">
+    <h2>Shipping it</h2>
+    <p>Every push runs the server's and the app's tests on GitHub. A version tag builds the server for macOS and Linux on Intel and ARM, with the web app inside, plus the macOS, Linux and Android apps, and publishes them with checksums. The installer installs the latest release. The builds aren't signed by Apple yet, which is why the Mac app is installed by the script rather than downloaded in a browser, and why it keeps its pairing in the ordinary login keychain.</p>
   </section>
 
   <section class="prose">
@@ -237,8 +264,9 @@ ol.steps b { font-family: var(--display); }
       <li>Inviting another person's machines into one chat.</li>
       <li>Your phone switching to another machine when the one it is paired with is down.</li>
       <li>Shared rules and spending caps across machines.</li>
-      <li>Showing the agent's real steps, such as "Reading 3 pages", in the thinking bubble. Today it says "Thinking", then "Working on it".</li>
-      <li>Keeping one agent session open across messages, which would save the agent re-reading its instructions on every turn.</li>
+      <li>Showing the agent's real steps, such as "Reading 3 pages", in the thinking bubble.</li>
+      <li>Keeping one agent session open across messages, so it doesn't re-read its instructions every turn.</li>
+      <li>Signing and notarizing the Mac builds, and installing with Homebrew, which needs the repository to be public.</li>
     </ul>
     <p class="muted">Related pages: <a href="https://claude.ai/artifact/Ak8cYcvuDyQCzW2MaqxTz9">heyrobots Agent Architecture</a> and <a href="https://claude.ai/artifact/Qc2mvKr3f86ZiEweEJkL5Q">heyrobots in the Cloud</a>.</p>
   </section>
