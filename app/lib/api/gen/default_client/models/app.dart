@@ -27,6 +27,18 @@ class App {
     required this.summary,
     required this.newTools,
     required this.agents,
+
+    /// Who publishes it, from the MCP registry, such as com.notion.
+    this.publisher,
+
+    /// The app's own server
+    this.official,
+
+    /// It runs as a program on the server's computer.
+    this.runsHere,
+
+    /// For one that runs here: the command that starts it.
+    this.command,
     this.additionalProperties = const {},
   });
 
@@ -48,6 +60,12 @@ class App {
     agents: (json["agents"] as List<Object?>)
         .map((item) => AgentRef.fromJson(item as Map<String, Object?>))
         .toList(),
+    publisher: json.containsKey("publisher")
+        ? json["publisher"] as String
+        : null,
+    official: json.containsKey("official") ? json["official"] as bool : null,
+    runsHere: json.containsKey("runs_here") ? json["runs_here"] as bool : null,
+    command: json.containsKey("command") ? json["command"] as String : null,
     additionalProperties: {
       for (final entry in json.entries)
         if (!_knownKeys.contains(entry.key)) entry.key: entry.value,
@@ -83,6 +101,18 @@ class App {
 
   final List<AgentRef> agents;
 
+  /// Who publishes it, from the MCP registry, such as com.notion.
+  final String? publisher;
+
+  /// The app's own server
+  final bool? official;
+
+  /// It runs as a program on the server's computer.
+  final bool? runsHere;
+
+  /// For one that runs here: the command that starts it.
+  final String? command;
+
   static const _knownKeys = <String>{
     "id",
     "name",
@@ -97,6 +127,10 @@ class App {
     "summary",
     "new_tools",
     "agents",
+    "publisher",
+    "official",
+    "runs_here",
+    "command",
   };
 
   final Map<String, Object?> additionalProperties;
@@ -117,5 +151,9 @@ class App {
     "summary": this.summary,
     "new_tools": this.newTools,
     "agents": this.agents.map((item) => item.toJson()).toList(),
+    if (this.publisher != null) "publisher": this.publisher,
+    if (this.official != null) "official": this.official,
+    if (this.runsHere != null) "runs_here": this.runsHere,
+    if (this.command != null) "command": this.command,
   };
 }

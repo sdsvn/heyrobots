@@ -10,6 +10,9 @@ class CatalogSkill {
     /// The agent it suits
     this.suggestedFor,
     required this.installed,
+
+    /// How many times people installed it, from skills.sh.
+    this.installs,
     this.additionalProperties = const {},
   });
 
@@ -21,6 +24,7 @@ class CatalogSkill {
         ? json["suggested_for"] as String
         : null,
     installed: json["installed"] as bool,
+    installs: json.containsKey("installs") ? json["installs"] as int : null,
     additionalProperties: {
       for (final entry in json.entries)
         if (!_knownKeys.contains(entry.key)) entry.key: entry.value,
@@ -39,12 +43,16 @@ class CatalogSkill {
 
   final bool installed;
 
+  /// How many times people installed it, from skills.sh.
+  final int? installs;
+
   static const _knownKeys = <String>{
     "source",
     "name",
     "description",
     "suggested_for",
     "installed",
+    "installs",
   };
 
   final Map<String, Object?> additionalProperties;
@@ -57,5 +65,6 @@ class CatalogSkill {
     "description": this.description,
     if (this.suggestedFor != null) "suggested_for": this.suggestedFor,
     "installed": this.installed,
+    if (this.installs != null) "installs": this.installs,
   };
 }

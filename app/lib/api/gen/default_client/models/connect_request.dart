@@ -7,12 +7,20 @@ class ConnectRequest {
 
     /// A token the server needs
     this.token,
+
+    /// Values a server that runs here needs, by name, when it asks for them.
+    this.settings,
     this.additionalProperties = const {},
   });
 
   factory ConnectRequest.fromJson(Map<String, Object?> json) => ConnectRequest(
     url: json.containsKey("url") ? json["url"] as String : null,
     token: json.containsKey("token") ? json["token"] as String : null,
+    settings: json.containsKey("settings")
+        ? (json["settings"] as Map<String, Object?>).map(
+            (key, item) => MapEntry(key, item as String),
+          )
+        : null,
     additionalProperties: {
       for (final entry in json.entries)
         if (!_knownKeys.contains(entry.key)) entry.key: entry.value,
@@ -25,7 +33,10 @@ class ConnectRequest {
   /// A token the server needs
   final String? token;
 
-  static const _knownKeys = <String>{"url", "token"};
+  /// Values a server that runs here needs, by name, when it asks for them.
+  final Map<String, String>? settings;
+
+  static const _knownKeys = <String>{"url", "token", "settings"};
 
   final Map<String, Object?> additionalProperties;
 
@@ -34,5 +45,7 @@ class ConnectRequest {
       if (!_knownKeys.contains(entry.key)) entry.key: entry.value,
     if (this.url != null) "url": this.url,
     if (this.token != null) "token": this.token,
+    if (this.settings != null)
+      "settings": this.settings?.map((key, item) => MapEntry(key, item)),
   };
 }

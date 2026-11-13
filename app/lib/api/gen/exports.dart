@@ -18,6 +18,7 @@ export 'default_client/models/app_category.dart';
 export 'default_client/models/app_detail.dart';
 export 'default_client/models/app_kind.dart';
 export 'default_client/models/app_list.dart';
+export 'default_client/models/app_setting.dart';
 export 'default_client/models/app_status.dart';
 export 'default_client/models/app_tint.dart';
 export 'default_client/models/app_tool.dart';

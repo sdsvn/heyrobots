@@ -2213,7 +2213,7 @@ class ApiClient {
     await response.stream.drain<void>();
   }
 
-  /// The app catalogue with what is connected. Owner devices only.
+  /// The app catalogue with what is connected. With q, servers from the official MCP registry that match follow, with ids starting registry~. Owner devices only.
   Future<models.AppList> listApps({
     Map<String, Object?> extra = const {
       "openapi.servers": [
