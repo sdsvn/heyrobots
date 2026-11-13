@@ -115,6 +115,13 @@ func TestListAppsShowsConnectedGmailAndMCPServers(t *testing.T) {
 	if rec.Code != http.StatusOK || tool.Mode != gen.AppToolModeOff {
 		t.Fatalf("set tool = %d %s", rec.Code, rec.Body)
 	}
+
+	// All tools at once: every one asks first.
+	rec = h.putJSON("/api/v1/apps/linear/tools", owner, gen.AppAccess{Access: gen.AppAccessAccessEverythingAsks})
+	json.Unmarshal(rec.Body.Bytes(), &detail)
+	if rec.Code != http.StatusOK || detail.Tools[0].Mode != gen.AppToolModeAfterOk {
+		t.Fatalf("access = %d %s", rec.Code, rec.Body)
+	}
 }
 
 func TestConnectingAnMCPAppRegistersItAndAsksForATokenOn401(t *testing.T) {

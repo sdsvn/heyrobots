@@ -79,6 +79,20 @@ class FakeServer {
       },
   };
 
+  /// Servers the MCP registry finds for any search, by id.
+  final registry = <String, Map<String, Object?>>{
+    'registry~com.notion~mcp': {
+      'id': 'registry~com.notion~mcp', 'name': 'Notion', 'category': 'other', 'kind': 'mcp', 'toolset': '', 'mark': 'N', 'tint': 'ink',
+      'connected': false, 'accounts': <String>[], 'status': 'off', 'summary': 'Official Notion MCP server', 'new_tools': 0, 'agents': <Object?>[],
+      'publisher': 'com.notion', 'official': true,
+    },
+    'registry~io.github.acme~notes': {
+      'id': 'registry~io.github.acme~notes', 'name': 'Acme Notes', 'category': 'other', 'kind': 'mcp', 'toolset': '', 'mark': 'AN', 'tint': 'ink',
+      'connected': false, 'accounts': <String>[], 'status': 'off', 'summary': 'Your notes', 'new_tools': 0, 'agents': <Object?>[],
+      'publisher': 'io.github.acme', 'official': false, 'runs_here': true, 'command': 'npx -y @acme/notes@2.0.0',
+    },
+  };
+
   /// Each app's tools, by app id.
   final appTools = <String, List<Map<String, Object?>>>{
     'gmail': [
@@ -230,11 +244,29 @@ class FakeServer {
       return _json(200, skill);
     }
     if (path == '/api/v1/apps' && r.method == 'GET') {
-      return _json(200, {'apps': apps.values.toList()});
+      final q = r.url.queryParameters['q'];
+      return _json(200, {
+        'apps': [
+          ...apps.values.where((a) => q == null || (a['name'] as String).toLowerCase().contains(q)),
+          if (q != null) ...registry.values,
+        ],
+      });
     }
     final app = RegExp(r'^/api/v1/apps/([^/]+)(/connect|/tools/([^/]+))?$').firstMatch(path);
     if (app != null) {
       final id = app[1]!;
+      if (app[2] == '/connect' && r.method == 'POST' && registry.containsKey(id)) {
+        final body = r.body.isEmpty ? <String, Object?>{} : jsonDecode(r.body) as Map<String, Object?>;
+        final reg = registry[id]!;
+        if (reg['runs_here'] == true && body['settings'] == null) {
+          return _json(200, {
+            'app': reg,
+            'needs_settings': [{'name': 'NOTES_TOKEN', 'description': 'Your notes token', 'secret': true, 'required': true}],
+          });
+        }
+        final a = apps[id] = {...reg, 'connected': true, 'status': 'on'};
+        return _json(200, {'app': a});
+      }
       if (app[2] == '/connect' && r.method == 'POST') {
         final body = r.body.isEmpty ? <String, Object?>{} : jsonDecode(r.body) as Map<String, Object?>;
         final a = apps[id] ?? (apps[id] = {...apps['slack']!, 'id': id, 'name': 'Custom', 'mark': 'C'});

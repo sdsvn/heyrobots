@@ -50,6 +50,31 @@ class _AppScreenState extends State<AppScreen> {
     }
   }
 
+  /// Sets all its tools at once: reads on their own, everything asks, or off.
+  Future<void> _setAccess(AppAccessAccess access) async {
+    try {
+      final d = await widget.state.api.setAppAccess(
+        appId: widget.appId,
+        body: AppAccess(access: access),
+      );
+      if (!mounted) return;
+      setState(() {
+        _modes.clear();
+        _detail = Future.value(d);
+      });
+    } catch (e) {
+      if (mounted) showMessage(context, describeError(e));
+    }
+  }
+
+  /// The access all its tools have now, read from each tool's mode.
+  AppAccessAccess _access(List<AppTool> tools) {
+    final modes = [for (final t in tools) (_modes[t.name] ?? t.mode).toJson()];
+    if (modes.isNotEmpty && modes.every((m) => m == 'off')) return AppAccessAccess.off;
+    if (modes.isNotEmpty && modes.every((m) => m == 'after_ok')) return AppAccessAccess.everythingAsks;
+    return AppAccessAccess.readsOnOwn;
+  }
+
   Future<void> _disconnect(App a) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -219,6 +244,43 @@ class _AppScreenState extends State<AppScreen> {
                   child: ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     children: [
+                      if (a.kind.toJson() == 'mcp' && d.tools.isNotEmpty) ...[
+                        Container(
+                          decoration: edged(p.card, edge: p.line),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              TwoLines('All ${d.tools.length} tools', 'Read-only tools can work on their own; the rest ask you first.'),
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(color: p.track, borderRadius: BorderRadius.circular(999)),
+                                child: Row(
+                                  children: [
+                                    for (final (i, (m, label)) in [
+                                      (AppAccessAccess.readsOnOwn, 'Reads on their own'),
+                                      (AppAccessAccess.everythingAsks, 'Everything asks'),
+                                      (AppAccessAccess.off, 'Off'),
+                                    ].indexed) ...[
+                                      if (i > 0) const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Segment(
+                                          key: Key('access:${m.toJson()}'),
+                                          label: label,
+                                          selected: _access(d.tools) == m,
+                                          onTap: () => _setAccess(m),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       RowsCard(
                         header: Padding(
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
@@ -252,7 +314,10 @@ class _AppScreenState extends State<AppScreen> {
                                       decoration: BoxDecoration(color: p.track, borderRadius: BorderRadius.circular(999)),
                                       child: Center(
                                         widthFactor: 1,
-                                        child: Text('+ Give to…', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: p.accent)),
+                                        child: Text(
+                                          '+ Give to…',
+                                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: p.accent),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -333,8 +398,8 @@ class _AppScreenState extends State<AppScreen> {
       trailing = Toggle(key: Key('tool:${t.name}'), label: t.title, value: mode.toJson() == 'own', onChanged: (on) => _setTool(t, on));
     } else {
       final (label, tint) = switch (mode.toJson()) {
-        'reads' => ('Reads', 'mint'),
-        'after_ok' => ('After your OK', 'peach'),
+        'reads' => ('On its own', 'mint'),
+        'after_ok' => ('Asks first', 'peach'),
         'own' => ('On its own', 'violet'),
         _ => ('Off', 'violet'),
       };

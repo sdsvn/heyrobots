@@ -80,20 +80,20 @@ void main() {
     expect(find.byKey(const Key('main-nav')), findsOneWidget);
   });
 
-  testWidgets('connect apps shows sections, filters, and connects an app', (tester) async {
+  testWidgets('add-ons show the starter sections, filter, and connect an app', (tester) async {
     // On the computer running heyrobots.
     await show(tester, ConnectAppsScreen(state: state));
-    expect(find.text('EMAIL & CALENDAR'), findsOneWidget);
-    expect(find.text('MESSAGING'), findsOneWidget);
-    expect(find.text('CODE & WORK'), findsOneWidget);
+    expect(find.text('MAIL & CALENDAR'), findsOneWidget);
+    expect(find.text('CODE'), findsOneWidget);
+    expect(find.text('YOUR OWN'), findsOneWidget);
+    expect(find.byKey(const Key('set-up-with-agent')), findsOneWidget);
     expect(find.text('Connected · 2'), findsOneWidget);
-    expect(find.text('5 apps · any MCP server works too'), findsOneWidget);
     // A connected Google app can add another account.
     expect(find.byKey(const Key('add-account:gmail')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('filter:email')));
+    await tester.tap(find.byKey(const Key('filter:connected')));
     await tester.pumpAndSettle();
-    expect(find.text('MESSAGING'), findsNothing);
+    expect(find.byKey(const Key('app:slack')), findsNothing);
     await tester.tap(find.byKey(const Key('filter:all')));
     await tester.pumpAndSettle();
 
@@ -101,6 +101,32 @@ void main() {
     await settle(tester);
     expect(server.requests.where((r) => r.method == 'POST' && r.url.path == '/api/v1/apps/slack/connect'), hasLength(1));
     expect(find.text('Connected · 3'), findsOneWidget);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('searching finds MCP registry servers; one that runs here shows its command and asks for its settings', (tester) async {
+    await show(tester, ConnectAppsScreen(state: state));
+    await tester.enterText(find.byKey(const Key('app-search')), 'no');
+    await tester.pump(const Duration(milliseconds: 450));
+    await settle(tester);
+    expect(server.requests.any((r) => r.url.path == '/api/v1/apps' && r.url.queryParameters['q'] == 'no'), isTrue);
+    expect(find.text("NOTION'S OWN"), findsOneWidget);
+    expect(find.text('FROM THE MCP REGISTRY'), findsOneWidget);
+    expect(find.text('io.github.acme'), findsOneWidget);
+    expect(find.text('Runs on this computer'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('app:registry~io.github.acme~notes')));
+    await tester.pumpAndSettle();
+    expect(find.text('npx -y @acme/notes@2.0.0'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('confirm-run')));
+    // The tile spins while the settings sheet is open, so pump frames.
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.enterText(find.byKey(const Key('setting:NOTES_TOKEN')), 'tok-1');
+    await tester.tap(find.text('Connect'));
+    await settle(tester);
+    final sent = bodies('POST', '/api/v1/apps/registry~io.github.acme~notes/connect');
+    expect(sent.last, {'settings': {'NOTES_TOKEN': 'tok-1'}});
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets('a phone lists apps but never starts a sign-in', (tester) async {
@@ -116,8 +142,8 @@ void main() {
   testWidgets('an app screen switches a tool and shows who uses it', (tester) async {
     await show(tester, AppScreen(state: state, appId: 'gmail'));
     expect(find.text('Gmail'), findsOneWidget);
-    expect(find.text('Reads'), findsOneWidget);
-    expect(find.text('After your OK'), findsOneWidget);
+    expect(find.text('On its own'), findsWidgets);
+    expect(find.text('Asks first'), findsOneWidget);
     expect(find.text('General'), findsOneWidget);
     expect(find.text('Ask General to do something with it'), findsOneWidget);
 

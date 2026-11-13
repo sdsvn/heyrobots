@@ -35,9 +35,9 @@ const (
 
 // The access an add-on's tools can have, all at once.
 const (
-	AccessReads = "reads_on_own"
-	AccessAsks  = "everything_asks"
-	AccessOff   = "off"
+	AccessReads = store.AccessReads
+	AccessAsks  = store.AccessAsks
+	AccessOff   = store.AccessOff
 )
 
 // Change is an action's payload: what to write, and how its card reads.

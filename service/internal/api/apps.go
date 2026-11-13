@@ -141,6 +141,14 @@ func (s *Server) appEntries() ([]appEntry, error) {
 				}
 			}
 		}
+		if len(c.Command) > 0 && e.server == nil {
+			here, line := true, strings.Join(c.Command, " ")
+			e.view.RunsHere, e.view.Command = &here, &line
+		}
+		if c.Registry != "" {
+			pub, _, _ := strings.Cut(c.Registry, "/")
+			e.view.Publisher = &pub
+		}
 		e.view.Agents = agentsWith(agents, toolset)
 		e.view.Toolset = string(toolset)
 		out = append(out, e)
@@ -643,5 +651,32 @@ func (s *Server) DisconnectApp(w http.ResponseWriter, r *http.Request, appID str
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// SetAppAccess sets all of an app's tools at once. Owner devices only.
+func (s *Server) SetAppAccess(w http.ResponseWriter, r *http.Request, appID string) {
+	if _, ok := requireOwner(w, r); !ok {
+		return
+	}
+	var req gen.AppAccess
+	if !decode(w, r, &req) {
+		return
+	}
+	e, ok := s.findApp(w, appID)
+	if !ok {
+		return
+	}
+	if e.server == nil {
+		writeError(w, http.StatusBadRequest, "this app's tools can't be changed")
+		return
+	}
+	if err := s.opts.Store.Tx(func(tx *store.Tx) error { return tx.SetMCPAccess(e.server.Name, string(req.Access)) }); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	s.opts.Log.Info("app access set", "app", appID, "access", req.Access)
+	if e, ok = s.findApp(w, appID); ok {
+		writeJSON(w, http.StatusOK, gen.AppDetail{App: e.view, Tools: appTools(e), Recent: []gen.Recent{}})
 	}
 }

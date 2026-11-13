@@ -10,6 +10,7 @@ import 'models/add_skill_request.dart' as models show AddSkillRequest;
 import 'models/agent.dart' as models show Agent;
 import 'models/agent_list.dart' as models show AgentList;
 import 'models/agent_request.dart' as models show AgentRequest;
+import 'models/app_access.dart' as models show AppAccess;
 import 'models/app_detail.dart' as models show AppDetail;
 import 'models/app_list.dart' as models show AppList;
 import 'models/app_tool.dart' as models show AppTool;
@@ -2484,6 +2485,60 @@ class ApiClient {
     return await convert.utf8.decoder.bind(response.stream).join().then((text) {
       final Object? value = convert.jsonDecode(text);
       return models.ConnectResult.fromJson(value as Map<String, Object?>);
+    });
+  }
+
+  /// Change how all of an app's tools may be used at once: read-only tools on their own and the rest asking first, every tool asking first, or all off. Owner devices only.
+  Future<models.AppDetail> setAppAccess({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://127.0.0.1:7340"},
+      ],
+      "openapi.security": [
+        {"deviceToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "deviceToken": {"type": "http", "scheme": "bearer"},
+      },
+    },
+    Future<void>? abortTrigger,
+    HttpRequestOptions? options,
+    required String appId,
+    required models.AppAccess body,
+  }) async {
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(appId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    var _url = Uri.parse(
+      _base + ("/api/v1/apps/" + Uri.encodeComponent(appId) + "/tools"),
+    );
+    final request = http.AbortableRequest(
+      "PUT",
+      _url,
+      abortTrigger: abortTrigger,
+    );
+    request.bodyBytes = convert.utf8.encode(convert.jsonEncode(body));
+    request.headers.addAll(
+      <String, Object?>{
+        ...?options?.headers,
+        'Accept': "application/json",
+        'Content-Type': "application/json",
+      }.map((key, value) => MapEntry(key, value.toString())),
+    );
+    if (options?.followRedirects case final value?)
+      request.followRedirects = value;
+    if (options?.maxRedirects case final value?) request.maxRedirects = value;
+    prepareRequest?.call(request, extra);
+    final response = await _transport.send(request);
+    final _status = response.statusCode;
+    if (!(_status == 200)) {
+      await response.stream.listen(null).cancel();
+      throw http.ClientException('HTTP $_status', _url);
+    }
+    return await convert.utf8.decoder.bind(response.stream).join().then((text) {
+      final Object? value = convert.jsonDecode(text);
+      return models.AppDetail.fromJson(value as Map<String, Object?>);
     });
   }
 

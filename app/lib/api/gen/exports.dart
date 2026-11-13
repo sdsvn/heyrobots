@@ -14,6 +14,8 @@ export 'default_client/models/agent_request_color.dart';
 export 'default_client/models/agent_request_provider.dart';
 export 'default_client/models/agent_task.dart';
 export 'default_client/models/app.dart';
+export 'default_client/models/app_access.dart';
+export 'default_client/models/app_access_access.dart';
 export 'default_client/models/app_category.dart';
 export 'default_client/models/app_detail.dart';
 export 'default_client/models/app_kind.dart';

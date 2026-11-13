@@ -115,7 +115,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               children: [
                                 for (final (i, (m, label)) in [(AcceptMode.off, 'Ask me'), (AcceptMode.observe, 'Suggest'), (AcceptMode.auto, 'Just do it')].indexed) ...[
                                   if (i > 0) const SizedBox(width: 4),
-                                  Expanded(child: _Segment(key: Key('mode:${m.toJson()}'), label: label, selected: mode == m, onTap: () => _setMode(m))),
+                                  Expanded(child: Segment(key: Key('mode:${m.toJson()}'), label: label, selected: mode == m, onTap: () => _setMode(m))),
                                 ],
                               ],
                             ),
@@ -169,31 +169,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-class _Segment extends StatelessWidget {
-  const _Segment({super.key, required this.label, required this.selected, required this.onTap});
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Palette.of(context);
-    return Semantics(
-      selected: selected,
-      button: true,
-      child: EdgedBox(
-        height: 40,
-        radius: 999,
-        depth: selected ? 2 : 0,
-        color: selected ? p.accent : Colors.transparent,
-        edge: p.accentDeep,
-        onTap: onTap,
-        child: Center(child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: selected ? Colors.white : p.muted))),
-      ),
-    );
-  }
-}
 
 class _Row extends StatelessWidget {
   const _Row({super.key, required this.glyph, required this.tint, required this.title, required this.line, required this.onTap});

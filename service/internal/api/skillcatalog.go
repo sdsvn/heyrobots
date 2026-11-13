@@ -211,7 +211,8 @@ func (s *Server) SearchSkills(w http.ResponseWriter, r *http.Request, p gen.Sear
 	}
 	if q != "" {
 		for _, f := range s.skillsSH(r.Context(), q) {
-			if !installed[f.Name] && !slices.ContainsFunc(out.Skills, func(c gen.CatalogSkill) bool { return c.Source == f.Source }) {
+			// The same skill from the same repository is listed once.
+			if !installed[f.Name] && !slices.ContainsFunc(out.Skills, func(c gen.CatalogSkill) bool { return c.Name == f.Name && repoOf(c.Source) == repoOf(f.Source) }) {
 				out.Skills = append(out.Skills, f)
 			}
 		}
@@ -236,6 +237,15 @@ func (s *Server) skillsSH(ctx context.Context, q string) []gen.CatalogSkill {
 		out = append(out, gen.CatalogSkill{Source: k.ID, Name: k.Name, Description: "From " + k.Source + " on skills.sh", Installs: &n})
 	}
 	return out
+}
+
+// repoOf is owner/repo of a source.
+func repoOf(source string) string {
+	parts := strings.SplitN(source, "/", 3)
+	if len(parts) < 2 {
+		return source
+	}
+	return parts[0] + "/" + parts[1]
 }
 
 func matches(q string, fields ...string) bool {

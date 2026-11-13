@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api/session.dart';
@@ -7,6 +9,7 @@ import 'common.dart';
 import 'icons.dart';
 import 'theme.dart';
 import 'chat_screen.dart';
+import 'connect_apps_screen.dart' show itAgent;
 
 /// Skills: what is installed, and a few picked from the catalogue.
 class SkillsScreen extends StatefulWidget {
@@ -30,6 +33,21 @@ class _SkillsScreenState extends State<SkillsScreen> {
     // Agents only color the rings; the list shows without them.
     final agents = await api.listAgents().then((l) => l.agents, onError: (_) => <Agent>[]);
     return (skills, agents);
+  }
+
+  Timer? _typing;
+
+  @override
+  void dispose() {
+    _typing?.cancel();
+    super.dispose();
+  }
+
+  /// Searches, skills.sh included, once typing stops.
+  void _onSearch(String q) {
+    setState(() {});
+    _typing?.cancel();
+    _typing = Timer(const Duration(milliseconds: 400), () => _find(q));
   }
 
   void _find(String q) {
@@ -73,7 +91,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
                 fieldKey: const Key('skill-search'),
                 hint: 'Find a skill, or paste a GitHub link',
                 controller: _search,
-                onChanged: (_) => setState(() {}),
+                onChanged: _onSearch,
                 onSubmitted: _find,
               ),
             ),
@@ -117,24 +135,44 @@ class _SkillsScreenState extends State<SkillsScreen> {
                     builder: (context, snap) {
                       if (snap.hasError) return Text(describeError(snap.error!), style: TextStyle(fontSize: 13, color: p.danger));
                       if (!snap.hasData) return const SizedBox(height: 80, child: Center(child: CircularProgressIndicator()));
-                      final picks = snap.data!.skills.where((s) => !s.installed && matches(s.name, s.description)).toList();
-                      if (picks.isEmpty) return const SizedBox();
+                      final all = snap.data!.skills.where((s) => !s.installed && matches(s.name, s.description));
+                      final picks = all.where((s) => s.installs == null).toList();
+                      final sh = all.where((s) => s.installs != null).toList();
+                      if (picks.isEmpty && sh.isEmpty) return const SizedBox();
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const CapsLabel('Picked for your team'),
-                          const SizedBox(height: 10),
-                          RowsCard(
-                            children: [
-                              for (final s in picks)
-                                _Item(
-                                  key: Key('catalog:${s.name}'),
-                                  name: _title(s.name),
-                                  detail: [_repo(s.source), if ((s.suggestedFor ?? '').isNotEmpty) 'for ${s.suggestedFor}'].join(' · '),
-                                  trailing: _AddButton(busy: _adding.contains(s.source), onPressed: () => _add(s), key: Key('add:${s.name}')),
-                                ),
-                            ],
-                          ),
+                          if (picks.isNotEmpty) ...[
+                            const CapsLabel('Picked for your team'),
+                            const SizedBox(height: 10),
+                            RowsCard(
+                              children: [
+                                for (final s in picks)
+                                  _Item(
+                                    key: Key('catalog:${s.name}'),
+                                    name: _title(s.name),
+                                    detail: [_repo(s.source), if ((s.suggestedFor ?? '').isNotEmpty) 'for ${s.suggestedFor}'].join(' · '),
+                                    trailing: _AddButton(busy: _adding.contains(s.source), onPressed: () => _add(s), key: Key('add:${s.name}')),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (sh.isNotEmpty) ...[
+                            const CapsLabel('On skills.sh'),
+                            const SizedBox(height: 10),
+                            RowsCard(
+                              children: [
+                                for (final s in sh)
+                                  _Item(
+                                    key: Key('sh:${s.source}'),
+                                    name: _title(s.name),
+                                    detail: '${_repo(s.source)} · ${_count(s.installs!)} installs',
+                                    trailing: _AddButton(busy: _adding.contains(s.source), onPressed: () => _add(s), key: Key('add:${s.source}')),
+                                  ),
+                              ],
+                            ),
+                          ],
                         ],
                       );
                     },
@@ -142,7 +180,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(6, 12, 6, 12),
                     child: Text(
-                      'A skill is a folder with a SKILL.md, the same format Claude Code uses. Adding one shows what it does before any agent gets it.',
+                      'A skill is a folder with a SKILL.md, the same format Claude Code uses. Adding one shows what it does before any agent gets it, and it never updates on its own.',
                       style: TextStyle(fontSize: 13, color: p.muted),
                     ),
                   ),
@@ -154,10 +192,10 @@ class _SkillsScreenState extends State<SkillsScreen> {
               child: BigButton(
                 primary: false,
                 leading: Glyph.chat,
-                label: "Or just tell Bit what you'd like it to learn",
+                label: 'Or ask IT to find one for you',
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => ChatScreen(state: widget.state, draft: 'Learn how to '),
+                    builder: (_) => ChatScreen(state: widget.state, agent: itAgent, draft: 'Find a skill for '),
                   ),
                 ),
               ),
@@ -203,6 +241,9 @@ String _title(String name) {
 }
 
 /// "anthropics/skills/release-notes" shows as "anthropics/skills".
+/// 228k, 9.9k, 312.
+String _count(int n) => n >= 1000 ? '${(n / 1000).toStringAsFixed(n >= 9950 ? 0 : 1)}k' : '$n';
+
 String _repo(String source) => source.split('/').take(2).join('/');
 
 /// An icon and tint that fit the skill's name.

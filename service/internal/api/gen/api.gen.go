@@ -299,6 +299,27 @@ func (e AppTint) Valid() bool {
 	}
 }
 
+// Defines values for AppAccessAccess.
+const (
+	AppAccessAccessEverythingAsks AppAccessAccess = "everything_asks"
+	AppAccessAccessOff            AppAccessAccess = "off"
+	AppAccessAccessReadsOnOwn     AppAccessAccess = "reads_on_own"
+)
+
+// Valid indicates whether the value is a known member of the AppAccessAccess enum.
+func (e AppAccessAccess) Valid() bool {
+	switch e {
+	case AppAccessAccessEverythingAsks:
+		return true
+	case AppAccessAccessOff:
+		return true
+	case AppAccessAccessReadsOnOwn:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AppToolMode.
 const (
 	AppToolModeAfterOk AppToolMode = "after_ok"
@@ -791,6 +812,14 @@ type AppStatus string
 
 // AppTint defines model for App.Tint.
 type AppTint string
+
+// AppAccess defines model for AppAccess.
+type AppAccess struct {
+	Access AppAccessAccess `json:"access"`
+}
+
+// AppAccessAccess defines model for AppAccess.Access.
+type AppAccessAccess string
 
 // AppDetail defines model for AppDetail.
 type AppDetail struct {
@@ -1510,6 +1539,9 @@ type ConnectAppJSONRequestBody = ConnectRequest
 // FinishAppConnectJSONRequestBody defines body for FinishAppConnect for application/json ContentType.
 type FinishAppConnectJSONRequestBody = GoogleConnectFinish
 
+// SetAppAccessJSONRequestBody defines body for SetAppAccess for application/json ContentType.
+type SetAppAccessJSONRequestBody = AppAccess
+
 // SetAppToolJSONRequestBody defines body for SetAppTool for application/json ContentType.
 type SetAppToolJSONRequestBody = AppToolUpdate
 
@@ -1587,6 +1619,9 @@ type ServerInterface interface {
 
 	// (POST /api/v1/apps/{appId}/connect/finish)
 	FinishAppConnect(w http.ResponseWriter, r *http.Request, appId string)
+
+	// (PUT /api/v1/apps/{appId}/tools)
+	SetAppAccess(w http.ResponseWriter, r *http.Request, appId string)
 
 	// (PUT /api/v1/apps/{appId}/tools/{toolName})
 	SetAppTool(w http.ResponseWriter, r *http.Request, appId string, toolName string)
@@ -1996,6 +2031,32 @@ func (siw *ServerInterfaceWrapper) FinishAppConnect(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.FinishAppConnect(w, r, appId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetAppAccess operation middleware
+func (siw *ServerInterfaceWrapper) SetAppAccess(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "appId" -------------
+	var appId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "appId", r.PathValue("appId"), &appId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "appId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetAppAccess(w, r, appId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2948,6 +3009,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/apps/{appId}", wrapper.GetApp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/apps/{appId}/connect", wrapper.ConnectApp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/apps/{appId}/connect/finish", wrapper.FinishAppConnect)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/apps/{appId}/tools", wrapper.SetAppAccess)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/apps/{appId}/tools/{toolName}", wrapper.SetAppTool)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/skills/catalog", wrapper.SearchSkills)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/skills/add", wrapper.AddSkill)

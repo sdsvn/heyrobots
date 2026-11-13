@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"fmt"
 	"heyrobots/service/internal/core"
 	"time"
 
@@ -214,4 +215,39 @@ func (tx *Tx) SetLocalApp(id string, on bool, now time.Time) error {
 		return tx.db.Save(&LocalApp{ID: id, EnabledAt: now}).Error
 	}
 	return tx.db.Delete(&LocalApp{}, "id = ?", id).Error
+}
+
+// The access all of a server's tools can be given at once.
+const (
+	AccessReads = "reads_on_own"
+	AccessAsks  = "everything_asks"
+	AccessOff   = "off"
+)
+
+// SetMCPAccess sets every tool of a server at once: read-only tools on
+// their own and the rest asking first, everything asking first, or off.
+func (tx *Tx) SetMCPAccess(server, access string) error {
+	if access != AccessReads && access != AccessAsks && access != AccessOff {
+		return fmt.Errorf("access is %s, %s or %s", AccessReads, AccessAsks, AccessOff)
+	}
+	ts, err := tx.MCPTools(server)
+	if err != nil {
+		return err
+	}
+	for _, t := range ts {
+		if t.Removed {
+			continue
+		}
+		mode, reach := MCPToolBlocked, ""
+		switch access {
+		case AccessReads:
+			mode, reach = DefaultMode(t.ReadOnlyHint)
+		case AccessAsks:
+			mode, reach = MCPToolOutward, string(core.ReachOthers)
+		}
+		if err := tx.ReviewMCPTool(server, t.Name, mode, reach); err != nil {
+			return err
+		}
+	}
+	return nil
 }

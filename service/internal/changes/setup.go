@@ -40,28 +40,7 @@ func (s Sender) setup(ctx context.Context, e store.Effect, c Change) (string, er
 		}
 		return "", nil
 	case ActionAccess:
-		return "", s.Store.Tx(func(tx *store.Tx) error {
-			ts, err := tx.MCPTools(c.Server)
-			if err != nil {
-				return err
-			}
-			for _, t := range ts {
-				mode, reach := store.MCPToolBlocked, ""
-				switch c.Access {
-				case AccessReads:
-					mode, reach = store.DefaultMode(t.ReadOnlyHint)
-				case AccessAsks:
-					mode, reach = store.MCPToolOutward, string(core.ReachOthers)
-				}
-				if t.Removed {
-					continue
-				}
-				if err := tx.ReviewMCPTool(c.Server, t.Name, mode, reach); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
+		return "", s.Store.Tx(func(tx *store.Tx) error { return tx.SetMCPAccess(c.Server, c.Access) })
 	case ActionGive:
 		a, err := s.Store.Agent(c.Agent)
 		if err != nil {
@@ -91,4 +70,3 @@ func (s Sender) say(e store.Effect, text string) error {
 			Reach: string(core.ReachOwner), Body: text, Status: store.EffectPending, CreatedAt: s.Now().UTC()})
 	})
 }
-

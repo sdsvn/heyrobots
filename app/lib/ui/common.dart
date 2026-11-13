@@ -548,3 +548,30 @@ Future<List<String>?> askInSheet(
     },
   );
 }
+
+/// One choice in a row of two or three, as on a pill track.
+class Segment extends StatelessWidget {
+  const Segment({super.key, required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: EdgedBox(
+        height: 40,
+        radius: 999,
+        depth: selected ? 2 : 0,
+        color: selected ? p.accent : Colors.transparent,
+        edge: p.accentDeep,
+        onTap: onTap,
+        child: Center(child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: selected ? Colors.white : p.muted))),
+      ),
+    );
+  }
+}

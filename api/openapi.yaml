@@ -754,6 +754,30 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
+  /api/v1/apps/{appId}/tools:
+    put:
+      operationId: setAppAccess
+      description: "Change how all of an app's tools may be used at once: read-only tools on their own and the rest asking first, every tool asking first, or all off. Owner devices only."
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AppAccess" }
+      responses:
+        "200":
+          description: The app with its tools.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AppDetail" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /api/v1/apps/{appId}/tools/{toolName}:
     put:
       operationId: setAppTool
@@ -1436,6 +1460,11 @@ components:
       required: [mode]
       properties:
         mode: { type: string, enum: [reads, after_ok, own, off] }
+    AppAccess:
+      type: object
+      required: [access]
+      properties:
+        access: { type: string, enum: [reads_on_own, everything_asks, "off"] }
     Recent:
       type: object
       required: [at, text]

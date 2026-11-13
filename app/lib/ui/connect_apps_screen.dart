@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/session.dart';
 import '../platform.dart';
 import '../state.dart';
+import 'agent_avatar.dart';
 import 'app_screen.dart';
+import 'chat_screen.dart';
 import 'common.dart';
 import 'icons.dart';
 import 'theme.dart';
@@ -19,40 +23,143 @@ class ConnectAppsScreen extends StatefulWidget {
   State<ConnectAppsScreen> createState() => _ConnectAppsScreenState();
 }
 
-const _sections = [('email', 'Email & calendar'), ('messaging', 'Messaging'), ('code', 'Code & work'), ('docs', 'Docs'), ('other', 'More')];
+/// The starter set, in sections for a team doing everyday work. Apps not
+/// listed, such as servers added by link, show under "Your own".
+const _sections = [
+  ('Mail & calendar', ['gmail', 'google_calendar', 'apple_calendar', 'imessage']),
+  ('Tasks & projects', ['linear', 'atlassian', 'monday', 'todoist']),
+  ('Notes & data', ['notion', 'airtable']),
+  ('Code', ['github', 'supabase', 'context7', 'claude_code']),
+  ('Design', ['figma', 'canva']),
+  ('Money', ['stripe']),
+  ('Research & browser', ['exa', 'playwright']),
+  ('Everything else', ['zapier']),
+];
+
+/// The IT agent, who sets up the team.
+const itAgent = AgentRef(id: 'ag_it', name: 'IT', color: 'sky', badge: 'bolt');
 
 class _ConnectAppsScreenState extends State<ConnectAppsScreen> {
   late Future<AppList> _apps = widget.state.api.listApps();
   final _search = TextEditingController();
+  Timer? _typing;
 
-  /// 'all', 'connected', or a category.
+  /// 'all' or 'connected'.
   String _filter = 'all';
   String? _busy;
 
+  /// How many are connected, from the last list without a search.
+  int? _connected;
+
+  @override
+  void dispose() {
+    _typing?.cancel();
+    _search.dispose();
+    super.dispose();
+  }
+
   void _reload() => setState(() {
-    _apps = widget.state.api.listApps();
+    final q = _search.text.trim();
+    _apps = widget.state.api.listApps(q: q.length >= 2 && !_isLink(q) ? q : null);
   });
+
+  /// Searches the server, and through it the MCP registry, once typing stops.
+  void _onSearch(String _) {
+    setState(() {});
+    _typing?.cancel();
+    _typing = Timer(const Duration(milliseconds: 400), _reload);
+  }
 
   static bool _isLink(String s) => s.startsWith('http://') || s.startsWith('https://');
 
-  Future<void> _connect(String id, {ConnectRequest? body}) async {
-    setState(() => _busy = id);
+  Future<void> _connect(App a, {ConnectRequest? body}) async {
+    if (a.runsHere == true && !a.connected && !await _confirmRunsHere(a)) return;
+    if (!mounted) return;
+    setState(() => _busy = a.id);
     try {
-      await connectApp(context, widget.state, id, body: body);
+      await connectApp(context, widget.state, a.id, body: body);
     } finally {
       if (mounted) setState(() => _busy = null);
       _reload();
     }
   }
 
+  /// A server that runs on this computer runs code as you: show what runs
+  /// before it starts.
+  Future<bool> _confirmRunsHere(App a) async {
+    final p = Palette.of(context);
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  AppLogo(app: a, size: 44, radius: 14, fontSize: 16, dot: false),
+                  const SizedBox(width: 12),
+                  Expanded(child: TwoLines(a.name, a.publisher ?? a.summary, titleSize: 20, titleWeight: FontWeight.w900, subtitleSize: 13)),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: p.peachSoft, borderRadius: BorderRadius.circular(16)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Runs on this computer',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: p.peachInk),
+                    ),
+                    const SizedBox(height: 4),
+                    Text('It starts as a program on the computer running heyrobots, as you. This is what runs:', style: TextStyle(fontSize: 13, color: p.ink)),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(10)),
+                      child: SelectableText(
+                        a.command ?? '',
+                        key: const Key('run-command'),
+                        style: TextStyle(fontFamily: 'monospace', fontSize: 13, color: p.ink),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text('Read-only tools work on their own; the rest ask you first.', style: TextStyle(fontSize: 13, color: p.muted)),
+              const SizedBox(height: 16),
+              BigButton(key: const Key('confirm-run'), label: 'Connect', onPressed: () => Navigator.pop(context, true)),
+            ],
+          ),
+        ),
+      ),
+    );
+    return ok == true;
+  }
+
   Future<void> _open(App a) async {
-    if (!a.connected) return _connect(a.id);
+    if (!a.connected) return _connect(a);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AppScreen(state: widget.state, appId: a.id),
       ),
     );
     _reload();
+  }
+
+  void _askIT() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatScreen(state: widget.state, agent: itAgent),
+      ),
+    );
   }
 
   @override
@@ -66,56 +173,70 @@ class _ConnectAppsScreenState extends State<ConnectAppsScreen> {
           builder: (context, snap) {
             final all = snap.data?.apps ?? const <App>[];
             final q = _search.text.trim().toLowerCase();
-            final shown = all.where((a) {
+            final ours = all.where((a) => !a.id.startsWith('registry~')).where((a) {
               if (q.isNotEmpty && !_isLink(q) && !a.name.toLowerCase().contains(q)) return false;
-              return switch (_filter) {
-                'all' => true,
-                'connected' => a.connected,
-                final c => a.category.toJson() == c,
-              };
+              return _filter == 'all' || a.connected;
             }).toList();
-            final connected = all.where((a) => a.connected).length;
+            final found = _filter == 'all' && q.isNotEmpty ? all.where((a) => a.id.startsWith('registry~')).toList() : const <App>[];
+            final official = found.where((a) => a.official == true).toList();
+            final others = found.where((a) => a.official != true).toList();
+            final placed = {for (final (_, ids) in _sections) ...ids};
+            final own = ours.where((a) => !placed.contains(a.id)).toList();
+            if (snap.hasData && q.isEmpty) _connected = all.where((a) => a.connected).length;
+            final connected = _connected ?? all.where((a) => a.connected).length;
+            final onTile = isPhoneApp ? null : (App a) => _connect(a);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const ScreenHeader('Connect apps', padding: EdgeInsets.fromLTRB(20, 20, 20, 8)),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                  child: Text(
-                    isPhoneApp ? onComputerOnly : "Tap one and I'll ask for what I need. Apps on this Mac just work.",
-                    key: const Key('apps-hint'),
-                    style: TextStyle(fontSize: 14, color: p.muted),
-                  ),
-                ),
+                const ScreenHeader('Add-ons', padding: EdgeInsets.fromLTRB(20, 20, 20, 8)),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                   child: SearchBox(
                     fieldKey: const Key('app-search'),
-                    hint: isPhoneApp ? 'Search apps' : 'Search apps, or paste an MCP link',
+                    hint: isPhoneApp ? 'Search any app or MCP server' : 'Search any app or MCP server, or paste a link',
                     controller: _search,
-                    onChanged: (_) => setState(() {}),
+                    onChanged: _onSearch,
                     onSubmitted: (v) {
                       if (_isLink(v.trim())) {
                         _search.clear();
-                        _connect('custom', body: ConnectRequest(url: v.trim()));
+                        _connect(
+                          App(
+                            id: 'custom',
+                            name: 'Custom',
+                            category: AppCategory.other,
+                            kind: AppKind.mcp,
+                            mark: '',
+                            tint: AppTint.ink,
+                            connected: false,
+                            accounts: const [],
+                            status: AppStatus.off,
+                            summary: '',
+                            newTools: 0,
+                            agents: const [],
+                            toolset: '',
+                          ),
+                          body: ConnectRequest(url: v.trim()),
+                        );
                       }
                     },
                   ),
                 ),
+                if (isPhoneApp)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                    child: Text(
+                      onComputerOnly,
+                      key: const Key('apps-hint'),
+                      style: TextStyle(fontSize: 13, color: p.muted),
+                    ),
+                  ),
                 SizedBox(
                   height: 36,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     children: [
-                      for (final (id, label) in [
-                        ('all', 'All'),
-                        ('connected', 'Connected · $connected'),
-                        ('email', 'Email'),
-                        ('messaging', 'Messaging'),
-                        ('code', 'Code'),
-                        ('docs', 'Docs'),
-                      ]) ...[
+                      for (final (id, label) in [('all', 'All'), ('connected', 'Connected · $connected')]) ...[
                         Align(
                           alignment: Alignment.topCenter,
                           child: PillChip(label, key: Key('filter:$id'), selected: _filter == id, onTap: () => setState(() => _filter = id)),
@@ -134,28 +255,88 @@ class _ConnectAppsScreenState extends State<ConnectAppsScreen> {
                       : ListView(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                           children: [
-                            for (final (cat, title) in _sections)
-                              if (shown.where((a) => a.category.toJson() == cat) case final apps when apps.isNotEmpty) ...[
+                            if (q.isEmpty) ...[_SetUpBanner(onTap: _askIT), const SizedBox(height: 14)],
+                            if (official.isNotEmpty) ...[
+                              CapsLabel("${official.first.name}'s own", padding: const EdgeInsets.fromLTRB(6, 4, 6, 0)),
+                              const SizedBox(height: 10),
+                              _Grid(apps: official, busy: _busy, onTap: _open, onAdd: onTile, wide: true),
+                              const SizedBox(height: 10),
+                            ],
+                            for (final (title, ids) in _sections)
+                              if ([for (final id in ids) ...ours.where((a) => a.id == id)] case final apps when apps.isNotEmpty) ...[
                                 CapsLabel(title, padding: const EdgeInsets.fromLTRB(6, 4, 6, 0)),
                                 const SizedBox(height: 10),
-                                _Grid(apps: apps.toList(), busy: _busy, onTap: _open, onAdd: isPhoneApp ? null : (a) => _connect(a.id)),
+                                _Grid(apps: apps, busy: _busy, onTap: _open, onAdd: onTile),
                                 const SizedBox(height: 10),
                               ],
+                            if (own.isNotEmpty) ...[
+                              CapsLabel('Your own', padding: const EdgeInsets.fromLTRB(6, 4, 6, 0)),
+                              const SizedBox(height: 10),
+                              _Grid(apps: own, busy: _busy, onTap: _open, onAdd: onTile),
+                              const SizedBox(height: 10),
+                            ],
+                            if (others.isNotEmpty) ...[
+                              CapsLabel('From the MCP registry', padding: const EdgeInsets.fromLTRB(6, 4, 6, 0)),
+                              const SizedBox(height: 10),
+                              _Grid(apps: others, busy: _busy, onTap: _open, onAdd: onTile, wide: true),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(6, 8, 6, 10),
+                                child: Text('Each shows who publishes it. Pick the one you trust.', style: TextStyle(fontSize: 12, color: p.muted)),
+                              ),
+                            ],
+                            if (q.length >= 2 && found.isEmpty && ours.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Text(
+                                  'Nothing called "$q" yet. Paste its MCP link instead.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: p.muted),
+                                ),
+                              ),
                           ],
                         ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
-                  child: Text(
-                    '${all.length} apps · any MCP server works too',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: p.muted),
-                  ),
                 ),
               ],
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+/// "Set up with an agent": opens a chat with IT, who connects things for you.
+class _SetUpBanner extends StatelessWidget {
+  const _SetUpBanner({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return EdgedBox(
+      key: const Key('set-up-with-agent'),
+      radius: 20,
+      depth: 3,
+      color: p.accentSoft,
+      edge: p.accent,
+      padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+      onTap: onTap,
+      child: Row(
+        children: [
+          const AgentAvatar(color: 'sky', badge: 'bolt', size: 44, name: 'IT', seed: 'ag_it'),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: TwoLines(
+              'Set up with an agent',
+              'Tell IT what you use; it finds it, connects it and gives it to the right agent.',
+              titleSize: 15,
+              titleWeight: FontWeight.w900,
+              subtitleSize: 12,
+            ),
+          ),
+          LineIcon(Glyph.chevron, size: 18, color: p.accent, stroke: 2.6),
+        ],
       ),
     );
   }
@@ -222,6 +403,20 @@ Future<void> connectApp(BuildContext context, AppState state, String appId, {Con
     if (v == null || v[0].isEmpty) return;
     return again(ConnectRequest(url: body?.url, token: v[0]));
   }
+  if (r.needsSettings case final need? when need.isNotEmpty) {
+    final v = await askInSheet(
+      context,
+      title: '${r.app.name} needs a few things',
+      body: 'They go to the vault on your server and start it on this computer.',
+      fields: [
+        for (final n in need)
+          (label: n.description.isEmpty ? n.name : '${n.name} · ${n.description}', secret: n.secret, initial: null, key: Key('setting:${n.name}')),
+      ],
+      action: 'Connect',
+    );
+    if (v == null) return;
+    return again(ConnectRequest(url: body?.url, token: body?.token, settings: {for (final (i, n) in need.indexed) n.name: v[i]}));
+  }
   if ((r.steps ?? const []).isNotEmpty && !r.app.connected) {
     final v = await askInSheet(context, title: 'One thing on your Mac first', steps: r.steps!, fields: const [], action: "I've done that");
     if (v == null) return;
@@ -242,9 +437,12 @@ Future<void> connectApp(BuildContext context, AppState state, String appId, {Con
 }
 
 class _Grid extends StatelessWidget {
-  const _Grid({required this.apps, required this.busy, required this.onTap, this.onAdd});
+  const _Grid({required this.apps, required this.busy, required this.onTap, this.onAdd, this.wide = false});
 
   final List<App> apps;
+
+  /// One app per row, with room for its publisher and what it does.
+  final bool wide;
   final String? busy;
   final void Function(App) onTap;
 
@@ -254,6 +452,15 @@ class _Grid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
+    if (wide) {
+      return Container(
+        decoration: edged(p.card, edge: p.line),
+        padding: const EdgeInsets.all(6),
+        child: Column(
+          children: [for (final a in apps) _Tile(app: a, busy: busy == a.id, onTap: onTap, onAdd: onAdd, wide: true)],
+        ),
+      );
+    }
     return Container(
       decoration: edged(p.card, edge: p.line),
       padding: const EdgeInsets.all(6),
@@ -324,9 +531,10 @@ class AppLogo extends StatelessWidget {
 }
 
 class _Tile extends StatelessWidget {
-  const _Tile({required this.app, required this.busy, required this.onTap, this.onAdd});
+  const _Tile({required this.app, required this.busy, required this.onTap, this.onAdd, this.wide = false});
 
   final App app;
+  final bool wide;
   final bool busy;
   final void Function(App) onTap;
 
@@ -338,6 +546,7 @@ class _Tile extends StatelessWidget {
     final p = Palette.of(context);
     final review = app.newTools > 0;
     final sub = review ? '${app.newTools} new tool${app.newTools == 1 ? '' : 's'} to review' : app.summary;
+    final chips = [if (app.official == true) ('Official', 'mint'), if (app.runsHere == true) ('Runs on this computer', 'peach')];
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
@@ -364,13 +573,30 @@ class _Tile extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
                       ),
+                      if (wide && app.publisher != null)
+                        Text(
+                          app.publisher!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: p.accent),
+                        ),
                       if (sub.isNotEmpty)
                         Text(
                           sub,
-                          maxLines: 1,
+                          maxLines: wide ? 2 : 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontSize: 12, color: review ? p.warn : p.muted),
                         ),
+                      if (wide && chips.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 6,
+                          children: [
+                            for (final (label, tint) in chips)
+                              Pill(label, background: tintColors(tint, p).$1, foreground: tint == 'peach' ? p.peachInk : tintColors(tint, p).$2),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
