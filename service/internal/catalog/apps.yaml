@@ -3,8 +3,8 @@
 # registry:, which is only used to refresh their urls.
 # kind: google (the Google account),
 # mcp (a remote MCP server at url, or a local one started by command) or
-# local (found on this machine by probe). coming: shown greyed, not yet
-# connectable.
+# local (found on this machine by probe). The starter set is for a team
+# doing everyday work; anything else is found by searching the registry.
 - id: gmail
   name: Gmail
   category: email
@@ -48,15 +48,6 @@
   mark: N
   tint: ink
   about: Searches, reads and writes your Notion pages and databases.
-- id: slack
-  name: Slack
-  category: messaging
-  kind: mcp
-  url: https://mcp.slack.com/mcp
-  mark: S
-  tint: peach
-  coming: true
-  about: Searches and reads channels; posts messages after your OK.
 - id: atlassian
   name: Jira & Confluence
   category: code
@@ -75,39 +66,96 @@
   mark: St
   tint: violet
   about: Customers, payments and invoices in your Stripe account.
-- id: google_drive
-  name: Google Drive
+- id: monday
+  name: monday.com
+  category: other
+  kind: mcp
+  registry: com.monday/monday.com
+  url: https://mcp.monday.com/mcp
+  mark: M
+  tint: rose
+  about: Boards, items and updates in your monday.com account.
+- id: todoist
+  name: Todoist
+  category: other
+  kind: mcp
+  registry: net.todoist/mcp
+  url: https://ai.todoist.net/mcp
+  mark: Td
+  tint: rose
+  about: Your tasks and projects in Todoist.
+- id: airtable
+  name: Airtable
   category: docs
   kind: mcp
-  url: https://drivemcp.googleapis.com/mcp/v1
-  mark: D
+  registry: com.airtable/mcp
+  url: https://mcp.airtable.com/mcp
+  mark: A
   tint: sun
-  coming: true
-  about: Finds and reads your Drive files.
-- id: outlook
-  name: Outlook
-  category: email
+  about: Reads and updates your Airtable bases.
+- id: supabase
+  name: Supabase
+  category: code
   kind: mcp
-  mark: O
-  tint: sky
-  coming: true
-  about: Reads your Outlook mail and calendar.
-- id: whatsapp
-  name: WhatsApp
-  category: messaging
-  kind: mcp
-  mark: W
+  registry: com.supabase/mcp
+  url: https://mcp.supabase.com/mcp
+  mark: Sb
   tint: mint
-  coming: true
-  about: Reads and answers your WhatsApp chats.
-- id: telegram
-  name: Telegram
-  category: messaging
+  about: Your Supabase projects, databases and logs.
+- id: figma
+  name: Figma
+  category: other
   kind: mcp
-  mark: T
+  registry: com.figma.mcp/mcp
+  url: https://mcp.figma.com/mcp
+  mark: F
+  tint: violet
+  about: Reads your Figma designs and comments.
+- id: canva
+  name: Canva
+  category: other
+  kind: mcp
+  registry: com.canva.mcp/mcp
+  url: https://mcp.canva.com/mcp
+  mark: C
   tint: sky
-  coming: true
-  about: Reads and answers your Telegram chats.
+  about: Finds and makes designs in your Canva account.
+- id: exa
+  name: Exa
+  category: other
+  kind: mcp
+  registry: ai.exa/exa
+  url: https://mcp.exa.ai/mcp
+  mark: E
+  tint: ink
+  about: Searches the web and reads pages for research.
+- id: context7
+  name: Context7
+  category: code
+  kind: mcp
+  registry: io.github.upstash/context7
+  url: https://mcp.context7.com/mcp
+  mark: C7
+  tint: mint
+  about: Up-to-date documentation for code libraries.
+- id: playwright
+  name: Playwright
+  category: other
+  kind: mcp
+  registry: io.github.microsoft/playwright-mcp
+  command: [npx, -y, "@playwright/mcp@0.0.85"]
+  mark: P
+  tint: peach
+  about: A browser on this computer that agents can drive.
+- id: zapier
+  name: Zapier
+  category: other
+  kind: mcp
+  registry: com.zapier/mcp
+  url: https://mcp.zapier.com/api/v1/connect
+  mark: Z
+  tint: peach
+  about: Thousands of apps, Slack included, through one connection.
 - id: imessage
   name: iMessage
   category: messaging

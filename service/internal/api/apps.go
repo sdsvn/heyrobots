@@ -169,6 +169,12 @@ func (s *Server) appEntries() ([]appEntry, error) {
 func mcpState(e *appEntry) {
 	e.view.Connected, e.view.Status = true, gen.AppStatusOn
 	e.view.Summary = "Reads on its own · changes after your OK"
+	if e.server.Transport == store.MCPStdio {
+		var cmd []string
+		_ = json.Unmarshal([]byte(e.server.Command), &cmd)
+		here, line := true, strings.Join(cmd, " ")
+		e.view.RunsHere, e.view.Command = &here, &line
+	}
 	for _, t := range e.tools {
 		if t.NeedsReview() {
 			e.view.NewTools++
@@ -282,6 +288,9 @@ func (s *Server) ListApps(w http.ResponseWriter, r *http.Request, p gen.ListApps
 		if strings.Contains(strings.ToLower(e.view.Name), q) {
 			out.Apps = append(out.Apps, e.view)
 		}
+	}
+	if q != "" {
+		out.Apps = append(out.Apps, s.registryApps(r.Context(), q, es)...)
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -421,6 +430,10 @@ func (s *Server) ConnectApp(w http.ResponseWriter, r *http.Request, appID string
 	}
 	c, known := catalog.Find(appID)
 	switch {
+	case strings.HasPrefix(appID, registryPrefix):
+		s.connectRegistry(w, r, appID, req)
+	case known && len(c.Command) > 0:
+		s.connectPackage(w, r, c.ID, c.Command, nil, req.Settings, nil)
 	case known && c.Coming:
 		writeError(w, http.StatusBadRequest, c.Name+" isn't available yet")
 	case known && c.Kind == catalog.KindGoogle:

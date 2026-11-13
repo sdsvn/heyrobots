@@ -98,7 +98,7 @@ func TestListAppsShowsConnectedGmailAndMCPServers(t *testing.T) {
 	if a := findApp(apps, "imessage"); a.Status != gen.AppStatusOff {
 		t.Fatalf("imessage off linux = %+v", a)
 	}
-	if got := getJSON[gen.AppList](t, h, "/api/v1/apps?q=gma", owner).Apps; len(got) != 1 || got[0].Id != "gmail" {
+	if got := getJSON[gen.AppList](t, h, "/api/v1/apps?q=gmai", owner).Apps; len(got) != 1 || got[0].Id != "gmail" {
 		t.Fatalf("q = %+v", got)
 	}
 

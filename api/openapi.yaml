@@ -659,7 +659,7 @@ paths:
   /api/v1/apps:
     get:
       operationId: listApps
-      description: The app catalogue with what is connected. Owner devices only.
+      description: "The app catalogue with what is connected. With q, servers from the official MCP registry that match follow, with ids starting registry~. Owner devices only."
       parameters:
         - name: q
           in: query
@@ -1411,6 +1411,10 @@ components:
         summary: { type: string, description: "A short line under the name: the account, 'posts after your OK', 'On this Mac'." }
         new_tools: { type: integer }
         agents: { type: array, items: { $ref: "#/components/schemas/AgentRef" } }
+        publisher: { type: string, description: "Who publishes it, from the MCP registry, such as com.notion." }
+        official: { type: boolean, description: The app's own server, run by its publisher. }
+        runs_here: { type: boolean, description: It runs as a program on the server's computer. }
+        command: { type: string, description: "For one that runs here: the command that starts it." }
     AppDetail:
       type: object
       required: [app, tools, recent]
@@ -1443,6 +1447,10 @@ components:
       properties:
         url: { type: string, description: An MCP server address, for an app not in the catalogue. }
         token: { type: string, description: A token the server needs, when it asks for one. }
+        settings:
+          type: object
+          additionalProperties: { type: string }
+          description: Values a server that runs here needs, by name, when it asks for them.
     ConnectResult:
       type: object
       required: [app]
@@ -1452,6 +1460,18 @@ components:
         needs_token: { type: boolean, description: The server wants a token pasted. }
         needs_client: { type: boolean, description: "Google only: the owner's own OAuth client isn't set yet; the app walks them through making one, then calls setGoogleClient and connects again." }
         steps: { type: array, items: { type: string }, description: Short steps the person must take themselves, such as granting Full Disk Access, before connecting again. }
+        needs_settings:
+          type: array
+          items: { $ref: "#/components/schemas/AppSetting" }
+          description: Values a server that runs here needs before it starts; send them as settings and connect again.
+    AppSetting:
+      type: object
+      required: [name, description, secret, required]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        secret: { type: boolean }
+        required: { type: boolean }
     SkillCatalog:
       type: object
       required: [skills]

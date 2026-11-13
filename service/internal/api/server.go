@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"heyrobots/service/internal/cluster"
+	"heyrobots/service/internal/registry"
 	"io"
 	"log/slog"
 	"net/http"
@@ -46,10 +47,12 @@ type Options struct {
 	// Jobs is the standing jobs folder.
 	Jobs *jobs.Library
 	// MCP reads the owner's MCP servers' tools.
-	MCP    *gateway.MCP
-	Broker *Broker
-	Log    *slog.Logger
-	Now    func() time.Time
+	MCP *gateway.MCP
+	// Registry finds MCP servers in the official MCP registry.
+	Registry *registry.Client
+	Broker   *Broker
+	Log      *slog.Logger
+	Now      func() time.Time
 	// ServerURL is put into pairing codes. When empty, the address of the
 	// request is used.
 	ServerURL string

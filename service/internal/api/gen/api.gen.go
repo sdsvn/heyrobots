@@ -747,17 +747,29 @@ type AgentTask struct {
 
 // App defines model for App.
 type App struct {
-	Accounts  []string    `json:"accounts"`
-	Agents    []AgentRef  `json:"agents"`
-	Category  AppCategory `json:"category"`
-	Connected bool        `json:"connected"`
-	Id        string      `json:"id"`
-	Kind      AppKind     `json:"kind"`
+	Accounts []string    `json:"accounts"`
+	Agents   []AgentRef  `json:"agents"`
+	Category AppCategory `json:"category"`
+
+	// Command For one that runs here: the command that starts it.
+	Command   *string `json:"command,omitempty"`
+	Connected bool    `json:"connected"`
+	Id        string  `json:"id"`
+	Kind      AppKind `json:"kind"`
 
 	// Mark One or two letters for the logo tile.
-	Mark     string    `json:"mark"`
-	Name     string    `json:"name"`
-	NewTools int       `json:"new_tools"`
+	Mark     string `json:"mark"`
+	Name     string `json:"name"`
+	NewTools int    `json:"new_tools"`
+
+	// Official The app's own server
+	Official *bool `json:"official,omitempty"`
+
+	// Publisher Who publishes it, from the MCP registry, such as com.notion.
+	Publisher *string `json:"publisher,omitempty"`
+
+	// RunsHere It runs as a program on the server's computer.
+	RunsHere *bool     `json:"runs_here,omitempty"`
 	Status   AppStatus `json:"status"`
 
 	// Summary A short line under the name: the account, 'posts after your OK', 'On this Mac'.
@@ -790,6 +802,14 @@ type AppDetail struct {
 // AppList defines model for AppList.
 type AppList struct {
 	Apps []App `json:"apps"`
+}
+
+// AppSetting defines model for AppSetting.
+type AppSetting struct {
+	Description string `json:"description"`
+	Name        string `json:"name"`
+	Required    bool   `json:"required"`
+	Secret      bool   `json:"secret"`
 }
 
 // AppTool defines model for AppTool.
@@ -973,6 +993,9 @@ type ChatModelUpdate struct {
 
 // ConnectRequest defines model for ConnectRequest.
 type ConnectRequest struct {
+	// Settings Values a server that runs here needs, by name, when it asks for them.
+	Settings *map[string]string `json:"settings,omitempty"`
+
 	// Token A token the server needs
 	Token *string `json:"token,omitempty"`
 
@@ -986,6 +1009,9 @@ type ConnectResult struct {
 
 	// NeedsClient Google only: the owner's own OAuth client isn't set yet; the app walks them through making one, then calls setGoogleClient and connects again.
 	NeedsClient *bool `json:"needs_client,omitempty"`
+
+	// NeedsSettings Values a server that runs here needs before it starts; send them as settings and connect again.
+	NeedsSettings *[]AppSetting `json:"needs_settings,omitempty"`
 
 	// NeedsToken The server wants a token pasted.
 	NeedsToken *bool `json:"needs_token,omitempty"`

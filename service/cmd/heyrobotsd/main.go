@@ -2,13 +2,15 @@
 package main
 
 import (
+	"heyrobots/service/internal/cluster"
+	"heyrobots/service/internal/policy"
+	"heyrobots/service/internal/registry"
+
 	"github.com/glebarez/sqlite"
 	"google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/session/database"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
-	"heyrobots/service/internal/cluster"
-	"heyrobots/service/internal/policy"
 
 	"context"
 	"errors"
@@ -268,6 +270,7 @@ func run() error {
 		Devices:   devices.New(st, time.Now),
 		Vault:     v,
 		MCP:       mcpServers,
+		Registry:  &registry.Client{},
 		Models:    resolver,
 		ACP:       claude,
 		Skills:    skillLib,
