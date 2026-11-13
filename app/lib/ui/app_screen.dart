@@ -33,8 +33,9 @@ class _AppScreenState extends State<AppScreen> {
   /// The toolset an agent needs to use this app.
   static String _toolset(App a) => a.toolset;
 
-  Future<void> _setTool(AppTool t, bool on) async {
-    final mode = on ? AppToolMode.own : AppToolMode.off;
+  Future<void> _setTool(AppTool t, bool on) => _setMode(t, on ? AppToolMode.own : AppToolMode.off);
+
+  Future<void> _setMode(AppTool t, AppToolMode mode) async {
     setState(() => _modes[t.name] = mode);
     try {
       await widget.state.api.setAppTool(
@@ -338,7 +339,25 @@ class _AppScreenState extends State<AppScreen> {
         _ => ('Off', 'violet'),
       };
       final (bg, ink) = tintColors(tint, p);
-      trailing = Pill(label, background: bg, foreground: tint == 'peach' ? p.peachInk : ink);
+      // Any tool can be set: reading on its own, acting after your OK, or off.
+      trailing = PopupMenuButton<AppToolMode>(
+        key: Key('tool:${t.name}'),
+        tooltip: 'Change how ${t.title} is used',
+        onSelected: (m) => _setMode(t, m),
+        itemBuilder: (_) => [
+          for (final (m, title, sub) in [
+            (AppToolMode.reads, 'Runs on its own', 'For reading and looking things up'),
+            (AppToolMode.afterOk, 'After your OK', 'For anything that changes or sends'),
+            (AppToolMode.off, 'Off', 'Never used'),
+          ])
+            PopupMenuItem(
+              key: Key('mode:${m.toJson()}'),
+              value: m,
+              child: TwoLines(title, sub, titleSize: 14, titleWeight: FontWeight.w800, subtitleSize: 12),
+            ),
+        ],
+        child: Pill(label, background: bg, foreground: tint == 'peach' ? p.peachInk : ink),
+      );
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

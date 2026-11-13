@@ -127,6 +127,13 @@ void main() {
     await tester.tap(find.byKey(const Key('tool:archive')));
     await settle(tester);
     expect(bodies('PUT', '/api/v1/apps/gmail/tools/archive').single, {'mode': 'off'});
+
+    // Any other tool is set from its menu, such as a read that's off.
+    await tester.tap(find.byKey(const Key('tool:send_email')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mode:reads')));
+    await settle(tester);
+    expect(bodies('PUT', '/api/v1/apps/gmail/tools/send_email').single, {'mode': 'reads'});
   });
 
   testWidgets('skills adds one from the catalogue', (tester) async {
