@@ -207,7 +207,7 @@ class _NewGroupScreenState extends State<NewGroupScreen> {
         decoration: BoxDecoration(border: last ? null : Border(bottom: BorderSide(color: rowLine(p)))),
         child: Row(
           children: [
-            AgentAvatar(color: a.color.toJson(), badge: a.badge.toJson(), size: 44, showBadge: false, name: a.name),
+            AgentAvatar(color: a.color.toJson(), badge: a.badge.toJson(), size: 44, showBadge: false, name: a.name, seed: a.id),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

@@ -104,7 +104,7 @@ class _AgentCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AgentAvatar(color: a.color.toJson(), badge: a.badge.toJson(), size: 52, mood: busy ? BitMood.thinking : BitMood.idle, name: a.name),
+              AgentAvatar(color: a.color.toJson(), badge: a.badge.toJson(), size: 52, mood: busy ? BitMood.thinking : BitMood.idle, name: a.name, seed: a.id),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -279,7 +279,7 @@ class _AgentEditScreenState extends State<AgentEditScreen> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
             children: [
-              Center(child: AgentAvatar(color: _color, badge: _badge, size: 84)),
+              Center(child: AgentAvatar(color: _color, badge: _badge, size: 84, seed: a?.id)),
               const SizedBox(height: 12),
               Wrap(
                 alignment: WrapAlignment.center,

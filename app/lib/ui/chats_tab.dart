@@ -418,7 +418,7 @@ class _ChatRow extends StatelessWidget {
     if (t.group != null) {
       avatar = GroupAvatar(members: t.group!.members);
     } else if (t.agent != null) {
-      avatar = AgentAvatar(color: t.agent!.color, badge: t.agent!.badge, size: 50, name: t.agent!.name, mood: t.typing ? BitMood.thinking : BitMood.idle);
+      avatar = AgentAvatar(color: t.agent!.color, badge: t.agent!.badge, size: 50, name: t.agent!.name, seed: t.agent!.id, mood: t.typing ? BitMood.thinking : BitMood.idle);
     } else {
       avatar = const AgentAvatar(color: 'violet', badge: 'star', size: 50, showBadge: false, name: 'Bit');
     }

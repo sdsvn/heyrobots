@@ -138,7 +138,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        AgentAvatar(color: ref.color, badge: ref.badge, size: 64, fill: p.card, name: a.name, mood: busy ? BitMood.thinking : (a.enabled ? BitMood.idle : BitMood.sleeping)),
+                        AgentAvatar(color: ref.color, badge: ref.badge, size: 64, fill: p.card, name: a.name, seed: a.id, mood: busy ? BitMood.thinking : (a.enabled ? BitMood.idle : BitMood.sleeping)),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(

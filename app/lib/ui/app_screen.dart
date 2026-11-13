@@ -101,7 +101,7 @@ class _AppScreenState extends State<AppScreen> {
             for (final g in others)
               ListTile(
                 key: Key('give:${g.id}'),
-                leading: AgentAvatar(color: g.color.toJson(), badge: g.badge.toJson(), size: 36),
+                leading: AgentAvatar(color: g.color.toJson(), badge: g.badge.toJson(), size: 36, seed: g.id),
                 title: Text(g.name),
                 subtitle: g.purpose.isEmpty ? null : Text(g.purpose, maxLines: 1, overflow: TextOverflow.ellipsis),
                 onTap: () => Navigator.pop(context, g),
