@@ -269,6 +269,10 @@ func run() error {
 		Log:       log,
 		ServerURL: cfg.ServerURL,
 		Addresses: reachable(cfg.ServerURL, cfg.Listen, scheme),
+		ShowPairingCode: func(code string, expires time.Time, servers []string) {
+			fmt.Fprint(os.Stderr, pairingBlock(code, expires, servers, scheme+"://"+localAddr(cfg.Listen[0])))
+			log.Info("pairing code issued; it is printed above")
+		},
 		ShowSetupCode: func(code string) {
 			fmt.Fprintf(os.Stderr, "\n  heyrobots setup code: %s\n  Open http://%s/setup on this machine and enter it.\n\n", code, cfg.Listen[0])
 			log.Info("setup code issued; it is printed above")

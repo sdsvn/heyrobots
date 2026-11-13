@@ -60,6 +60,9 @@ type Options struct {
 	Guard func(http.Handler) http.Handler
 	// ShowSetupCode prints the setup code to the terminal and log.
 	ShowSetupCode func(code string)
+	// ShowPairingCode prints, at every start, a one-time code that pairs an
+	// owner device, with the addresses other devices can reach.
+	ShowPairingCode func(code string, expires time.Time, servers []string)
 	// Heartbeat is how often an idle event stream sends a keep-alive.
 	Heartbeat time.Duration
 	// Intake stores chat messages.
@@ -115,15 +118,29 @@ func New(o Options) *Server {
 // changes, for wiring that needs the Server first.
 func (s *Server) SetOnDecided(fn func()) { s.opts.OnDecided = fn }
 
-// AnnounceSetup prints a setup code if setup is open. The server calls it
-// at start.
+// AnnounceSetup runs at start. It prints the setup code while setup is
+// open, and on every start a one-time owner pairing code: whoever can read
+// the server's terminal may pair a device, so a lost phone or a cleared
+// browser never locks the owner out.
 func (s *Server) AnnounceSetup() error {
 	open, err := s.opts.Devices.SetupOpen()
-	if err != nil || !open {
+	if err != nil {
 		return err
 	}
-	_, err = s.setup.code()
-	return err
+	if open {
+		if _, err := s.setup.code(); err != nil {
+			return err
+		}
+	}
+	if s.opts.ShowPairingCode == nil {
+		return nil
+	}
+	c, err := s.opts.Devices.NewCode(devices.RoleOwner, "", "terminal")
+	if err != nil {
+		return err
+	}
+	s.opts.ShowPairingCode(c.Code, c.ExpiresAt, append([]string{}, s.opts.Addresses...))
+	return nil
 }
 
 // maxBody caps request bodies.

@@ -3,7 +3,9 @@ package main
 import (
 	"net/netip"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestPairingAddressesPutTheTailnetFirst(t *testing.T) {
@@ -18,5 +20,14 @@ func TestPairingAddressesPutTheTailnetFirst(t *testing.T) {
 	}
 	if got := reachable("", []string{"127.0.0.1:7340"}, "http"); len(got) != 0 {
 		t.Fatalf("loopback only = %v, want none", got)
+	}
+}
+
+func TestThePairingBlockOffersEveryAddressAndTheCode(t *testing.T) {
+	out := pairingBlock("ABCDE-FGHJK", time.Date(2026, 11, 13, 9, 30, 0, 0, time.Local), []string{"http://100.101.102.103:7340"}, "http://127.0.0.1:7340")
+	for _, want := range []string{"ABCDE-FGHJK", "http://100.101.102.103:7340", "http://127.0.0.1:7340   (on this machine)", "09:30", "█"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("pairing block lacks %q:\n%s", want, out)
+		}
 	}
 }

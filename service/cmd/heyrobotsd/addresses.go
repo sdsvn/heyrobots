@@ -83,3 +83,15 @@ func reachable(serverURL string, listen []string, scheme string) []string {
 	}
 	return out
 }
+
+// localAddr is a listen address as this machine's browser reaches it.
+func localAddr(listen string) string {
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return listen
+	}
+	if ip, err := netip.ParseAddr(host); err == nil && ip.IsUnspecified() {
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, port)
+}
