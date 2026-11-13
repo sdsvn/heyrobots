@@ -531,8 +531,7 @@ func (s *Server) connectMCP(w http.ResponseWriter, r *http.Request, id, addr str
 		name = hostName(addr)
 	}
 	if existing == nil {
-		req := gen.McpServerRequest{Name: name, Transport: gen.McpServerRequestTransportHttp, Url: &addr, Token: token}
-		if status, msg := s.addMCPServer(req); msg != "" {
+		if status, msg := s.addMCPServer(name, addr, token); msg != "" {
 			writeError(w, status, msg)
 			return
 		}

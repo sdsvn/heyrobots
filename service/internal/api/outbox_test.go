@@ -104,43 +104,6 @@ func TestOwnerApprovesAndDelegateCannot(t *testing.T) {
 	}
 }
 
-func TestStandingApprovalsAreVersionedAndValidated(t *testing.T) {
-	h := newHarness(t, nil)
-	owner := h.completeSetup()
-	sa := gen.StandingApproval{Name: "anna", Source: "mail", Action: "send_email", People: []string{"anna@example.com", " anna@example.com "}}
-	rec := h.postJSON("/api/v1/standing-approvals", owner, sa)
-	var list gen.StandingApprovalList
-	json.Unmarshal(rec.Body.Bytes(), &list)
-	if rec.Code != http.StatusCreated || len(list.StandingApprovals) != 1 || len(list.StandingApprovals[0].People) != 1 || list.Version != 2 {
-		t.Fatalf("create: %d %s", rec.Code, rec.Body)
-	}
-	if rec := h.postJSON("/api/v1/standing-approvals", owner, sa); rec.Code != http.StatusConflict {
-		t.Fatalf("duplicate: %d", rec.Code)
-	}
-	for _, bad := range []gen.StandingApproval{
-		{Name: "x", Source: "app", Action: "a", People: []string{"p"}},
-		{Name: "x", Source: "nowhere", Action: "a", People: []string{"p"}},
-		{Name: "x", Source: "mail", Action: "a", People: []string{}},
-	} {
-		if rec := h.postJSON("/api/v1/standing-approvals", owner, bad); rec.Code != http.StatusBadRequest {
-			t.Fatalf("bad %+v: %d", bad, rec.Code)
-		}
-	}
-	// Changing the rest of the policy keeps standing approvals.
-	h.do("PUT", "/api/v1/policy", owner, strings.NewReader(`{"mode":"auto","toolsets":["research"],"delegates":[],"rules":[]}`), "application/json")
-	rec = h.do("GET", "/api/v1/standing-approvals", owner, nil, "")
-	json.Unmarshal(rec.Body.Bytes(), &list)
-	if len(list.StandingApprovals) != 1 {
-		t.Fatalf("after policy update: %s", rec.Body)
-	}
-	if rec := h.do("DELETE", "/api/v1/standing-approvals/anna", owner, nil, ""); rec.Code != http.StatusNoContent {
-		t.Fatalf("delete: %d", rec.Code)
-	}
-	if rec := h.do("DELETE", "/api/v1/standing-approvals/anna", owner, nil, ""); rec.Code != http.StatusNotFound {
-		t.Fatalf("delete again: %d", rec.Code)
-	}
-}
-
 func TestLimitsAreValidatedAndKept(t *testing.T) {
 	h := newHarness(t, nil)
 	owner := h.completeSetup()

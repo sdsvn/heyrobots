@@ -24,20 +24,12 @@ const (
 )
 
 // NeedsApproval reports whether an action of this reach needs the owner's
-// approval before it is sent.
-//
-// coveredByStanding is true when a standing approval in the Policy covers
-// the action. taintedDetails is true when any controlling detail of the
-// action (recipients, destinations, dates, amounts, links) appears only in
-// untrusted content; it overrides a standing approval.
-//
-// An unknown reach always needs approval, so a new kind fails closed.
-func (r Reach) NeedsApproval(coveredByStanding, taintedDetails bool) bool {
+// approval before it is sent. Anything that reaches other people does, and
+// an unknown reach does too, so a new kind fails closed.
+func (r Reach) NeedsApproval() bool {
 	switch r {
 	case ReachInternal, ReachOwner, ReachRequester:
 		return false
-	case ReachOthers:
-		return !coveredByStanding || taintedDetails
 	default:
 		return true
 	}

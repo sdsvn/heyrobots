@@ -40,7 +40,6 @@ import (
 	"heyrobots/service/internal/outbox"
 	"heyrobots/service/internal/quarantine"
 	"heyrobots/service/internal/router"
-	"heyrobots/service/internal/sandbox"
 	"heyrobots/service/internal/skills"
 	"heyrobots/service/internal/sources/calendar"
 	"heyrobots/service/internal/sources/mail"
@@ -194,13 +193,6 @@ func run() error {
 			}, ledger.Record)(ctx)
 		},
 	}
-	sb := sandbox.Detect(ctx, cfg.SandboxImage)
-	if sb.Mode() == sandbox.ModeLimited {
-		log.Warn("no container runtime: commands would run with limited isolation and no real network limit; the code and data toolsets need Docker or OrbStack")
-	} else {
-		log.Info("sandbox", "mode", sb.Mode(), "image", cfg.SandboxImage)
-	}
-
 	// The owner's Google account, if connected, for mail and calendar.
 	gg := &google.Google{Vault: v, Store: st, Ends: google.Live, HTTP: &http.Client{Timeout: time.Minute}}
 	workers.Google = gg

@@ -131,6 +131,10 @@ func (e *env) effect(ef store.Effect) uint {
 // action queues an email to the given people.
 func (e *env) action(threadID, ticketID, body string, approval string, to ...string) uint {
 	d, _ := json.Marshal(taint.Details{Recipients: to})
+	// Actions to other people only reach the outbox approved.
+	if approval == "" {
+		approval = store.ApprovalApproved
+	}
 	status := store.EffectPending
 	if approval == store.ApprovalAwaiting {
 		status = store.EffectAwaitingApproval
@@ -175,12 +179,6 @@ func (e *env) notices() []string {
 	return out
 }
 
-func (e *env) coverAnn() {
-	e.setPolicy(func(p *policy.Policy) {
-		p.StandingApprovals = []policy.StandingApproval{{Name: "ann", Source: core.SourceMail, Action: "send_email", People: []string{"ann@example.com"}}}
-	})
-}
-
 func TestAppRepliesAreSentInOrder(t *testing.T) {
 	e := newEnv(t)
 	th, tk := e.ticket("app", core.Mandate{})
@@ -200,7 +198,6 @@ func TestAppRepliesAreSentInOrder(t *testing.T) {
 
 func TestALaterEffectWaitsForAnEarlierOneOnItsThread(t *testing.T) {
 	e := newEnv(t)
-	e.coverAnn()
 	th, tk := e.ticket("mail", core.Mandate{})
 	other, tk2 := e.ticket("mail", core.Mandate{})
 	e.mail.errs = []error{errors.New("timeout")}
@@ -226,7 +223,6 @@ func TestALaterEffectWaitsForAnEarlierOneOnItsThread(t *testing.T) {
 
 func TestAPermanentErrorFailsAndTellsTheOwner(t *testing.T) {
 	e := newEnv(t)
-	e.coverAnn()
 	th, tk := e.ticket("mail", core.Mandate{})
 	e.mail.errs = []error{Permanent(errors.New("mailbox full"))}
 	id := e.action(th, tk, "hi", "", "ann@example.com")
@@ -254,7 +250,6 @@ func TestAPermanentErrorFailsAndTellsTheOwner(t *testing.T) {
 
 func TestRetriesStopAfterMaxAttempts(t *testing.T) {
 	e := newEnv(t)
-	e.coverAnn()
 	th, tk := e.ticket("mail", core.Mandate{})
 	for range MaxAttempts {
 		e.mail.errs = append(e.mail.errs, errors.New("down"))
@@ -275,7 +270,6 @@ func TestRetriesStopAfterMaxAttempts(t *testing.T) {
 func TestNoConnectedAccountFails(t *testing.T) {
 	e := newEnv(t)
 	delete(e.ob.Senders, "mail")
-	e.coverAnn()
 	th, tk := e.ticket("mail", core.Mandate{})
 	id := e.action(th, tk, "hi", "", "ann@example.com")
 	e.drain()
@@ -286,7 +280,6 @@ func TestNoConnectedAccountFails(t *testing.T) {
 
 func TestSendCapsHoldSendsUntilTheWindowPasses(t *testing.T) {
 	e := newEnv(t)
-	e.coverAnn()
 	e.setPolicy(func(p *policy.Policy) { p.Limits.SendsPerHour = 2 })
 	var idsOut []uint
 	for _, body := range []string{"a", "b", "c"} {
@@ -318,7 +311,6 @@ func TestSendCapsHoldSendsUntilTheWindowPasses(t *testing.T) {
 
 func TestAStoppedTasksActionsAreCancelled(t *testing.T) {
 	e := newEnv(t)
-	e.coverAnn()
 	th, tk := e.ticket("mail", core.Mandate{})
 	id := e.action(th, tk, "hi", "", "ann@example.com")
 	e.tx(func(tx *store.Tx) error { return tx.SetTicketState(tk, false, core.StageEnded, "app:owner", e.clock) })
@@ -331,12 +323,13 @@ func TestAStoppedTasksActionsAreCancelled(t *testing.T) {
 	}
 }
 
-func TestARemovedStandingApprovalSendsTheActionBackForApproval(t *testing.T) {
+// An action to other people that somehow reached the outbox without the
+// owner's OK goes back for approval.
+func TestAnUnapprovedActionGoesBackForApproval(t *testing.T) {
 	e := newEnv(t)
-	e.coverAnn()
 	th, tk := e.ticket("mail", core.Mandate{})
-	id := e.action(th, tk, "hi", "", "ann@example.com")
-	e.setPolicy(func(p *policy.Policy) { p.StandingApprovals = nil })
+	id := e.effect(store.Effect{TicketID: tk, ThreadID: th, Source: "mail", Kind: "action", Action: "send_email",
+		Reach: string(core.ReachOthers), Body: "hi", Recipients: "ann@example.com", Status: store.EffectPending})
 	e.drain()
 	if s := e.get(id); s.Status != store.EffectAwaitingApproval || s.Approval != store.ApprovalAwaiting {
 		t.Fatalf("effect %+v, want awaiting approval", s)
@@ -426,7 +419,6 @@ func TestRejectionTellsTheTaskWithoutTrustingTheRecipient(t *testing.T) {
 
 func TestRecoveryRetriesOnlyIdempotentSends(t *testing.T) {
 	e := newEnv(t)
-	e.coverAnn()
 	th, tk := e.ticket("mail", core.Mandate{})
 	id := e.action(th, tk, "hi", "", "ann@example.com")
 	ath, atk := e.ticket("app", core.Mandate{})

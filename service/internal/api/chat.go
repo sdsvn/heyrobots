@@ -390,7 +390,7 @@ func (s *Server) UpdatePolicy(w http.ResponseWriter, r *http.Request) {
 }
 
 func fromUpdate(cur policy.Policy, req gen.PolicyUpdate) (policy.Policy, string) {
-	next := policy.Policy{Owner: cur.Owner, Bots: cur.Bots, StandingApprovals: cur.StandingApprovals}
+	next := policy.Policy{Owner: cur.Owner, Bots: cur.Bots}
 	var lmsg string
 	if next.Limits, lmsg = limitsFrom(cur.Limits, req.Limits); lmsg != "" {
 		return policy.Policy{}, lmsg

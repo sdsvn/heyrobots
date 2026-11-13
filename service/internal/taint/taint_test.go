@@ -12,9 +12,9 @@ var trusted = Trusted{
 	People: []string{"partner@example.com"},
 }
 
-func needsApproval(t Trusted, d Details, standing bool) (bool, []Finding) {
+func needsApproval(t Trusted, d Details, _ bool) (bool, []Finding) {
 	f := t.Check(d)
-	return core.ReachOthers.NeedsApproval(standing, len(f) > 0), f
+	return core.ReachOthers.NeedsApproval(), f
 }
 
 func TestAnEmailThatNamesANewRecipientNeedsFreshApproval(t *testing.T) {
@@ -33,20 +33,20 @@ func TestALinkToAnUntrustedDomainNeedsFreshApproval(t *testing.T) {
 	}
 }
 
-func TestTrustedDetailsUnderAStandingApprovalGoThrough(t *testing.T) {
-	need, f := needsApproval(trusted, Details{
+func TestTrustedDetailsHaveNoFindings(t *testing.T) {
+	_, f := needsApproval(trusted, Details{
 		Recipients: []string{"Anna@Example.com"},
 		Links:      []string{"https://trattoria.example/menu?lang=en"},
 		Dates:      []string{"Friday 21  November"},
 	}, true)
-	if need || len(f) != 0 {
-		t.Fatalf("need=%v findings=%+v", need, f)
+	if len(f) != 0 {
+		t.Fatalf("findings=%+v", f)
 	}
 }
 
-func TestWithoutAStandingApprovalOthersReachAlwaysNeedsApproval(t *testing.T) {
+func TestReachingOthersAlwaysNeedsApproval(t *testing.T) {
 	if need, _ := needsApproval(trusted, Details{Recipients: []string{"anna@example.com"}}, false); !need {
-		t.Fatal("reaching another person without a standing approval must need approval")
+		t.Fatal("reaching another person must need approval")
 	}
 }
 

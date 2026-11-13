@@ -4,7 +4,6 @@ package policy
 
 import (
 	"slices"
-	"strings"
 	"time"
 
 	"heyrobots/service/internal/core"
@@ -57,9 +56,6 @@ type Policy struct {
 	Toolsets  []core.Toolset `json:"toolsets"`
 	Delegates []Delegate     `json:"delegates"`
 	Rules     []Rule         `json:"rules"`
-	// StandingApprovals let narrow kinds of action reach specific people
-	// without asking each time.
-	StandingApprovals []StandingApproval `json:"standing_approvals,omitempty"`
 	// Bots lists bot identities whose messages may become inferred
 	// candidates. Other bots are never admitted.
 	Bots []core.Identity `json:"bots"`
@@ -177,41 +173,6 @@ func (l Limits) Location() *time.Location {
 		}
 	}
 	return time.Local
-}
-
-// StandingApproval lets one kind of action on one Source reach the named
-// people without a fresh approval each time. It never covers irreversible
-// actions, and an action whose details came from untrusted content still
-// needs approval.
-type StandingApproval struct {
-	Name   string          `json:"name"`
-	Source core.SourceKind `json:"source"`
-	Action string          `json:"action"`
-	People []string        `json:"people"`
-}
-
-// Covers reports whether a standing approval covers an action on a Source
-// to all of the given recipients.
-func (p Policy) Covers(source core.SourceKind, action string, recipients []string) bool {
-	if len(recipients) == 0 {
-		return false
-	}
-	for _, sa := range p.StandingApprovals {
-		if sa.Source != source || sa.Action != action {
-			continue
-		}
-		all := true
-		for _, r := range recipients {
-			if !slices.ContainsFunc(sa.People, func(p string) bool { return strings.EqualFold(strings.TrimSpace(p), strings.TrimSpace(r)) }) {
-				all = false
-				break
-			}
-		}
-		if all {
-			return true
-		}
-	}
-	return false
 }
 
 // AppOwner is the owner's identity on the app Source. Every owner device

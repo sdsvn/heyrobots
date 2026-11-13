@@ -7,6 +7,7 @@ import 'package:heyrobots/main.dart';
 import 'package:heyrobots/platform.dart';
 import 'package:heyrobots/state.dart';
 import 'package:heyrobots/ui/agents_screen.dart';
+import 'package:heyrobots/ui/team_tab.dart';
 import 'package:heyrobots/ui/thread_screen.dart';
 
 import 'fake_server.dart';
@@ -119,9 +120,8 @@ void main() {
   testWidgets('adds an agent to the team', (tester) async {
     await pump(tester);
     await pairByHand(tester);
-    await push(tester, AgentsScreen(state: state));
-    expect(find.text('General'), findsOneWidget);
-    expect(find.text('Working on “Plan Lisbon”'), findsOneWidget);
+    await push(tester, Scaffold(body: TeamTab(state: state)));
+    expect(find.text('General'), findsWidgets);
 
     await tester.tap(find.byKey(const Key('add-agent')));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
@@ -145,11 +145,11 @@ void main() {
     expect(body['skills'], ['trip-planner']);
     expect(body['delegates'], ['sam']);
     expect(body['color'], 'sky');
-    expect(find.byKey(const Key('agent:Researcher')), findsOneWidget);
-    expect(find.text('Web research'), findsOneWidget);
+    expect(find.text('Researcher'), findsOneWidget);
 
     // An agent's profile lists the standing jobs its files name.
-    await tester.tap(find.byKey(const Key('agent:General')));
+    final general = (await tester.runAsync(state.api.listAgents))!.agents.firstWhere((a) => a.id == 'ag_general');
+    await push(tester, AgentEditScreen(state: state, agent: general));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.byKey(const Key('job:brief')), 200, scrollable: find.byType(Scrollable).last);

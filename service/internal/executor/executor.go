@@ -489,9 +489,6 @@ func (r *run) trustedSources() taint.Trusted {
 		}
 		return nil
 	})
-	for _, sa := range r.pol.StandingApprovals {
-		t.People = append(t.People, sa.People...)
-	}
 	return t
 }
 

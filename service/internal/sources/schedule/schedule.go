@@ -128,7 +128,7 @@ func (s *Source) Run(ctx context.Context) {
 	}
 }
 
-// Fire sends a Trigger for each schedule that is due.
+// Fire sends a Trigger for each standing job that is due.
 func (s *Source) Fire() error {
 	now := s.Now()
 	p, err := s.Store.Policy()
@@ -136,50 +136,7 @@ func (s *Source) Fire() error {
 		return err
 	}
 	loc := p.Limits.Location()
-	var schedules []store.Schedule
-	if err := s.Store.Tx(func(tx *store.Tx) error {
-		var err error
-		schedules, err = tx.Schedules()
-		return err
-	}); err != nil {
-		return err
-	}
-	fired := 0
-	for _, sc := range schedules {
-		if !sc.Enabled {
-			continue
-		}
-		at, due := Due(sc, now, loc)
-		if !due {
-			continue
-		}
-		creator := parseIdentity(sc.CreatedBy)
-		t := core.Trigger{
-			// One delivery per schedule and time, so a repeat is dropped.
-			DeliveryID: sc.ID + "@" + at.UTC().Format(time.RFC3339),
-			Source:     core.SourceSchedule,
-			Actor:      creator,
-			// Schedules are stored by the server from an authenticated
-			// request; their creator is known.
-			Authenticity: core.Verified,
-			ReceivedAll:  true,
-			// Each firing is its own conversation. Sharing one would make
-			// the next firing look like the owner following up on the last
-			// one's task, which is an explicit request.
-			ThreadKeys: []string{"schedule:" + sc.ID + "@" + at.UTC().Format(time.RFC3339)},
-			Text:       fmt.Sprintf("Schedule %q, %s:\n%s", sc.Name, at.Format("Monday 15:04 MST"), sc.Note),
-			At:         at.UTC(),
-		}
-		if _, err := s.Intake.Ingest(intake.Message{Trigger: t, ThreadKeys: t.ThreadKeys, CreatedBy: creator}); err != nil {
-			return err
-		}
-		if err := s.Store.Tx(func(tx *store.Tx) error { return tx.MarkScheduleRun(sc.ID, at.UTC()) }); err != nil {
-			return err
-		}
-		fired++
-	}
-	n, err := s.fireJobs(now, loc, p)
-	fired += n
+	fired, err := s.fireJobs(now, loc, p)
 	if fired > 0 && s.OnNew != nil {
 		s.OnNew()
 	}
@@ -365,9 +322,4 @@ func items(text, key string) []map[string]string {
 		out = append(out, map[string]string{key: fmt.Sprint(m[key]), "_json": string(b)})
 	}
 	return out
-}
-
-func parseIdentity(s string) core.Identity {
-	src, id, _ := strings.Cut(s, ":")
-	return core.Identity{Source: core.SourceKind(src), ID: id}
 }

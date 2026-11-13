@@ -8,7 +8,6 @@ package outbox
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -24,7 +23,6 @@ import (
 	"heyrobots/service/internal/ids"
 	"heyrobots/service/internal/policy"
 	"heyrobots/service/internal/store"
-	"heyrobots/service/internal/taint"
 	"heyrobots/service/internal/telemetry"
 )
 
@@ -262,15 +260,12 @@ func (o *Outbox) stillAllowed(tx *store.Tx, p policy.Policy, e store.Effect, now
 		return cancel("the settings changed and the task is no longer allowed (" + err.Error() + ")")
 	}
 	if e.Approval == "" && core.Reach(e.Reach) == core.ReachOthers {
-		var d taint.Details
-		_ = json.Unmarshal([]byte(e.Details), &d)
-		if !p.Covers(core.SourceKind(e.Source), e.Action, d.Recipients) {
-			_, err := tx.UpdateEffect(e.ID, store.EffectPending, map[string]any{
-				"status": store.EffectAwaitingApproval, "approval": store.ApprovalAwaiting,
-				"last_error": "no standing approval covers it any more",
-			})
-			return false, err
-		}
+		// Nothing reaches other people without the owner's OK.
+		_, err := tx.UpdateEffect(e.ID, store.EffectPending, map[string]any{
+			"status": store.EffectAwaitingApproval, "approval": store.ApprovalAwaiting,
+			"last_error": "it needs your OK",
+		})
+		return false, err
 	}
 	return true, nil
 }

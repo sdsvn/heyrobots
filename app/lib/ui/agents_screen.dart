@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../api/session.dart';
 import '../state.dart';
 import 'agent_avatar.dart';
-import 'bit.dart';
 import 'common.dart';
 import 'theme.dart';
 
@@ -23,127 +22,6 @@ String toolsetLabel(String t) {
     'code' => 'Code',
     _ => t,
   };
-}
-
-/// The team: each agent with what it's for, what it can reach and what it's
-/// doing now.
-class AgentsScreen extends StatefulWidget {
-  const AgentsScreen({super.key, required this.state});
-
-  final AppState state;
-
-  @override
-  State<AgentsScreen> createState() => _AgentsScreenState();
-}
-
-class _AgentsScreenState extends State<AgentsScreen> {
-  int _version = 0;
-
-  Future<void> _edit(Agent? a) async {
-    final changed = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => AgentEditScreen(state: widget.state, agent: a)));
-    if (changed == true && mounted) setState(() => _version++);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Your team')),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const Key('add-agent'),
-        onPressed: () => _edit(null),
-        icon: const Icon(Icons.add),
-        label: const Text('Add an agent'),
-      ),
-      body: Loaded<AgentList>(
-        key: ValueKey(_version),
-        load: () => widget.state.api.listAgents(),
-        builder: (context, list, reload) => RefreshIndicator(
-          onRefresh: () async => reload(),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-            children: [
-              const Text('Agents share the work. Each one has its own tools, skills and model, and works on its tasks one at a time unless you let it take more.'),
-              const SizedBox(height: 16),
-              for (final a in list.agents)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _AgentCard(agent: a, onTap: () => _edit(a)),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AgentCard extends StatelessWidget {
-  const _AgentCard({required this.agent, required this.onTap});
-
-  final Agent agent;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Palette.of(context);
-    final a = agent;
-    final (strong, soft) = agentColors(a.color.toJson(), p);
-    final busy = a.working.isNotEmpty;
-    final status = busy
-        ? 'Working on “${a.working.first.scope}”${a.working.length > 1 ? ' and ${a.working.length - 1} more' : ''}'
-        : a.waiting > 0
-        ? '${a.waiting} waiting'
-        : (a.enabled ? 'Idle' : 'Off');
-    final reach = a.anyToolset ? ['Anything a task allows'] : [for (final t in a.toolsets) toolsetLabel(t)];
-    return SoftCard(
-      key: Key('agent:${a.name}'),
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AgentAvatar(color: a.color.toJson(), badge: a.badge.toJson(), size: 52, mood: busy ? BitMood.thinking : BitMood.idle, name: a.name, seed: a.id),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(a.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
-                    if (a.purpose.isNotEmpty) Text(a.purpose, style: TextStyle(fontSize: 13, color: p.muted)),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Container(width: 8, height: 8, decoration: BoxDecoration(color: busy ? strong : (a.waiting > 0 ? p.peach : p.line), shape: BoxShape.circle)),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(status, maxLines: 1, overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: busy ? strong : p.muted)),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              Pill(a.model == null ? "Worker's model" : a.model!, background: soft, foreground: strong),
-              for (final r in reach)
-                Pill(r, background: r.contains('your OK') ? p.peachSoft : p.ground, foreground: r.contains('your OK') ? p.peachInk : p.ink),
-              for (final s in a.skills) Pill('Skill: $s', background: p.mintSoft, foreground: p.mintInk),
-              if (a.capacity > 1) Pill('${a.capacity} at once', background: p.ground, foreground: p.muted),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 /// Adds or changes an agent.

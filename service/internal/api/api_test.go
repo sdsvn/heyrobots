@@ -152,7 +152,7 @@ func (h *harness) inviteDelegate(ownerToken, name string) string {
 		h.t.Fatalf("policy: %d %s", rec.Code, rec.Body)
 	}
 	dn := name
-	rec = h.postJSON("/api/v1/pairing-codes", ownerToken, gen.PairingCodeRequest{Role: gen.RoleDelegate, DelegateName: &dn})
+	rec = h.postJSON("/api/v1/pairing-codes", ownerToken, gen.PairingCodeRequest{Role: gen.Delegate, DelegateName: &dn})
 	if rec.Code != http.StatusCreated {
 		h.t.Fatalf("invite status %d: %s", rec.Code, rec.Body)
 	}
@@ -190,7 +190,7 @@ func TestSetupPairsTheOwnerAndThenCloses(t *testing.T) {
 	rec := h.do("GET", "/api/v1/me", token, nil, "")
 	var me gen.Device
 	json.Unmarshal(rec.Body.Bytes(), &me)
-	if rec.Code != http.StatusOK || me.Role != gen.RoleOwner {
+	if rec.Code != http.StatusOK || me.Role != gen.Owner {
 		t.Fatalf("me: %d %s", rec.Code, rec.Body)
 	}
 	if rec := h.do("GET", "/setup", "", nil, ""); rec.Code != http.StatusNotFound {
@@ -255,13 +255,13 @@ func TestDelegateDevicesAreLimited(t *testing.T) {
 	rec := h.do("GET", "/api/v1/me", delegate, nil, "")
 	var me gen.Device
 	json.Unmarshal(rec.Body.Bytes(), &me)
-	if me.Role != gen.RoleDelegate || me.DelegateName == nil || *me.DelegateName != "partner" {
+	if me.Role != gen.Delegate || me.DelegateName == nil || *me.DelegateName != "partner" {
 		t.Fatalf("delegate me: %s", rec.Body)
 	}
 	if rec := h.do("GET", "/api/v1/devices", delegate, nil, ""); rec.Code != http.StatusForbidden {
 		t.Fatalf("delegate list devices: %d, want 403", rec.Code)
 	}
-	if rec := h.postJSON("/api/v1/pairing-codes", delegate, gen.PairingCodeRequest{Role: gen.RoleOwner}); rec.Code != http.StatusForbidden {
+	if rec := h.postJSON("/api/v1/pairing-codes", delegate, gen.PairingCodeRequest{Role: gen.Owner}); rec.Code != http.StatusForbidden {
 		t.Fatalf("delegate create code: %d, want 403", rec.Code)
 	}
 	if rec := h.do("GET", "/api/v1/devices", owner, nil, ""); rec.Code != http.StatusOK {

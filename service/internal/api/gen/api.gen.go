@@ -35,24 +35,6 @@ func (e AcceptMode) Valid() bool {
 	}
 }
 
-// Defines values for AccountStatus.
-const (
-	AccountStatusBroken    AccountStatus = "broken"
-	AccountStatusConnected AccountStatus = "connected"
-)
-
-// Valid indicates whether the value is a known member of the AccountStatus enum.
-func (e AccountStatus) Valid() bool {
-	switch e {
-	case AccountStatusBroken:
-		return true
-	case AccountStatusConnected:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for AgentBadge.
 const (
 	AgentBadgeBolt     AgentBadge = "bolt"
@@ -521,129 +503,6 @@ func (e JobStepKind) Valid() bool {
 	}
 }
 
-// Defines values for McpServerTransport.
-const (
-	McpServerTransportHttp  McpServerTransport = "http"
-	McpServerTransportStdio McpServerTransport = "stdio"
-)
-
-// Valid indicates whether the value is a known member of the McpServerTransport enum.
-func (e McpServerTransport) Valid() bool {
-	switch e {
-	case McpServerTransportHttp:
-		return true
-	case McpServerTransportStdio:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for McpServerRequestTransport.
-const (
-	McpServerRequestTransportHttp  McpServerRequestTransport = "http"
-	McpServerRequestTransportStdio McpServerRequestTransport = "stdio"
-)
-
-// Valid indicates whether the value is a known member of the McpServerRequestTransport enum.
-func (e McpServerRequestTransport) Valid() bool {
-	switch e {
-	case McpServerRequestTransportHttp:
-		return true
-	case McpServerRequestTransportStdio:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for McpToolMode.
-const (
-	McpToolModeBlocked    McpToolMode = "blocked"
-	McpToolModeOutward    McpToolMode = "outward"
-	McpToolModeRead       McpToolMode = "read"
-	McpToolModeUnreviewed McpToolMode = "unreviewed"
-)
-
-// Valid indicates whether the value is a known member of the McpToolMode enum.
-func (e McpToolMode) Valid() bool {
-	switch e {
-	case McpToolModeBlocked:
-		return true
-	case McpToolModeOutward:
-		return true
-	case McpToolModeRead:
-		return true
-	case McpToolModeUnreviewed:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for McpToolReach.
-const (
-	McpToolReachIrreversible McpToolReach = "irreversible"
-	McpToolReachOthers       McpToolReach = "others"
-	McpToolReachOwner        McpToolReach = "owner"
-)
-
-// Valid indicates whether the value is a known member of the McpToolReach enum.
-func (e McpToolReach) Valid() bool {
-	switch e {
-	case McpToolReachIrreversible:
-		return true
-	case McpToolReachOthers:
-		return true
-	case McpToolReachOwner:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for McpToolReviewMode.
-const (
-	McpToolReviewModeBlocked McpToolReviewMode = "blocked"
-	McpToolReviewModeOutward McpToolReviewMode = "outward"
-	McpToolReviewModeRead    McpToolReviewMode = "read"
-)
-
-// Valid indicates whether the value is a known member of the McpToolReviewMode enum.
-func (e McpToolReviewMode) Valid() bool {
-	switch e {
-	case McpToolReviewModeBlocked:
-		return true
-	case McpToolReviewModeOutward:
-		return true
-	case McpToolReviewModeRead:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for McpToolReviewReach.
-const (
-	McpToolReviewReachIrreversible McpToolReviewReach = "irreversible"
-	McpToolReviewReachOthers       McpToolReviewReach = "others"
-	McpToolReviewReachOwner        McpToolReviewReach = "owner"
-)
-
-// Valid indicates whether the value is a known member of the McpToolReviewReach enum.
-func (e McpToolReviewReach) Valid() bool {
-	switch e {
-	case McpToolReviewReachIrreversible:
-		return true
-	case McpToolReviewReachOthers:
-		return true
-	case McpToolReviewReachOwner:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for ModelRoleProvider.
 const (
 	ModelRoleProviderAnthropic  ModelRoleProvider = "anthropic"
@@ -736,16 +595,16 @@ func (e Presence) Valid() bool {
 
 // Defines values for Role.
 const (
-	RoleDelegate Role = "delegate"
-	RoleOwner    Role = "owner"
+	Delegate Role = "delegate"
+	Owner    Role = "owner"
 )
 
 // Valid indicates whether the value is a known member of the Role enum.
 func (e Role) Valid() bool {
 	switch e {
-	case RoleDelegate:
+	case Delegate:
 		return true
-	case RoleOwner:
+	case Owner:
 		return true
 	default:
 		return false
@@ -781,30 +640,6 @@ func (e ThreadItemKind) Valid() bool {
 
 // AcceptMode defines model for AcceptMode.
 type AcceptMode string
-
-// Account defines model for Account.
-type Account struct {
-	AssistantAddress string `json:"assistant_address"`
-
-	// CanSend Sending mail and changing the calendar were allowed.
-	CanSend     bool          `json:"can_send"`
-	CheckedAt   *time.Time    `json:"checked_at,omitempty"`
-	ConnectedAt time.Time     `json:"connected_at"`
-	Email       string        `json:"email"`
-	Provider    string        `json:"provider"`
-	Status      AccountStatus `json:"status"`
-	StatusError *string       `json:"status_error,omitempty"`
-}
-
-// AccountStatus defines model for Account.Status.
-type AccountStatus string
-
-// AccountList defines model for AccountList.
-type AccountList struct {
-	Accounts          []Account `json:"accounts"`
-	GoogleClientSet   bool      `json:"google_client_set"`
-	GoogleRedirectUrl string    `json:"google_redirect_url"`
-}
 
 // AddSkillRequest defines model for AddSkillRequest.
 type AddSkillRequest struct {
@@ -1211,22 +1046,9 @@ type GoogleClient struct {
 	ClientSecret string `json:"client_secret"`
 }
 
-// GoogleConnect defines model for GoogleConnect.
-type GoogleConnect struct {
-	// AddressTag The tag in the Assistant's address, you+TAG@gmail.com. Default: assistant.
-	AddressTag   *string `json:"address_tag,omitempty"`
-	AllowSending bool    `json:"allow_sending"`
-}
-
 // GoogleConnectFinish defines model for GoogleConnectFinish.
 type GoogleConnectFinish struct {
 	// RedirectUrl The full address the browser ended on after signing in.
-	RedirectUrl string `json:"redirect_url"`
-}
-
-// GoogleConnectStart defines model for GoogleConnectStart.
-type GoogleConnectStart struct {
-	AuthUrl     string `json:"auth_url"`
 	RedirectUrl string `json:"redirect_url"`
 }
 
@@ -1365,107 +1187,6 @@ type MachineList struct {
 	Machines []Machine `json:"machines"`
 }
 
-// McpServer defines model for McpServer.
-type McpServer struct {
-	CheckedAt *time.Time `json:"checked_at,omitempty"`
-	Command   *[]string  `json:"command,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
-
-	// Enabled Tasks may use the server.
-	Enabled     bool      `json:"enabled"`
-	HasSecrets  bool      `json:"has_secrets"`
-	Name        string    `json:"name"`
-	Purpose     string    `json:"purpose"`
-	StatusError *string   `json:"status_error,omitempty"`
-	ToReview    int       `json:"to_review"`
-	Tools       []McpTool `json:"tools"`
-
-	// Toolset The toolset a rule or request grants, mcp:NAME.
-	Toolset   string             `json:"toolset"`
-	Transport McpServerTransport `json:"transport"`
-
-	// Trusted Results reach the worker without quarantine.
-	Trusted bool    `json:"trusted"`
-	Url     *string `json:"url,omitempty"`
-}
-
-// McpServerTransport defines model for McpServer.Transport.
-type McpServerTransport string
-
-// McpServerList defines model for McpServerList.
-type McpServerList struct {
-	Servers []McpServer `json:"servers"`
-
-	// ToReview Tools across all servers waiting for the owner's review.
-	ToReview int `json:"to_review"`
-}
-
-// McpServerRequest defines model for McpServerRequest.
-type McpServerRequest struct {
-	Command *[]string `json:"command,omitempty"`
-
-	// Env Variables for a stdio server
-	Env     *map[string]string `json:"env,omitempty"`
-	Name    string             `json:"name"`
-	Purpose *string            `json:"purpose,omitempty"`
-
-	// Token Bearer token for an http server
-	Token     *string                   `json:"token,omitempty"`
-	Transport McpServerRequestTransport `json:"transport"`
-	Trusted   *bool                     `json:"trusted,omitempty"`
-	Url       *string                   `json:"url,omitempty"`
-}
-
-// McpServerRequestTransport defines model for McpServerRequest.Transport.
-type McpServerRequestTransport string
-
-// McpServerUpdate defines model for McpServerUpdate.
-type McpServerUpdate struct {
-	Enabled *bool   `json:"enabled,omitempty"`
-	Purpose *string `json:"purpose,omitempty"`
-	Trusted *bool   `json:"trusted,omitempty"`
-}
-
-// McpTool defines model for McpTool.
-type McpTool struct {
-	// Changed The server changed the tool since the owner reviewed it.
-	Changed bool `json:"changed"`
-
-	// Description What the server says the tool does
-	Description string `json:"description"`
-
-	// DestructiveHint The server's own claim; not trusted.
-	DestructiveHint bool          `json:"destructive_hint"`
-	Mode            McpToolMode   `json:"mode"`
-	Name            string        `json:"name"`
-	NeedsReview     bool          `json:"needs_review"`
-	Reach           *McpToolReach `json:"reach,omitempty"`
-
-	// ReadOnlyHint The server's own claim; not trusted.
-	ReadOnlyHint bool   `json:"read_only_hint"`
-	Title        string `json:"title"`
-}
-
-// McpToolMode defines model for McpTool.Mode.
-type McpToolMode string
-
-// McpToolReach defines model for McpTool.Reach.
-type McpToolReach string
-
-// McpToolReview defines model for McpToolReview.
-type McpToolReview struct {
-	Mode McpToolReviewMode `json:"mode"`
-
-	// Reach Required for outward.
-	Reach *McpToolReviewReach `json:"reach,omitempty"`
-}
-
-// McpToolReviewMode defines model for McpToolReview.Mode.
-type McpToolReviewMode string
-
-// McpToolReviewReach Required for outward.
-type McpToolReviewReach string
-
 // ModelList defines model for ModelList.
 type ModelList struct {
 	Roles []ModelRole `json:"roles"`
@@ -1512,30 +1233,6 @@ type ModelRoleUpdate struct {
 
 // ModelRoleUpdateProvider defines model for ModelRoleUpdate.Provider.
 type ModelRoleUpdateProvider string
-
-// NotifySettings defines model for NotifySettings.
-type NotifySettings struct {
-	Enabled    bool   `json:"enabled"`
-	HasToken   bool   `json:"has_token"`
-	PerHour    int    `json:"per_hour"`
-	QuietEnd   int    `json:"quiet_end"`
-	QuietStart int    `json:"quiet_start"`
-	ServerUrl  string `json:"server_url"`
-	Topic      string `json:"topic"`
-}
-
-// NotifyUpdate defines model for NotifyUpdate.
-type NotifyUpdate struct {
-	Enabled    bool   `json:"enabled"`
-	PerHour    int    `json:"per_hour"`
-	QuietEnd   int    `json:"quiet_end"`
-	QuietStart int    `json:"quiet_start"`
-	ServerUrl  string `json:"server_url"`
-
-	// Token A new access token. Omit to keep the saved one; send an empty string to remove it.
-	Token *string `json:"token,omitempty"`
-	Topic string  `json:"topic"`
-}
 
 // PairRequest defines model for PairRequest.
 type PairRequest struct {
@@ -1614,58 +1311,6 @@ type RulePolicy struct {
 	Text    string    `json:"text"`
 }
 
-// RuleTemplate defines model for RuleTemplate.
-type RuleTemplate struct {
-	Added bool `json:"added"`
-
-	// Available Everything it needs is connected.
-	Available    bool      `json:"available"`
-	Name         string    `json:"name"`
-	Needs        *[]string `json:"needs,omitempty"`
-	ScheduleDays *string   `json:"schedule_days,omitempty"`
-	ScheduleTime *string   `json:"schedule_time,omitempty"`
-	Text         string    `json:"text"`
-}
-
-// RuleTemplateList defines model for RuleTemplateList.
-type RuleTemplateList struct {
-	Mode      AcceptMode     `json:"mode"`
-	Templates []RuleTemplate `json:"templates"`
-}
-
-// Schedule defines model for Schedule.
-type Schedule struct {
-	CreatedAt time.Time `json:"created_at"`
-
-	// Days Days such as mon,tue; empty for every day.
-	Days      string     `json:"days"`
-	Enabled   bool       `json:"enabled"`
-	Id        string     `json:"id"`
-	LastRunAt *time.Time `json:"last_run_at,omitempty"`
-	Name      string     `json:"name"`
-	Note      string     `json:"note"`
-
-	// Time Local time
-	Time string `json:"time"`
-}
-
-// ScheduleList defines model for ScheduleList.
-type ScheduleList struct {
-	Schedules []Schedule `json:"schedules"`
-	Timezone  string     `json:"timezone"`
-}
-
-// ScheduleRequest defines model for ScheduleRequest.
-type ScheduleRequest struct {
-	// Days mon,tue,…, or weekdays; empty for every day.
-	Days *string `json:"days,omitempty"`
-	Name string  `json:"name"`
-	Note string  `json:"note"`
-
-	// Time Local time
-	Time string `json:"time"`
-}
-
 // SendMessageRequest defines model for SendMessageRequest.
 type SendMessageRequest struct {
 	// AgentId Start or continue the direct chat with this agent.
@@ -1712,20 +1357,6 @@ type SkillList struct {
 type SkillRequest struct {
 	// Content The whole SKILL.md, with frontmatter naming the skill and describing it.
 	Content string `json:"content"`
-}
-
-// StandingApproval defines model for StandingApproval.
-type StandingApproval struct {
-	Action string   `json:"action"`
-	Name   string   `json:"name"`
-	People []string `json:"people"`
-	Source string   `json:"source"`
-}
-
-// StandingApprovalList defines model for StandingApprovalList.
-type StandingApprovalList struct {
-	StandingApprovals []StandingApproval `json:"standing_approvals"`
-	Version           int                `json:"version"`
 }
 
 // ThreadDetail defines model for ThreadDetail.
@@ -1835,12 +1466,6 @@ type SearchSkillsParams struct {
 // SetGoogleClientJSONRequestBody defines body for SetGoogleClient for application/json ContentType.
 type SetGoogleClientJSONRequestBody = GoogleClient
 
-// StartGoogleConnectJSONRequestBody defines body for StartGoogleConnect for application/json ContentType.
-type StartGoogleConnectJSONRequestBody = GoogleConnect
-
-// FinishGoogleConnectJSONRequestBody defines body for FinishGoogleConnect for application/json ContentType.
-type FinishGoogleConnectJSONRequestBody = GoogleConnectFinish
-
 // CreateAgentJSONRequestBody defines body for CreateAgent for application/json ContentType.
 type CreateAgentJSONRequestBody = AgentRequest
 
@@ -1874,23 +1499,11 @@ type SaveJobJSONRequestBody = JobRequest
 // JoinMachineJSONRequestBody defines body for JoinMachine for application/json ContentType.
 type JoinMachineJSONRequestBody = JoinMachineRequest
 
-// CreateMcpServerJSONRequestBody defines body for CreateMcpServer for application/json ContentType.
-type CreateMcpServerJSONRequestBody = McpServerRequest
-
-// UpdateMcpServerJSONRequestBody defines body for UpdateMcpServer for application/json ContentType.
-type UpdateMcpServerJSONRequestBody = McpServerUpdate
-
-// ReviewMcpToolJSONRequestBody defines body for ReviewMcpTool for application/json ContentType.
-type ReviewMcpToolJSONRequestBody = McpToolReview
-
 // SendMessageJSONRequestBody defines body for SendMessage for application/json ContentType.
 type SendMessageJSONRequestBody = SendMessageRequest
 
 // SetModelJSONRequestBody defines body for SetModel for application/json ContentType.
 type SetModelJSONRequestBody = ModelRoleUpdate
-
-// UpdateNotificationsJSONRequestBody defines body for UpdateNotifications for application/json ContentType.
-type UpdateNotificationsJSONRequestBody = NotifyUpdate
 
 // PairDeviceJSONRequestBody defines body for PairDevice for application/json ContentType.
 type PairDeviceJSONRequestBody = PairRequest
@@ -1901,35 +1514,17 @@ type CreatePairingCodeJSONRequestBody = PairingCodeRequest
 // UpdatePolicyJSONRequestBody defines body for UpdatePolicy for application/json ContentType.
 type UpdatePolicyJSONRequestBody = PolicyUpdate
 
-// CreateScheduleJSONRequestBody defines body for CreateSchedule for application/json ContentType.
-type CreateScheduleJSONRequestBody = ScheduleRequest
-
 // AddSkillJSONRequestBody defines body for AddSkill for application/json ContentType.
 type AddSkillJSONRequestBody = AddSkillRequest
 
 // SaveSkillJSONRequestBody defines body for SaveSkill for application/json ContentType.
 type SaveSkillJSONRequestBody = SkillRequest
 
-// CreateStandingApprovalJSONRequestBody defines body for CreateStandingApproval for application/json ContentType.
-type CreateStandingApprovalJSONRequestBody = StandingApproval
-
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (GET /api/v1/accounts)
-	ListAccounts(w http.ResponseWriter, r *http.Request)
-
-	// (DELETE /api/v1/accounts/google)
-	DisconnectGoogle(w http.ResponseWriter, r *http.Request)
-
 	// (PUT /api/v1/accounts/google/client)
 	SetGoogleClient(w http.ResponseWriter, r *http.Request)
-
-	// (POST /api/v1/accounts/google/connect)
-	StartGoogleConnect(w http.ResponseWriter, r *http.Request)
-
-	// (POST /api/v1/accounts/google/finish)
-	FinishGoogleConnect(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/v1/agents)
 	ListAgents(w http.ResponseWriter, r *http.Request)
@@ -2030,24 +1625,6 @@ type ServerInterface interface {
 	// (DELETE /api/v1/machines/{machineId})
 	RemoveMachine(w http.ResponseWriter, r *http.Request, machineId string)
 
-	// (GET /api/v1/mcp-servers)
-	ListMcpServers(w http.ResponseWriter, r *http.Request)
-
-	// (POST /api/v1/mcp-servers)
-	CreateMcpServer(w http.ResponseWriter, r *http.Request)
-
-	// (DELETE /api/v1/mcp-servers/{name})
-	DeleteMcpServer(w http.ResponseWriter, r *http.Request, name string)
-
-	// (PATCH /api/v1/mcp-servers/{name})
-	UpdateMcpServer(w http.ResponseWriter, r *http.Request, name string)
-
-	// (POST /api/v1/mcp-servers/{name}/refresh)
-	RefreshMcpServer(w http.ResponseWriter, r *http.Request, name string)
-
-	// (PUT /api/v1/mcp-servers/{name}/tools/{tool})
-	ReviewMcpTool(w http.ResponseWriter, r *http.Request, name string, tool string)
-
 	// (GET /api/v1/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
 
@@ -2060,15 +1637,6 @@ type ServerInterface interface {
 	// (PUT /api/v1/models/{role})
 	SetModel(w http.ResponseWriter, r *http.Request, role string)
 
-	// (GET /api/v1/notifications)
-	GetNotifications(w http.ResponseWriter, r *http.Request)
-
-	// (PUT /api/v1/notifications)
-	UpdateNotifications(w http.ResponseWriter, r *http.Request)
-
-	// (POST /api/v1/notifications/test)
-	TestNotifications(w http.ResponseWriter, r *http.Request)
-
 	// (POST /api/v1/pair)
 	PairDevice(w http.ResponseWriter, r *http.Request)
 
@@ -2080,21 +1648,6 @@ type ServerInterface interface {
 
 	// (PUT /api/v1/policy)
 	UpdatePolicy(w http.ResponseWriter, r *http.Request)
-
-	// (GET /api/v1/rule-templates)
-	ListRuleTemplates(w http.ResponseWriter, r *http.Request)
-
-	// (POST /api/v1/rule-templates/{name})
-	AddRuleTemplate(w http.ResponseWriter, r *http.Request, name string)
-
-	// (GET /api/v1/schedules)
-	ListSchedules(w http.ResponseWriter, r *http.Request)
-
-	// (POST /api/v1/schedules)
-	CreateSchedule(w http.ResponseWriter, r *http.Request)
-
-	// (DELETE /api/v1/schedules/{scheduleId})
-	DeleteSchedule(w http.ResponseWriter, r *http.Request, scheduleId string)
 
 	// (GET /api/v1/skills)
 	ListSkills(w http.ResponseWriter, r *http.Request)
@@ -2110,15 +1663,6 @@ type ServerInterface interface {
 
 	// (PUT /api/v1/skills/{name})
 	SaveSkill(w http.ResponseWriter, r *http.Request, name string)
-
-	// (GET /api/v1/standing-approvals)
-	ListStandingApprovals(w http.ResponseWriter, r *http.Request)
-
-	// (POST /api/v1/standing-approvals)
-	CreateStandingApproval(w http.ResponseWriter, r *http.Request)
-
-	// (DELETE /api/v1/standing-approvals/{name})
-	DeleteStandingApproval(w http.ResponseWriter, r *http.Request, name string)
 
 	// (GET /api/v1/threads)
 	ListThreads(w http.ResponseWriter, r *http.Request)
@@ -2142,67 +1686,11 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
-// ListAccounts operation middleware
-func (siw *ServerInterfaceWrapper) ListAccounts(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListAccounts(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DisconnectGoogle operation middleware
-func (siw *ServerInterfaceWrapper) DisconnectGoogle(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DisconnectGoogle(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // SetGoogleClient operation middleware
 func (siw *ServerInterfaceWrapper) SetGoogleClient(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetGoogleClient(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// StartGoogleConnect operation middleware
-func (siw *ServerInterfaceWrapper) StartGoogleConnect(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.StartGoogleConnect(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// FinishGoogleConnect operation middleware
-func (siw *ServerInterfaceWrapper) FinishGoogleConnect(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.FinishGoogleConnect(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2917,147 +2405,6 @@ func (siw *ServerInterfaceWrapper) RemoveMachine(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
-// ListMcpServers operation middleware
-func (siw *ServerInterfaceWrapper) ListMcpServers(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListMcpServers(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateMcpServer operation middleware
-func (siw *ServerInterfaceWrapper) CreateMcpServer(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateMcpServer(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DeleteMcpServer operation middleware
-func (siw *ServerInterfaceWrapper) DeleteMcpServer(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "name" -------------
-	var name string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", r.PathValue("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteMcpServer(w, r, name)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// UpdateMcpServer operation middleware
-func (siw *ServerInterfaceWrapper) UpdateMcpServer(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "name" -------------
-	var name string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", r.PathValue("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateMcpServer(w, r, name)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// RefreshMcpServer operation middleware
-func (siw *ServerInterfaceWrapper) RefreshMcpServer(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "name" -------------
-	var name string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", r.PathValue("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RefreshMcpServer(w, r, name)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ReviewMcpTool operation middleware
-func (siw *ServerInterfaceWrapper) ReviewMcpTool(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "name" -------------
-	var name string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", r.PathValue("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "tool" -------------
-	var tool string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tool", r.PathValue("tool"), &tool, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tool", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ReviewMcpTool(w, r, name, tool)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
 
@@ -3126,48 +2473,6 @@ func (siw *ServerInterfaceWrapper) SetModel(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
-// GetNotifications operation middleware
-func (siw *ServerInterfaceWrapper) GetNotifications(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetNotifications(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// UpdateNotifications operation middleware
-func (siw *ServerInterfaceWrapper) UpdateNotifications(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateNotifications(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// TestNotifications operation middleware
-func (siw *ServerInterfaceWrapper) TestNotifications(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.TestNotifications(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // PairDevice operation middleware
 func (siw *ServerInterfaceWrapper) PairDevice(w http.ResponseWriter, r *http.Request) {
 
@@ -3215,100 +2520,6 @@ func (siw *ServerInterfaceWrapper) UpdatePolicy(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdatePolicy(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListRuleTemplates operation middleware
-func (siw *ServerInterfaceWrapper) ListRuleTemplates(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListRuleTemplates(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// AddRuleTemplate operation middleware
-func (siw *ServerInterfaceWrapper) AddRuleTemplate(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "name" -------------
-	var name string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", r.PathValue("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.AddRuleTemplate(w, r, name)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListSchedules operation middleware
-func (siw *ServerInterfaceWrapper) ListSchedules(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListSchedules(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateSchedule operation middleware
-func (siw *ServerInterfaceWrapper) CreateSchedule(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateSchedule(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DeleteSchedule operation middleware
-func (siw *ServerInterfaceWrapper) DeleteSchedule(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "scheduleId" -------------
-	var scheduleId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "scheduleId", r.PathValue("scheduleId"), &scheduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "scheduleId", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteSchedule(w, r, scheduleId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3422,60 +2633,6 @@ func (siw *ServerInterfaceWrapper) SaveSkill(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SaveSkill(w, r, name)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListStandingApprovals operation middleware
-func (siw *ServerInterfaceWrapper) ListStandingApprovals(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListStandingApprovals(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateStandingApproval operation middleware
-func (siw *ServerInterfaceWrapper) CreateStandingApproval(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateStandingApproval(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DeleteStandingApproval operation middleware
-func (siw *ServerInterfaceWrapper) DeleteStandingApproval(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "name" -------------
-	var name string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", r.PathValue("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteStandingApproval(w, r, name)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3699,30 +2856,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/policy", wrapper.UpdatePolicy)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/approvals", wrapper.ListApprovals)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/approvals/{approvalId}", wrapper.DecideApproval)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/standing-approvals", wrapper.ListStandingApprovals)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/standing-approvals", wrapper.CreateStandingApproval)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/standing-approvals/{name}", wrapper.DeleteStandingApproval)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/digests", wrapper.ListDigests)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/usage", wrapper.GetUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/attention", wrapper.ListAttention)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/attention/{itemId}/dismiss", wrapper.DismissAttention)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/notifications", wrapper.GetNotifications)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/notifications", wrapper.UpdateNotifications)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/notifications/test", wrapper.TestNotifications)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/accounts", wrapper.ListAccounts)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/accounts/google/client", wrapper.SetGoogleClient)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounts/google/connect", wrapper.StartGoogleConnect)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/accounts/google/finish", wrapper.FinishGoogleConnect)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/accounts/google", wrapper.DisconnectGoogle)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/schedules", wrapper.ListSchedules)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/schedules", wrapper.CreateSchedule)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/schedules/{scheduleId}", wrapper.DeleteSchedule)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/mcp-servers", wrapper.ListMcpServers)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/mcp-servers", wrapper.CreateMcpServer)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/mcp-servers/{name}", wrapper.DeleteMcpServer)
-	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/mcp-servers/{name}", wrapper.UpdateMcpServer)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/mcp-servers/{name}/refresh", wrapper.RefreshMcpServer)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/mcp-servers/{name}/tools/{tool}", wrapper.ReviewMcpTool)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/models", wrapper.ListModels)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/models/{role}", wrapper.SetModel)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agents", wrapper.ListAgents)
@@ -3735,8 +2873,6 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/jobs", wrapper.ListJobs)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/jobs/{name}", wrapper.DeleteJob)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/jobs/{name}", wrapper.SaveJob)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/rule-templates", wrapper.ListRuleTemplates)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/rule-templates/{name}", wrapper.AddRuleTemplate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/machines", wrapper.ListMachines)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/machines", wrapper.JoinMachine)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/machines/code", wrapper.CreateMachineCode)

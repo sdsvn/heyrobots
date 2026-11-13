@@ -78,24 +78,6 @@ type Schedule struct {
 	Enabled   bool
 }
 
-// Schedules lists schedules by name.
-func (tx *Tx) Schedules() ([]Schedule, error) {
-	var ss []Schedule
-	return ss, tx.db.Order("name").Find(&ss).Error
-}
-
-// CreateSchedule stores a schedule.
-func (tx *Tx) CreateSchedule(s Schedule) error { return tx.db.Create(&s).Error }
-
-// DeleteSchedule removes a schedule.
-func (tx *Tx) DeleteSchedule(id string) error {
-	res := tx.db.Delete(&Schedule{}, "id = ?", id)
-	if res.Error == nil && res.RowsAffected == 0 {
-		return ErrNotFound
-	}
-	return res.Error
-}
-
 // JobRun is when a standing job last fired, and when it was first seen,
 // so a job added today doesn't fire for this morning.
 type JobRun struct {
@@ -129,11 +111,6 @@ func (tx *Tx) JobRunIfAny(key string) (*JobRun, error) {
 // MarkJobRun records that a job fired.
 func (tx *Tx) MarkJobRun(key string, at time.Time) error {
 	return tx.db.Model(&JobRun{}).Where("key = ?", key).Update("last_run_at", at).Error
-}
-
-// MarkScheduleRun records when a schedule last fired.
-func (tx *Tx) MarkScheduleRun(id string, at time.Time) error {
-	return tx.db.Model(&Schedule{}).Where("id = ?", id).Update("last_run_at", at).Error
 }
 
 // SentRefs reports which Source message ids the Assistant itself sent, so

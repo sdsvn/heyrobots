@@ -2,12 +2,13 @@ package store
 
 import (
 	"errors"
-	"gorm.io/gorm"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 func openTemp(t *testing.T) *Store {

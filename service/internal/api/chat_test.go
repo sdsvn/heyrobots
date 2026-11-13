@@ -136,7 +136,7 @@ func TestPolicyIsOwnerOnlyAndValidated(t *testing.T) {
 	if rec.Code != http.StatusOK || p.Mode != gen.AcceptModeAuto || len(p.Rules) != 1 || p.Version < 3 {
 		t.Fatalf("put: %d %s", rec.Code, rec.Body)
 	}
-	if c := h.postJSON("/api/v1/pairing-codes", owner, gen.PairingCodeRequest{Role: gen.RoleDelegate, DelegateName: ptr("stranger")}).Code; c != http.StatusBadRequest {
+	if c := h.postJSON("/api/v1/pairing-codes", owner, gen.PairingCodeRequest{Role: gen.Delegate, DelegateName: ptr("stranger")}).Code; c != http.StatusBadRequest {
 		t.Fatalf("inviting a delegate missing from the policy: %d, want 400", c)
 	}
 }

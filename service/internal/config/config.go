@@ -41,9 +41,6 @@ type Config struct {
 	RouterModel string
 	// WorkerModel is the Gemini model the Executors use.
 	WorkerModel string
-	// SandboxImage is the container image for commands, pulled once by the
-	// owner. The server never pulls it.
-	SandboxImage string
 	// ACPCommand starts the claude-agent-acp adapter, from
 	// HEYROBOTS_ACP_COMMAND; empty finds it on PATH or runs it with npx.
 	ACPCommand []string
@@ -75,9 +72,6 @@ type Config struct {
 // DefaultWorkerModel suits multi-step work with tools.
 const DefaultWorkerModel = "gemini-3.5-flash"
 
-// DefaultSandboxImage is the container image for sandboxed commands.
-const DefaultSandboxImage = "alpine:3.24"
-
 // DefaultRouterModel is a small, fast model, which suits routing.
 const DefaultRouterModel = "gemini-3.1-flash-lite"
 
@@ -107,7 +101,6 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		VaultKey:        getenv("HEYROBOTS_VAULT_KEY"),
 		RouterModel:     getenv("HEYROBOTS_ROUTER_MODEL"),
 		WorkerModel:     getenv("HEYROBOTS_WORKER_MODEL"),
-		SandboxImage:    getenv("HEYROBOTS_SANDBOX_IMAGE"),
 		WebDir:          getenv("HEYROBOTS_WEB_DIR"),
 		ACPCommand:      strings.Fields(getenv("HEYROBOTS_ACP_COMMAND")),
 		ClusterListen:   getenv("HEYROBOTS_CLUSTER_LISTEN"),
@@ -145,9 +138,6 @@ func FromEnv(getenv func(string) string) (Config, error) {
 	}
 	if c.WorkerModel == "" {
 		c.WorkerModel = DefaultWorkerModel
-	}
-	if c.SandboxImage == "" {
-		c.SandboxImage = DefaultSandboxImage
 	}
 	prices, err := usage.ParsePrices(getenv("HEYROBOTS_MODEL_PRICES"))
 	if err != nil {

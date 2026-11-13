@@ -109,67 +109,6 @@ func TestAttentionShowsWhatWaitsOnEachPerson(t *testing.T) {
 	}
 }
 
-func TestNotificationSettingsKeepTheTokenSecret(t *testing.T) {
-	h := newHarness(t, nil)
-	owner := h.completeSetup()
-	sam := h.pair(h.inviteDelegate(owner, "sam"), "sam's phone")
-
-	rec := h.do("GET", "/api/v1/notifications", owner, nil, "")
-	var ns gen.NotifySettings
-	json.Unmarshal(rec.Body.Bytes(), &ns)
-	if rec.Code != 200 || ns.Enabled || ns.ServerUrl != "https://ntfy.sh" || ns.QuietStart != 22 || ns.QuietEnd != 7 || ns.PerHour != 6 {
-		t.Fatalf("defaults: %d %s", rec.Code, rec.Body)
-	}
-	if rec := h.do("GET", "/api/v1/notifications", sam, nil, ""); rec.Code != http.StatusForbidden {
-		t.Fatalf("delegate read settings: %d", rec.Code)
-	}
-
-	tok := "tk_secret_value"
-	up := gen.NotifyUpdate{Enabled: true, ServerUrl: "https://ntfy.example.com", Topic: "hr-x8f2k", QuietStart: 23, QuietEnd: 6, PerHour: 4, Token: &tok}
-	rec = h.putJSON("/api/v1/notifications", owner, up)
-	if rec.Code != 200 || strings.Contains(rec.Body.String(), tok) {
-		t.Fatalf("update: %d %s", rec.Code, rec.Body)
-	}
-	json.Unmarshal(rec.Body.Bytes(), &ns)
-	if !ns.HasToken || ns.Topic != "hr-x8f2k" || ns.PerHour != 4 {
-		t.Fatalf("saved %+v", ns)
-	}
-	if v, _ := h.vault.Get("ntfy_token"); v != tok {
-		t.Fatal("token not in the vault")
-	}
-	p, _ := h.store.Policy()
-	if b, _ := json.Marshal(p); strings.Contains(string(b), tok) {
-		t.Fatal("token stored in the policy")
-	}
-
-	// Leaving the token out keeps it; an empty one removes it.
-	up.Token = nil
-	rec = h.putJSON("/api/v1/notifications", owner, up)
-	json.Unmarshal(rec.Body.Bytes(), &ns)
-	if !ns.HasToken {
-		t.Fatal("token dropped")
-	}
-	empty := ""
-	up.Token = &empty
-	rec = h.putJSON("/api/v1/notifications", owner, up)
-	json.Unmarshal(rec.Body.Bytes(), &ns)
-	if ns.HasToken {
-		t.Fatal("token kept")
-	}
-
-	for name, bad := range map[string]gen.NotifyUpdate{
-		"topic":    {Enabled: true, ServerUrl: "https://ntfy.sh", Topic: "a/b", QuietStart: 22, QuietEnd: 7, PerHour: 6},
-		"no topic": {Enabled: true, ServerUrl: "https://ntfy.sh", QuietStart: 22, QuietEnd: 7, PerHour: 6},
-		"scheme":   {Enabled: true, ServerUrl: "ftp://ntfy.sh", Topic: "abc", QuietStart: 22, QuietEnd: 7, PerHour: 6},
-		"hour":     {Enabled: true, ServerUrl: "https://ntfy.sh", Topic: "abc", QuietStart: 24, QuietEnd: 7, PerHour: 6},
-		"rate":     {Enabled: true, ServerUrl: "https://ntfy.sh", Topic: "abc", QuietStart: 22, QuietEnd: 7, PerHour: 0},
-	} {
-		if rec := h.putJSON("/api/v1/notifications", owner, bad); rec.Code != http.StatusBadRequest {
-			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
-		}
-	}
-}
-
 func (h *harness) putJSON(path, token string, v any) *httptest.ResponseRecorder {
 	b, _ := json.Marshal(v)
 	return h.do("PUT", path, token, bytes.NewReader(b), "application/json")

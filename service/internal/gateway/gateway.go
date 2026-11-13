@@ -148,10 +148,8 @@ func (s *Session) propose(ctx context.Context, toolName string, p toolsets.Propo
 		p.Reach = core.ReachOwner
 	}
 	findings := task.Trusted.Check(p.Details)
-	covered := pol.Covers(p.Source, p.Action, p.Details.Recipients)
-	need := p.Reach.NeedsApproval(covered, len(findings) > 0)
-	// Only the owner can approve, and a delegate's request is never covered
-	// by the owner's standing approvals when it acts as the owner.
+	need := p.Reach.NeedsApproval()
+	// Only the owner can approve.
 	if task.Mandate.Role != core.RoleOwner && p.Reach != core.ReachInternal && p.Reach != core.ReachRequester {
 		need = true
 	}

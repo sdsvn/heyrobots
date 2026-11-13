@@ -536,9 +536,6 @@ func (e *env) withEmailTool() {
 				Details: taint.Details{Recipients: a.To, Links: taint.Links(a.Body)}}, nil
 		},
 	}
-	e.setPolicy(func(p *policy.Policy) {
-		p.StandingApprovals = []policy.StandingApproval{{Name: "replies to Anna", Source: core.SourceMail, Action: "send", People: []string{"anna@example.com"}}}
-	})
 }
 
 func (e *env) actions(threadID string) []store.Effect {
@@ -567,8 +564,8 @@ func TestOutwardActionsAreQueuedAndCheckedNotRun(t *testing.T) {
 	if len(acts) != 3 {
 		t.Fatalf("actions = %d", len(acts))
 	}
-	// Trusted recipient under a standing approval: goes out without asking.
-	if acts[0].Status != store.EffectPending || acts[0].Approval != "" {
+	// Even a trusted recipient waits for the owner's OK, with no findings.
+	if acts[0].Status != store.EffectAwaitingApproval || strings.Contains(acts[0].Findings, "anna") {
 		t.Fatalf("trusted reply: %+v", acts[0])
 	}
 	// An email that names a new recipient needs fresh approval.

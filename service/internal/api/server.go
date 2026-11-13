@@ -335,7 +335,7 @@ func (s *Server) CreatePairingCode(w http.ResponseWriter, r *http.Request) {
 	if req.DelegateName != nil {
 		name = *req.DelegateName
 	}
-	if req.Role == gen.RoleDelegate {
+	if req.Role == gen.Delegate {
 		pol, err := s.opts.Store.Policy()
 		if err != nil {
 			s.internal(w, "load policy", err)
