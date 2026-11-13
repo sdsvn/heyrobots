@@ -881,6 +881,37 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+  /api/v1/chat-model:
+    get:
+      operationId: getChatModel
+      description: The model a chat uses (an agent's own, else the one doing the work) and the others its provider offers. Owner devices only.
+      parameters:
+        - { name: agent_id, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: The model and the choices.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatModel" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    put:
+      operationId: setChatModel
+      description: Switches to another model of the same provider. With an agent, only that agent changes; otherwise the model doing the work. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatModelUpdate" }
+      responses:
+        "200":
+          description: The model now in use.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatModel" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /api/v1/groups:
     get:
       operationId: listGroups
@@ -1733,6 +1764,22 @@ components:
         presence: { $ref: "#/components/schemas/Presence" }
         home: { type: string, description: The machine that runs it, when that isn't this one. Such an agent is read-only here. }
         unavailable_since: { type: string, format: date-time, description: When its machine was last heard from, while unavailable. }
+    ChatModel:
+      type: object
+      required: [provider, model, scope, models]
+      properties:
+        provider: { type: string }
+        model: { type: string }
+        base_url: { type: string }
+        scope: { type: string, enum: [agent, default], description: "agent: the agent's own model; default: the model doing the work for every agent without one." }
+        models: { type: array, items: { type: string }, description: "The provider's models, to switch between." }
+        note: { type: string, description: Why there's nothing to choose, such as your own agent picking its own model. }
+    ChatModelUpdate:
+      type: object
+      required: [model]
+      properties:
+        agent_id: { type: string }
+        model: { type: string, minLength: 1, maxLength: 200 }
     Machine:
       type: object
       required: [id, name, self, online, agents]

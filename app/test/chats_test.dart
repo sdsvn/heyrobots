@@ -6,6 +6,7 @@ import 'package:heyrobots/api/session.dart';
 import 'package:heyrobots/pairing.dart';
 import 'package:heyrobots/platform.dart';
 import 'package:heyrobots/state.dart';
+import 'package:heyrobots/ui/agent_profile_screen.dart';
 import 'package:heyrobots/ui/chat_screen.dart';
 import 'package:heyrobots/ui/chats_tab.dart';
 import 'package:heyrobots/ui/new_group_screen.dart';
@@ -73,6 +74,29 @@ void main() {
     expect(find.byType(ChatScreen), findsOneWidget);
     expect(find.text('Launch v2'), findsOneWidget);
     expect(find.text('Chats'), findsOneWidget);
+  });
+
+  testWidgets('a chat switches model, and an agent opens beside it on a wide screen', (tester) async {
+    await show(tester, ChatScreen(state: state, threadId: 'th_coder', agent: coder));
+    tester.view.physicalSize = const Size(2800, 1800);
+    await settle(tester);
+    expect(find.text('deepseek-chat'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('model-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('model:deepseek-reasoner')));
+    await settle(tester);
+    final put = server.requests.where((r) => r.method == 'PUT' && r.url.path == '/api/v1/chat-model').single;
+    expect(jsonDecode(put.body), {'agent_id': 'ag_coder', 'model': 'deepseek-reasoner'});
+    expect(find.text('deepseek-reasoner'), findsOneWidget);
+
+    // The agent's profile opens beside the chat, and closes again.
+    await tester.tap(find.byKey(const Key('header-name')));
+    await settle(tester);
+    expect(find.byType(AgentProfileScreen), findsOneWidget);
+    expect(find.byType(ChatScreen), findsOneWidget);
+    await tester.tap(find.byKey(const Key('close-panel')));
+    await settle(tester);
+    expect(find.byType(AgentProfileScreen), findsNothing);
   });
 
   testWidgets('sending in a new direct chat starts it with the agent', (tester) async {

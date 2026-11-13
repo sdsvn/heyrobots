@@ -21,6 +21,8 @@ import 'models/approval_decision.dart' as models show ApprovalDecision;
 import 'models/approval_list.dart' as models show ApprovalList;
 import 'models/attention_list.dart' as models show AttentionList;
 import 'models/brain_list.dart' as models show BrainList;
+import 'models/chat_model.dart' as models show ChatModel;
+import 'models/chat_model_update.dart' as models show ChatModelUpdate;
 import 'models/connect_request.dart' as models show ConnectRequest;
 import 'models/connect_result.dart' as models show ConnectResult;
 import 'models/device.dart' as models show Device;
@@ -2856,6 +2858,108 @@ class ApiClient {
       throw http.ClientException('HTTP $_status', _url);
     }
     await response.stream.drain<void>();
+  }
+
+  /// The model a chat uses (an agent's own, else the one doing the work) and the others its provider offers. Owner devices only.
+  Future<models.ChatModel> getChatModel({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://127.0.0.1:7340"},
+      ],
+      "openapi.security": [
+        {"deviceToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "deviceToken": {"type": "http", "scheme": "bearer"},
+      },
+    },
+    Future<void>? abortTrigger,
+    HttpRequestOptions? options,
+    String? agentId,
+  }) async {
+    final _base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    var _url = Uri.parse(_base + ("/api/v1/chat-model"));
+    final _query = _httpQuery(<String, Object?>{
+      if (agentId != null) "agent_id": agentId,
+    });
+    if (_query.isNotEmpty) {
+      _url = _url.replace(
+        query: [_url.query, _query].where((s) => s.isNotEmpty).join('&'),
+      );
+    }
+    final request = http.AbortableRequest(
+      "GET",
+      _url,
+      abortTrigger: abortTrigger,
+    );
+    request.headers.addAll(
+      <String, Object?>{
+        ...?options?.headers,
+        'Accept': "application/json",
+      }.map((key, value) => MapEntry(key, value.toString())),
+    );
+    if (options?.followRedirects case final value?)
+      request.followRedirects = value;
+    if (options?.maxRedirects case final value?) request.maxRedirects = value;
+    prepareRequest?.call(request, extra);
+    final response = await _transport.send(request);
+    final _status = response.statusCode;
+    if (!(_status == 200)) {
+      await response.stream.listen(null).cancel();
+      throw http.ClientException('HTTP $_status', _url);
+    }
+    return await convert.utf8.decoder.bind(response.stream).join().then((text) {
+      final Object? value = convert.jsonDecode(text);
+      return models.ChatModel.fromJson(value as Map<String, Object?>);
+    });
+  }
+
+  /// Switches to another model of the same provider. With an agent, only that agent changes; otherwise the model doing the work. Owner devices only.
+  Future<models.ChatModel> setChatModel({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://127.0.0.1:7340"},
+      ],
+      "openapi.security": [
+        {"deviceToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "deviceToken": {"type": "http", "scheme": "bearer"},
+      },
+    },
+    Future<void>? abortTrigger,
+    HttpRequestOptions? options,
+    required models.ChatModelUpdate body,
+  }) async {
+    final _base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    var _url = Uri.parse(_base + ("/api/v1/chat-model"));
+    final request = http.AbortableRequest(
+      "PUT",
+      _url,
+      abortTrigger: abortTrigger,
+    );
+    request.bodyBytes = convert.utf8.encode(convert.jsonEncode(body));
+    request.headers.addAll(
+      <String, Object?>{
+        ...?options?.headers,
+        'Accept': "application/json",
+        'Content-Type': "application/json",
+      }.map((key, value) => MapEntry(key, value.toString())),
+    );
+    if (options?.followRedirects case final value?)
+      request.followRedirects = value;
+    if (options?.maxRedirects case final value?) request.maxRedirects = value;
+    prepareRequest?.call(request, extra);
+    final response = await _transport.send(request);
+    final _status = response.statusCode;
+    if (!(_status == 200)) {
+      await response.stream.listen(null).cancel();
+      throw http.ClientException('HTTP $_status', _url);
+    }
+    return await convert.utf8.decoder.bind(response.stream).join().then((text) {
+      final Object? value = convert.jsonDecode(text);
+      return models.ChatModel.fromJson(value as Map<String, Object?>);
+    });
   }
 
   /// Groups of agents you chat with. Owner devices see all; a delegate sees the groups it may use.

@@ -12,6 +12,9 @@ class FakeServer {
   String pairingCode = 'ABCDE-FGHJK';
   String role = 'owner';
 
+  /// The model chats use, as the chat model picker sees it.
+  String chatModel = 'deepseek-chat';
+
   List<Map<String, Object?>> attention = [];
   List<Map<String, Object?>> approvals = [];
   List<Map<String, Object?>> threads = [];
@@ -163,6 +166,14 @@ class FakeServer {
         return _json(202, {'trigger_id': 'tr1', 'thread_id': id, 'duplicate': false});
     }
     if (path == '/api/v1/agents' && r.method == 'GET') return _json(200, {'agents': agents});
+    if (path == '/api/v1/chat-model' && r.method == 'GET') {
+      return _json(200, {'provider': 'openai', 'model': chatModel, 'scope': 'default', 'models': ['deepseek-chat', 'deepseek-reasoner']});
+    }
+    if (path == '/api/v1/chat-model' && r.method == 'PUT') {
+      final body = jsonDecode(r.body) as Map<String, Object?>;
+      chatModel = body['model'] as String;
+      return _json(200, {'provider': 'openai', 'model': chatModel, 'scope': body['agent_id'] == null ? 'default' : 'agent', 'models': ['deepseek-chat', 'deepseek-reasoner']});
+    }
     if (path == '/api/v1/groups' && r.method == 'GET') return _json(200, {'groups': groups});
     if (path == '/api/v1/groups' && r.method == 'POST') {
       final body = jsonDecode(r.body) as Map<String, Object?>;

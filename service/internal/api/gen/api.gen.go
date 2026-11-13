@@ -464,6 +464,24 @@ func (e ChatCardKind) Valid() bool {
 	}
 }
 
+// Defines values for ChatModelScope.
+const (
+	ChatModelScopeAgent   ChatModelScope = "agent"
+	ChatModelScopeDefault ChatModelScope = "default"
+)
+
+// Valid indicates whether the value is a known member of the ChatModelScope enum.
+func (e ChatModelScope) Valid() bool {
+	switch e {
+	case ChatModelScopeAgent:
+		return true
+	case ChatModelScopeDefault:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	Ok HealthStatus = "ok"
@@ -1092,6 +1110,31 @@ type ChatCard struct {
 
 // ChatCardKind defines model for ChatCard.Kind.
 type ChatCardKind string
+
+// ChatModel defines model for ChatModel.
+type ChatModel struct {
+	BaseUrl *string `json:"base_url,omitempty"`
+	Model   string  `json:"model"`
+
+	// Models The provider's models, to switch between.
+	Models []string `json:"models"`
+
+	// Note Why there's nothing to choose
+	Note     *string `json:"note,omitempty"`
+	Provider string  `json:"provider"`
+
+	// Scope agent: the agent's own model; default: the model doing the work for every agent without one.
+	Scope ChatModelScope `json:"scope"`
+}
+
+// ChatModelScope agent: the agent's own model; default: the model doing the work for every agent without one.
+type ChatModelScope string
+
+// ChatModelUpdate defines model for ChatModelUpdate.
+type ChatModelUpdate struct {
+	AgentId *string `json:"agent_id,omitempty"`
+	Model   string  `json:"model"`
+}
 
 // ConnectRequest defines model for ConnectRequest.
 type ConnectRequest struct {
@@ -1779,6 +1822,11 @@ type DisconnectAppParams struct {
 	Account *string `form:"account,omitempty" json:"account,omitempty"`
 }
 
+// GetChatModelParams defines parameters for GetChatModel.
+type GetChatModelParams struct {
+	AgentId *string `form:"agent_id,omitempty" json:"agent_id,omitempty"`
+}
+
 // SearchSkillsParams defines parameters for SearchSkills.
 type SearchSkillsParams struct {
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
@@ -1810,6 +1858,9 @@ type FinishAppConnectJSONRequestBody = GoogleConnectFinish
 
 // SetAppToolJSONRequestBody defines body for SetAppTool for application/json ContentType.
 type SetAppToolJSONRequestBody = AppToolUpdate
+
+// SetChatModelJSONRequestBody defines body for SetChatModel for application/json ContentType.
+type SetChatModelJSONRequestBody = ChatModelUpdate
 
 // CreateGroupJSONRequestBody defines body for CreateGroup for application/json ContentType.
 type CreateGroupJSONRequestBody = GroupRequest
@@ -1924,6 +1975,12 @@ type ServerInterface interface {
 
 	// (GET /api/v1/brains)
 	ListBrains(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v1/chat-model)
+	GetChatModel(w http.ResponseWriter, r *http.Request, params GetChatModelParams)
+
+	// (PUT /api/v1/chat-model)
+	SetChatModel(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/v1/devices)
 	ListDevices(w http.ResponseWriter, r *http.Request)
@@ -2508,6 +2565,53 @@ func (siw *ServerInterfaceWrapper) ListBrains(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListBrains(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetChatModel operation middleware
+func (siw *ServerInterfaceWrapper) GetChatModel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetChatModelParams
+
+	// ------------- Optional query parameter "agent_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "agent_id", r.URL.Query(), &params.AgentId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agent_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agent_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetChatModel(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetChatModel operation middleware
+func (siw *ServerInterfaceWrapper) SetChatModel(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetChatModel(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3637,6 +3741,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/machines", wrapper.JoinMachine)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/machines/code", wrapper.CreateMachineCode)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/machines/{machineId}", wrapper.RemoveMachine)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/chat-model", wrapper.GetChatModel)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/chat-model", wrapper.SetChatModel)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/groups", wrapper.ListGroups)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/groups", wrapper.CreateGroup)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/groups/{groupId}", wrapper.DeleteGroup)

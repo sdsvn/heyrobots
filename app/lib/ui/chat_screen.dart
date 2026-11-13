@@ -69,6 +69,13 @@ class _ChatScreenState extends State<ChatScreen> {
   final _confirmed = <String>{};
   StreamSubscription<String>? _changes;
 
+  /// The agent whose profile shows beside the chat, on a wide screen.
+  String? _panelAgent;
+  bool _wide = false;
+
+  /// The model this chat uses, and the others its provider offers.
+  ChatModel? _model;
+
   AppState get s => widget.state;
 
   @override
@@ -81,6 +88,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _input.addListener(() => setState(() {}));
     if (_threadId != null) _load();
     _loadAgent();
+    _loadModel();
   }
 
   @override
@@ -94,6 +102,118 @@ class _ChatScreenState extends State<ChatScreen> {
   AgentRef? get _chatAgent => _detail?.agent ?? widget.agent;
   Group? get _group => _detail?.group ?? widget.group;
   bool get _isGroup => _group != null;
+
+  /// The id of the agent whose model this chat switches: the agent of a
+  /// direct chat; none for a group or Bit, which use the default.
+  String? get _modelAgent => _isGroup ? null : (widget.agent ?? _detail?.agent)?.id;
+
+  Future<void> _loadModel() async {
+    if (!s.isOwner) return;
+    try {
+      final m = await s.api.getChatModel(agentId: _modelAgent);
+      if (mounted) setState(() => _model = m);
+    } catch (_) {
+      // No picker; the chat works as before.
+    }
+  }
+
+  Future<void> _pickModel(ChatModel m) async {
+    final p = Palette.of(context);
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: p.card,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (sheet) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheet).height * .7),
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+                child: SectionLabel(
+                  m.scope == ChatModelScope.agent ? 'Model for ${widget.agent?.name ?? _chatAgent?.name ?? 'this agent'}' : 'Model for every agent',
+                  size: 13,
+                  weight: FontWeight.w800,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(
+                  m.scope == ChatModelScope.agent || _modelAgent != null
+                      ? 'Only this agent changes. Others keep theirs.'
+                      : 'Agents without a model of their own use this one.',
+                  style: TextStyle(fontSize: 13, color: p.muted),
+                ),
+              ),
+              for (final id in m.models)
+                ListTile(
+                  key: Key('model:$id'),
+                  title: Text(id, style: TextStyle(fontWeight: id == m.model ? FontWeight.w900 : FontWeight.w600)),
+                  trailing: id == m.model ? Icon(Icons.check_rounded, color: p.accent) : null,
+                  onTap: () => Navigator.of(sheet).pop(id),
+                ),
+              if (m.note != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                  child: Text(m.note!, style: TextStyle(fontSize: 13, color: p.muted)),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked == null || picked == m.model || !mounted) return;
+    try {
+      final now = await s.api.setChatModel(
+        body: ChatModelUpdate(agentId: _modelAgent, model: picked),
+      );
+      if (!mounted) return;
+      setState(() => _model = now);
+      showMessage(context, 'Now using $picked');
+    } catch (e) {
+      if (mounted) showMessage(context, describeError(e));
+    }
+  }
+
+  Widget _modelChip(Palette p, ChatModel m) {
+    final choosable = m.models.length > 1;
+    final label = m.provider == 'claude_code' ? 'Your agent' : m.model;
+    return Tooltip(
+      message: choosable ? 'Change the model' : (m.note ?? m.model),
+      child: Material(
+        color: p.ground,
+        shape: const StadiumBorder(),
+        child: InkWell(
+          key: const Key('model-picker'),
+          customBorder: const StadiumBorder(),
+          onTap: choosable ? () => _pickModel(m) : null,
+          child: Container(
+            height: 44,
+            constraints: const BoxConstraints(maxWidth: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.auto_awesome_rounded, size: 16, color: p.accent),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: p.ink),
+                  ),
+                ),
+                if (choosable) ...[const SizedBox(width: 2), Icon(Icons.expand_more_rounded, size: 18, color: p.muted)],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   /// The agent's reach and jobs for the header line. Owner only.
   Future<void> _loadAgent() async {
@@ -271,10 +391,20 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  /// An agent's profile: beside the chat on a wide screen, else its own
+  /// screen.
+  void _openAgent(String id) {
+    if (_wide) {
+      setState(() => _panelAgent = _panelAgent == id ? null : id);
+    } else {
+      _push(AgentProfileScreen(state: s, agentId: id));
+    }
+  }
+
   void _profile() {
     final a = _chatAgent;
     if (a != null && !_isGroup) {
-      _push(AgentProfileScreen(state: s, agentId: a.id));
+      _openAgent(a.id);
       return;
     }
     final g = _group;
@@ -299,7 +429,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 onTap: s.isOwner
                     ? () {
                         Navigator.of(sheet).pop();
-                        _push(AgentProfileScreen(state: s, agentId: m.id));
+                        _openAgent(m.id);
                       }
                     : null,
               ),
@@ -310,8 +440,29 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// Width from which an agent's profile opens beside the chat.
+  static const _panelFrom = 1000.0;
+  static const _panelWidth = 380.0;
+
   @override
-  Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) => _build(context, box.maxWidth));
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      _wide = s.isOwner && box.maxWidth >= _panelFrom;
+      final id = _panelAgent;
+      if (!_wide || id == null) return _build(context, box.maxWidth);
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: _build(context, box.maxWidth - _panelWidth - 2)),
+          Container(width: 2, color: Palette.of(context).line),
+          SizedBox(
+            width: _panelWidth,
+            child: AgentProfileScreen(key: ValueKey('panel:$id'), state: s, agentId: id, onClose: () => setState(() => _panelAgent = null)),
+          ),
+        ],
+      );
+    },
+  );
 
   /// The widest the conversation gets; wider screens centre it.
   static const _column = 760.0;
@@ -537,17 +688,26 @@ class _ChatScreenState extends State<ChatScreen> {
                 const AgentAvatar(color: 'violet', badge: 'star', size: 42, showBadge: false),
               const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+                child: Semantics(
+                  button: s.isOwner,
+                  label: s.isOwner ? 'About $name' : null,
+                  child: GestureDetector(
+                    key: const Key('header-name'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: s.isOwner ? _profile : null,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+                        ),
+                        sub,
+                      ],
                     ),
-                    sub,
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -586,25 +746,7 @@ class _ChatScreenState extends State<ChatScreen> {
           padding: EdgeInsets.fromLTRB(12 + side, 10, 12 + side, 10),
           child: Row(
             children: [
-              if (!_isGroup && s.isOwner) ...[
-                Tooltip(
-                  message: 'Connect an app',
-                  child: Material(
-                    color: p.ground,
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: () => _push(ConnectAppsScreen(state: s)),
-                      child: SizedBox(
-                        width: 44,
-                        height: 44,
-                        child: Center(child: LineIcon(Glyph.plus, size: 22, color: p.ink, stroke: 2.4)),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
+              if (s.isOwner && _model != null) ...[_modelChip(p, _model!), const SizedBox(width: 8)],
               Expanded(
                 child: TextField(
                   key: const Key('message'),

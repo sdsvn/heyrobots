@@ -11,10 +11,14 @@ import 'theme.dart';
 
 /// One agent: what it's doing, its standing jobs and what it can reach.
 class AgentProfileScreen extends StatefulWidget {
-  const AgentProfileScreen({super.key, required this.state, required this.agentId});
+  const AgentProfileScreen({super.key, required this.state, required this.agentId, this.onClose});
 
   final AppState state;
   final String agentId;
+
+  /// Shown as a panel beside a chat: a close button instead of back, and no
+  /// button to open the chat that's already open.
+  final VoidCallback? onClose;
 
   @override
   State<AgentProfileScreen> createState() => _AgentProfileScreenState();
@@ -91,10 +95,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
     final reach = [...reachLabels(a), for (final sk in a.skills) 'Skill: $sk'];
     final model = a.model ?? "Worker's model";
     final purpose = a.purpose.trim().replaceAll(RegExp(r'\.$'), '');
-    final about = [
-      if (purpose.isNotEmpty) '$purpose.',
-      '$model · ${a.capacity == 1 ? '1 task' : '${a.capacity} tasks'} at a time',
-    ].join(' ');
+    final about = [if (purpose.isNotEmpty) '$purpose.', '$model · ${a.capacity == 1 ? '1 task' : '${a.capacity} tasks'} at a time'].join(' ');
     final recent = _recent(a, jobs);
     return RefreshIndicator(
       onRefresh: () async => reload(),
@@ -112,39 +113,73 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                   children: [
                     Row(
                       children: [
-                        SquareButton(icon: LineIcon(Glyph.back, size: 22, color: p.ink, stroke: 2.6), label: 'Back to team', width: 40, height: 40, radius: 14, edge: 0, onPressed: () => Navigator.of(context).maybePop()),
-                        const Spacer(),
-                        Tooltip(
-                          message: 'Change anything about this agent by asking it',
-                          child: EdgeCard(
+                        if (widget.onClose != null)
+                          SquareButton(
+                            key: const Key('close-panel'),
+                            icon: Icon(Icons.close_rounded, size: 22, color: p.ink),
+                            label: 'Close',
+                            width: 40,
+                            height: 40,
                             radius: 14,
                             edge: 0,
-                            onTap: () => openAgentChat(context, s, ref),
-                            child: Container(
-                              height: 40,
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.chat_bubble_outline_rounded, size: 16, color: p.accent),
-                                  const SizedBox(width: 6),
-                                  Text('Ask to change', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: p.accent)),
-                                ],
+                            onPressed: widget.onClose!,
+                          )
+                        else
+                          SquareButton(
+                            icon: LineIcon(Glyph.back, size: 22, color: p.ink, stroke: 2.6),
+                            label: 'Back to team',
+                            width: 40,
+                            height: 40,
+                            radius: 14,
+                            edge: 0,
+                            onPressed: () => Navigator.of(context).maybePop(),
+                          ),
+                        const Spacer(),
+                        if (widget.onClose == null)
+                          Tooltip(
+                            message: 'Change anything about this agent by asking it',
+                            child: EdgeCard(
+                              radius: 14,
+                              edge: 0,
+                              onTap: () => openAgentChat(context, s, ref),
+                              child: Container(
+                                height: 40,
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.chat_bubble_outline_rounded, size: 16, color: p.accent),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Ask to change',
+                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: p.accent),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        AgentAvatar(color: ref.color, badge: ref.badge, size: 64, fill: p.card, name: a.name, mood: busy ? BitMood.thinking : (a.enabled ? BitMood.idle : BitMood.sleeping)),
+                        AgentAvatar(
+                          color: ref.color,
+                          badge: ref.badge,
+                          size: 64,
+                          fill: p.card,
+                          name: a.name,
+                          mood: busy ? BitMood.thinking : (a.enabled ? BitMood.idle : BitMood.sleeping),
+                        ),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(a.name, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: p.ink)),
+                              Text(
+                                a.name,
+                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: p.ink),
+                              ),
                               Text(a.enabled ? about : 'Paused · $about', style: TextStyle(fontSize: 13, color: ink)),
                             ],
                           ),
@@ -154,18 +189,25 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
+                        // Beside its chat, messaging it is the chat itself.
+                        if (widget.onClose == null) ...[
+                          Expanded(
+                            child: _HeaderButton(
+                              key: const Key('message-agent'),
+                              label: 'Message',
+                              icon: Icons.chat_bubble_outline_rounded,
+                              primary: true,
+                              onTap: () => openAgentChat(context, s, ref),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         Expanded(
                           child: _HeaderButton(
-                            key: const Key('message-agent'),
-                            label: 'Message',
-                            icon: Icons.chat_bubble_outline_rounded,
-                            primary: true,
-                            onTap: () => openAgentChat(context, s, ref),
+                            key: const Key('give-job'),
+                            label: 'Give it a job',
+                            onTap: () => openAgentChat(context, s, ref, draft: 'Give you a job: '),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _HeaderButton(key: const Key('give-job'), label: 'Give it a job', onTap: () => openAgentChat(context, s, ref, draft: 'Give you a job: ')),
                         ),
                         const SizedBox(width: 8),
                         Tooltip(
@@ -204,9 +246,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                   Container(
                     decoration: edgeBox(p, radius: 20),
                     child: Column(
-                      children: [
-                        for (var i = 0; i < jobs.length; i++) _JobRow(job: jobs[i], divider: i < jobs.length - 1),
-                      ],
+                      children: [for (var i = 0; i < jobs.length; i++) _JobRow(job: jobs[i], divider: i < jobs.length - 1)],
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -226,7 +266,13 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SizedBox(width: 42, child: Text(chatTime(at) == 'Yesterday' ? 'Yest.' : chatTime(at), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: p.muted))),
+                          SizedBox(
+                            width: 42,
+                            child: Text(
+                              chatTime(at) == 'Yesterday' ? 'Yest.' : chatTime(at),
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: p.muted),
+                            ),
+                          ),
                           const SizedBox(width: 10),
                           Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
                         ],
@@ -248,11 +294,14 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
         if (j.lastRunAt != null) (j.lastRunAt!, 'Ran ${jobTitle(j)}'),
       for (final item in s.attention)
         if (agentOfItem(item, [a], s.threads)?.id == a.id)
-          (item.at, switch (item.kind) {
-            AttentionItemKind.approval => 'Asked you to approve ${actionName(item.action ?? item.text)}',
-            AttentionItemKind.question => 'Asked you: ${item.text}',
-            _ => item.text,
-          }),
+          (
+            item.at,
+            switch (item.kind) {
+              AttentionItemKind.approval => 'Asked you to approve ${actionName(item.action ?? item.text)}',
+              AttentionItemKind.question => 'Asked you: ${item.text}',
+              _ => item.text,
+            },
+          ),
     ]..sort((x, y) => y.$1.compareTo(x.$1));
     return out.take(5).toList();
   }
@@ -276,7 +325,10 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               if (thread != null && where != null)
                 InkWell(
                   onTap: () => openThread(context, s, thread),
-                  child: Text('in $where', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: p.accent)),
+                  child: Text(
+                    'in $where',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: p.accent),
+                  ),
                 ),
             ],
           ),
@@ -317,7 +369,10 @@ class _HeaderButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[Icon(icon, size: 16, color: fg), const SizedBox(width: 6)],
-              Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: fg)),
+              Text(
+                label,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: fg),
+              ),
             ],
           ),
         ),
@@ -337,13 +392,13 @@ class _JobRow extends StatelessWidget {
     final p = Palette.of(context);
     final j = job;
     final trigger = j.trigger.split(' ').first;
-    final title = j.schedule.isNotEmpty
-        ? scheduleWords(j.schedule)
-        : (trigger.isNotEmpty ? 'When $trigger has something new' : jobTitle(j));
+    final title = j.schedule.isNotEmpty ? scheduleWords(j.schedule) : (trigger.isNotEmpty ? 'When $trigger has something new' : jobTitle(j));
     return Container(
       key: Key('profile-job:${j.name}'),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(border: divider ? Border(bottom: BorderSide(color: rowLine(p))) : null),
+      decoration: BoxDecoration(
+        border: divider ? Border(bottom: BorderSide(color: rowLine(p))) : null,
+      ),
       child: Row(
         children: [
           LineIcon(j.schedule.isNotEmpty ? Glyph.clock : Glyph.bolt, size: 18, color: p.accent),
@@ -361,7 +416,10 @@ class _JobRow extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: p.peachSoft, borderRadius: BorderRadius.circular(999)),
-              child: Text('asks you', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: p.peachInk)),
+              child: Text(
+                'asks you',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: p.peachInk),
+              ),
             ),
         ],
       ),
