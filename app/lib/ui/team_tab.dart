@@ -187,7 +187,7 @@ class _AgentCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              AgentAvatar(color: a.color.toJson(), badge: a.badge.toJson(), size: 48, name: a.name, mood: busy ? BitMood.thinking : BitMood.idle),
+              AgentAvatar(color: a.color.toJson(), badge: a.badge.toJson(), size: 48, name: a.name, seed: a.id, mood: busy ? BitMood.thinking : BitMood.idle),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

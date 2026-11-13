@@ -255,7 +255,7 @@ class GroupAvatar extends StatelessWidget {
     final p = Palette.of(context);
     Widget one(AgentRef? a) => a == null
         ? Container(width: face, height: face, decoration: BoxDecoration(color: p.accentSoft, shape: BoxShape.circle, border: Border.all(color: p.line, width: 2)))
-        : AgentAvatar(color: a.color, badge: a.badge, size: face, showBadge: false, name: a.name);
+        : AgentAvatar(color: a.color, badge: a.badge, size: face, showBadge: false, name: a.name, seed: a.id);
     return SizedBox(
       width: width,
       height: height,

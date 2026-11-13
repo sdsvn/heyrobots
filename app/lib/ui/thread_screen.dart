@@ -129,7 +129,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
                     _Square(label: 'Back', icon: Icons.chevron_left_rounded, onPressed: () => Navigator.of(context).maybePop()),
                     const SizedBox(width: 10),
                     if (ticket?.agent != null && ticket!.agent!.id != 'ag_general') ...[
-                      AgentAvatar(color: ticket.agent!.color, badge: ticket.agent!.badge, size: 38, name: ticket.agent!.name,
+                      AgentAvatar(color: ticket.agent!.color, badge: ticket.agent!.badge, size: 38, name: ticket.agent!.name, seed: ticket.agent!.id,
                           mood: ticket.open && !ticket.stopped ? BitMood.thinking : BitMood.idle),
                       const SizedBox(width: 10),
                     ],
@@ -472,7 +472,7 @@ class _Bubble extends StatelessWidget {
             children: [
               if (bit) ...[
                 if (agent != null && agent!.id != 'ag_general')
-                  AgentAvatar(color: agent!.color, badge: agent!.badge, size: 34, name: agent!.name)
+                  AgentAvatar(color: agent!.color, badge: agent!.badge, size: 34, name: agent!.name, seed: agent!.id)
                 else
                   const Bit(size: 34),
                 const SizedBox(width: 8),

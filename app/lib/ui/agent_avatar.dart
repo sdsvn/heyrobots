@@ -32,7 +32,7 @@ IconData agentBadgeIcon(String badge) => switch (badge) {
 /// Bit in an agent's color, wearing its badge, so you can tell at a glance
 /// who is working.
 class AgentAvatar extends StatelessWidget {
-  const AgentAvatar({super.key, required this.color, required this.badge, this.size = 40, this.mood = BitMood.idle, this.name, this.showBadge = true, this.fill});
+  const AgentAvatar({super.key, required this.color, required this.badge, this.size = 40, this.mood = BitMood.idle, this.name, this.showBadge = true, this.fill, this.seed});
 
   final String color;
   final String badge;
@@ -47,6 +47,9 @@ class AgentAvatar extends StatelessWidget {
 
   /// The circle's fill, when not the agent's soft shade.
   final Color? fill;
+
+  /// The agent's id, which picks its face; without one it is Bit's own face.
+  final String? seed;
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +69,7 @@ class AgentAvatar extends StatelessWidget {
               height: size,
               decoration: BoxDecoration(color: fill ?? soft, shape: BoxShape.circle, border: Border.all(color: strong, width: size > 44 ? 3 : 2)),
               alignment: Alignment.center,
-              child: Bit(mood: mood, size: size * .74),
+              child: Bit(mood: mood, size: size * .74, face: BitFace.of(seed)),
             ),
             if (showBadge) Positioned(
               right: -size * .06,

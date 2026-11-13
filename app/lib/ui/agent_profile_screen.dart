@@ -169,6 +169,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                           size: 64,
                           fill: p.card,
                           name: a.name,
+                          seed: a.id,
                           mood: busy ? BitMood.thinking : (a.enabled ? BitMood.idle : BitMood.sleeping),
                         ),
                         const SizedBox(width: 14),

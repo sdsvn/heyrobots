@@ -424,7 +424,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             for (final m in g.members)
               ListTile(
-                leading: AgentAvatar(color: m.color, badge: m.badge, size: 40, name: m.name),
+                leading: AgentAvatar(color: m.color, badge: m.badge, size: 40, name: m.name, seed: m.id),
                 title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.w900)),
                 onTap: s.isOwner
                     ? () {
@@ -600,7 +600,7 @@ class _ChatScreenState extends State<ChatScreen> {
             if (_group != null)
               GroupAvatar(members: _group!.members, width: 84, height: 80, face: 56)
             else if (a != null)
-              AgentAvatar(color: a.color, badge: a.badge, size: 72, name: a.name)
+              AgentAvatar(color: a.color, badge: a.badge, size: 72, name: a.name, seed: a.id)
             else
               const Bit(size: 72),
             const SizedBox(height: 14),
@@ -683,7 +683,7 @@ class _ChatScreenState extends State<ChatScreen> {
               if (g != null)
                 GroupAvatar(members: g.members, width: 46, height: 42, face: 30, ring: 2)
               else if (a != null)
-                AgentAvatar(color: a.color, badge: a.badge, size: 42, name: a.name, mood: _typing ? BitMood.thinking : BitMood.idle)
+                AgentAvatar(color: a.color, badge: a.badge, size: 42, name: a.name, seed: a.id, mood: _typing ? BitMood.thinking : BitMood.idle)
               else
                 const AgentAvatar(color: 'violet', badge: 'star', size: 42, showBadge: false),
               const SizedBox(width: 10),
@@ -936,7 +936,7 @@ class _Face extends StatelessWidget {
     final a = agent;
     return a == null || a.id == 'ag_general' && a.name == 'General'
         ? AgentAvatar(color: a?.color ?? 'violet', badge: 'star', size: 32, showBadge: false, name: a?.name)
-        : AgentAvatar(color: a.color, badge: a.badge, size: 32, showBadge: false, name: a.name);
+        : AgentAvatar(color: a.color, badge: a.badge, size: 32, showBadge: false, name: a.name, seed: a.id);
   }
 }
 
