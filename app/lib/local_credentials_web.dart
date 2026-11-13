@@ -5,7 +5,7 @@ import 'platform.dart';
 /// The web app's pairing, kept in this site's local storage so a reload
 /// stays signed in. The app is served by the heyrobots server itself, so
 /// only pages from that server can read it.
-CredentialStore? webCredentialStore() => _LocalStorageStore();
+CredentialStore? localCredentialStore() => _LocalStorageStore();
 
 class _LocalStorageStore implements CredentialStore {
   static const _server = 'heyrobots.server', _token = 'heyrobots.device_token', _device = 'heyrobots.device_id';

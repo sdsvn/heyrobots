@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 
 import 'pairing.dart';
 import 'platform.dart';
-import 'web_credentials.dart' if (dart.library.js_interop) 'web_credentials_web.dart';
+import 'local_credentials.dart' if (dart.library.js_interop) 'local_credentials_web.dart';
 import 'state.dart';
 import 'ui/approval_screen.dart';
 import 'ui/bit.dart';
@@ -29,7 +29,7 @@ void main() {
     yield LicenseEntryWithLineBreaks(['Nunito'], await rootBundle.loadString('assets/fonts/OFL.txt'));
   });
   final state = AppState(
-    credentials: webCredentialStore() ?? SecureCredentialStore(),
+    credentials: localCredentialStore() ?? SecureCredentialStore(),
     verifier: BiometricVerifier(),
   );
   // Push notifications open heyrobots:// links.
