@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"google.golang.org/adk/v2/agent"
@@ -13,6 +15,7 @@ import (
 	"google.golang.org/adk/v2/tool/functiontool"
 
 	"heyrobots/service/internal/core"
+	"heyrobots/service/internal/store"
 )
 
 // Memory limits. The file keeps its newest notes; the prompt shows the
@@ -118,4 +121,91 @@ func (r *run) memoryTool() (tool.Tool, error) {
 		}
 		return map[string]any{"ok": true}, nil
 	})
+}
+
+// chatContextLen is how many earlier messages of a chat a new task sees.
+const chatContextLen = 20
+
+// chatSection gives a new task in a chat what was said there lately: the
+// people's messages and every agent's replies, oldest first. A chat is one
+// long conversation, so a task started in it shouldn't begin knowing
+// nothing of it. It goes in the first user turn, so the cached system
+// prompt stays the same.
+func (r *run) chatSection() string {
+	if r.c.Assignment.Kind != store.AssignmentNew {
+		return ""
+	}
+	type line struct {
+		at   time.Time
+		text string
+	}
+	var lines []line
+	var team []string
+	_ = r.e.Store.Tx(func(tx *store.Tx) error {
+		v, err := tx.ThreadView(r.c.Ticket.OriginThreadID)
+		if err != nil || (v.Thread.AgentID == "" && v.Thread.GroupID == "") {
+			return err
+		}
+		if g, err := tx.Group(v.Thread.GroupID); err == nil {
+			for _, id := range g.MemberList() {
+				if a, err := tx.Agent(id); err == nil && a.ID != r.agent.ID {
+					team = append(team, "@"+a.Name+" ("+a.Purpose+")")
+				}
+			}
+		}
+		now := map[string]bool{}
+		for _, t := range r.c.Inputs {
+			now[t.ID] = true
+		}
+		for _, t := range v.Triggers {
+			if now[t.ID] || t.Source == string(core.SourceAgent) {
+				continue
+			}
+			who := "Owner"
+			if role, _ := r.pol.RoleOf(core.Identity{Source: core.SourceKind(t.ActorSource), ID: t.ActorID}); role != core.RoleOwner {
+				who = t.ActorID
+			}
+			lines = append(lines, line{t.At, who + ": " + shorten(t.Text, 600)})
+		}
+		names := map[string]string{}
+		for _, tk := range v.Tickets {
+			if a, err := tx.Agent(tk.AgentID); err == nil {
+				names[tk.ID] = a.Name
+			}
+		}
+		for _, e := range v.Effects {
+			if e.Kind != "message" || e.TicketID == r.c.Ticket.ID {
+				continue
+			}
+			who := names[e.TicketID]
+			if who == "" {
+				who = "Bit"
+			}
+			if who == r.agent.Name {
+				who = "You (" + who + ")"
+			}
+			lines = append(lines, line{e.CreatedAt, who + ": " + shorten(e.Body, 600)})
+		}
+		return nil
+	})
+	var b strings.Builder
+	if len(team) > 0 {
+		b.WriteString("This is a group chat. Your teammates here: " + strings.Join(team, ", ") +
+			". To give one of them a piece of the work, write @Name and what you need in your reply; they get it as a request and answer here. Only do that when the piece fits them better than you.\n\n")
+	}
+	if len(lines) == 0 {
+		return b.String()
+	}
+	slices.SortStableFunc(lines, func(a, b line) int { return a.at.Compare(b.at) })
+	b.WriteString("Earlier in this chat, oldest first, as context only")
+	if len(lines) > chatContextLen {
+		lines = lines[len(lines)-chatContextLen:]
+		b.WriteString(" (older messages left out)")
+	}
+	b.WriteString(":\n<chat>\n")
+	for _, l := range lines {
+		b.WriteString(l.text + "\n")
+	}
+	b.WriteString("</chat>\n\n")
+	return b.String()
 }

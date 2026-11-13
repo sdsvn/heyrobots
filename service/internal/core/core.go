@@ -22,7 +22,19 @@ const (
 	SourceSlack    SourceKind = "slack"
 	SourceGitHub   SourceKind = "github"
 	SourceSchedule SourceKind = "schedule"
+	// SourceAgent is a group member asking another member for a piece of
+	// work, with the authority of the task it came from.
+	SourceAgent SourceKind = "agent"
 )
+
+// ReplySource is where an answer to a message from src goes: a member's
+// request lives in the app's chat, so its answer does too.
+func ReplySource(src SourceKind) SourceKind {
+	if src == SourceAgent {
+		return SourceApp
+	}
+	return src
+}
 
 // KnownSources lists every kind of Source.
 var KnownSources = []SourceKind{SourceApp, SourceMail, SourceCalendar, SourceSlack, SourceGitHub, SourceSchedule}

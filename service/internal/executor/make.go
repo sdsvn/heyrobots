@@ -82,6 +82,8 @@ func (r *run) mayChange() string {
 		return "only the owner, asking directly, can change jobs, rules and settings"
 	case r.mandate.Received.Source == core.SourceSchedule || r.mandate.Job != "":
 		return "a scheduled or triggered task can't change jobs, rules or settings"
+	case r.mandate.Received.Source == core.SourceAgent:
+		return "a teammate's request can't change jobs, rules or settings; the owner can ask for it in a message"
 	case r.isTainted():
 		return "this task read outside content (mail, the web or a connected app), so it can't change jobs, rules or settings; the owner can ask for it in a new message"
 	}

@@ -1,7 +1,10 @@
 package executor
 
 import (
+	"fmt"
+	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"google.golang.org/adk/v2/agent"
@@ -9,6 +12,7 @@ import (
 	"google.golang.org/adk/v2/tool/functiontool"
 
 	"heyrobots/service/internal/core"
+	"heyrobots/service/internal/ids"
 	"heyrobots/service/internal/store"
 )
 
@@ -138,7 +142,7 @@ func (r *run) message(tx *store.Tx, kind, text string) error {
 		kind, reach, status = "digest", core.ReachOwner, store.EffectHeld
 	}
 	return tx.CreateEffect(store.AddressReply(store.Effect{
-		TicketID: r.c.Ticket.ID, ThreadID: r.c.Ticket.OriginThreadID, Source: string(r.mandate.Received.Source),
+		TicketID: r.c.Ticket.ID, ThreadID: r.c.Ticket.OriginThreadID, Source: string(core.ReplySource(r.mandate.Received.Source)),
 		Kind: kind, Reach: string(reach), Body: text, Status: status, CreatedAt: r.e.Now().UTC(),
 	}, r.mandate.Requester, r.mandate.Role == core.RoleOwner))
 }
@@ -152,7 +156,8 @@ func (r *run) finish(rep report) error {
 		// recovers the Assignment.
 		return nil
 	}
-	return r.e.Store.Tx(func(tx *store.Tx) error {
+	asked, answered := false, false
+	err := r.e.Store.Tx(func(tx *store.Tx) error {
 		if err := tx.EndAssignment(r.c.Assignment.ID, rep.State, rep.Summary, rep.HumanAction, rep.Result, now); err != nil {
 			return err
 		}
@@ -188,7 +193,10 @@ func (r *run) finish(rep report) error {
 			stage = core.StageBlocked
 			text = rep.Summary
 		case "waiting":
+			// Waiting on a teammate, say: what it wrote still goes out, so
+			// an @mention in it reaches them.
 			stage = core.StageWaiting
+			text = rep.Result
 		}
 		if q := strings.TrimSpace(rep.HumanAction); q != "" && open {
 			stage = core.StageQuestion
@@ -208,8 +216,121 @@ func (r *run) finish(rep report) error {
 		if strings.TrimSpace(text) == "" {
 			return nil
 		}
-		return r.message(tx, "message", text)
+		if err := r.message(tx, "message", text); err != nil {
+			return err
+		}
+		if answered, err = r.answerAsker(tx, text, now); err != nil {
+			return err
+		}
+		if answered {
+			// The answer goes back to the asker already; an @mention of it
+			// in the answer would only ask it twice.
+			return nil
+		}
+		asked, err = r.askMembers(tx, text, now)
+		return err
 	})
+	if err == nil && asked && r.e.OnHandBack != nil {
+		r.e.OnHandBack()
+	}
+	if err == nil && answered {
+		r.e.Kick()
+	}
+	return err
+}
+
+// askPrefix starts the delivery id of a member's request; the asking task
+// follows, so the answer can find its way back.
+const askPrefix = "ask:"
+
+// answerAsker sends a member's answer back to the task that asked for it,
+// which then carries on with it.
+func (r *run) answerAsker(tx *store.Tx, text string, now time.Time) (bool, error) {
+	if r.mandate.Received.Source != core.SourceAgent {
+		return false, nil
+	}
+	for _, in := range r.c.Inputs {
+		rest, ok := strings.CutPrefix(in.DeliveryID, askPrefix)
+		if !ok || in.Source != string(core.SourceAgent) {
+			continue
+		}
+		asker, _, _ := strings.Cut(rest, ":")
+		tk, err := tx.Ticket(asker)
+		if err != nil || !tk.Open || tk.StoppedBy != "" {
+			continue
+		}
+		t := store.Trigger{
+			ID: ids.New("tr"), Source: string(core.SourceAgent), DeliveryID: "answer:" + r.c.Assignment.ID + ":" + asker,
+			ActorSource: in.ActorSource, ActorID: in.ActorID, Authenticity: in.Authenticity, Addressed: true, ReceivedAll: true,
+			Text: r.agent.Name + " answers: " + text, At: now, CreatedAt: now, EvalState: store.EvalDone, Owned: true,
+		}
+		if err := tx.CreateTrigger(t, []string{r.c.Ticket.OriginThreadID}); err != nil {
+			return false, err
+		}
+		if err := tx.AddTicketInput(asker, t.ID, now); err != nil {
+			return false, err
+		}
+		if err := tx.SetTicketState(asker, true, core.StageWorking, "", now); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+// maxMemberTurns is how many requests between members may follow one
+// another in a group before it waits for a person.
+const maxMemberTurns = 6
+
+// askMembers lets a group member ask another for a piece of work by
+// @mentioning it in its reply. The mentioned member gets the request with
+// the authority of this task, never more: it can't change jobs, rules or
+// settings, and anything outward still waits for the owner.
+func (r *run) askMembers(tx *store.Tx, text string, now time.Time) (bool, error) {
+	if r.mandate.Strength != core.Explicit {
+		return false, nil
+	}
+	th, err := tx.Thread(r.c.Ticket.OriginThreadID)
+	if err != nil || th.GroupID == "" {
+		return false, nil
+	}
+	g, err := tx.Group(th.GroupID)
+	if err != nil {
+		return false, nil
+	}
+	lower := strings.ToLower(text)
+	var to []store.Agent
+	for _, id := range g.MemberList() {
+		if id == r.agent.ID {
+			continue
+		}
+		if a, err := tx.Agent(id); err == nil && strings.Contains(lower, "@"+strings.ToLower(a.Name)) {
+			to = append(to, a)
+		}
+	}
+	if len(to) == 0 {
+		return false, nil
+	}
+	// Members talking among themselves stop after a few turns and wait.
+	recent, err := tx.RecentTriggers(th.ID, maxMemberTurns)
+	if err != nil {
+		return false, err
+	}
+	if len(recent) >= maxMemberTurns && !slices.ContainsFunc(recent, func(t store.Trigger) bool { return t.Source != string(core.SourceAgent) }) {
+		return false, r.message(tx, "message", "We've passed this back and forth a few times; I'll wait for you before going on.")
+	}
+	req := r.mandate.Requester
+	for i, a := range to {
+		t := store.Trigger{
+			ID: ids.New("tr"), Source: string(core.SourceAgent), DeliveryID: fmt.Sprintf("%s%s:%s:%s:%d", askPrefix, r.c.Ticket.ID, r.c.Assignment.ID, a.ID, i),
+			ActorSource: string(req.Source), ActorID: req.ID, Authenticity: int(core.Verified), Addressed: true, ReceivedAll: true,
+			Text: r.agent.Name + " asks: " + text, At: now, CreatedAt: now, EvalState: store.EvalPending, LeadAgent: a.ID,
+		}
+		if err := tx.CreateTrigger(t, []string{th.ID}); err != nil {
+			return false, err
+		}
+	}
+	return true, tx.TouchThread(th.ID, now)
 }
 
 // Answer choices are short single lines; a question offers 2 to 5.

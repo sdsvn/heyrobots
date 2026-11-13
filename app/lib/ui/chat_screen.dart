@@ -348,7 +348,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   String? _decisionNote(ThreadItem it, AgentRef? agent) => switch (it.decision) {
-    'accept' || 'attach' => _isGroup && agent != null ? '${agent.name} is leading this task' : null,
+    'accept' || 'attach' => _isGroup && agent != null ? '${agent.name} is on it' : null,
     'stop' => 'Stopped the task',
     'refused' => (it.reason ?? '').isEmpty ? "Couldn't take this on" : "Couldn't take this on: ${it.reason}",
     'unavailable' => "Can't think right now; it will try again.",
@@ -547,7 +547,8 @@ class _ChatScreenState extends State<ChatScreen> {
       children.add(
         Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: ThinkingBubble(agent: _typingAgent, working: _workingTicket != null),
+          // In a group, everyone hears it: until one is on it, all of them think.
+          child: ThinkingBubble(agent: _typingAgent, working: _workingTicket != null, group: _workingTicket == null ? _group?.members : null),
         ),
       );
     }
@@ -1265,9 +1266,12 @@ class _ChoiceChip extends StatelessWidget {
 /// glowing ring, beside "Thinking…" with a light passing over it. It shows
 /// from the moment a message is sent until the reply lands.
 class ThinkingBubble extends StatefulWidget {
-  const ThinkingBubble({super.key, required this.agent, this.working = false});
+  const ThinkingBubble({super.key, required this.agent, this.working = false, this.group});
 
   final AgentRef? agent;
+
+  /// A group's members, all deciding whether to answer.
+  final List<AgentRef>? group;
 
   /// A task has started: the words say so.
   final bool working;
@@ -1292,9 +1296,10 @@ class _ThinkingBubbleState extends State<ThinkingBubble> with SingleTickerProvid
     final (strong, soft) = agentColors(a?.color ?? 'violet', p);
     final still = MediaQuery.of(context).disableAnimations;
     final words = widget.working ? 'Working on it' : 'Thinking';
+    final everyone = (widget.group?.length ?? 0) > 1;
     return Semantics(
       liveRegion: true,
-      label: '${a?.name ?? 'Bit'} is ${widget.working ? 'working' : 'thinking'}',
+      label: everyone ? 'Everyone is thinking' : '${a?.name ?? 'Bit'} is ${widget.working ? 'working' : 'thinking'}',
       child: ExcludeSemantics(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -1325,17 +1330,19 @@ class _ThinkingBubbleState extends State<ThinkingBubble> with SingleTickerProvid
                     ],
                   );
                 },
-                child: Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: soft,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: strong, width: 2),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Bit(mood: BitMood.thinking, size: 34),
-                ),
+                child: everyone
+                    ? GroupAvatar(members: widget.group!, width: 52, height: 46, face: 30, ring: 2)
+                    : Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: soft,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: strong, width: 2),
+                        ),
+                        alignment: Alignment.center,
+                        child: Bit(mood: BitMood.thinking, size: 34, face: BitFace.of(a?.id)),
+                      ),
               ),
             ),
             const SizedBox(width: 10),

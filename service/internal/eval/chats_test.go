@@ -230,3 +230,15 @@ func TestANewMessageNeverWaitsBehindARunningTask(t *testing.T) {
 		t.Fatalf("the first task has %d inputs; want its own and the one about it", len(inputs))
 	}
 }
+
+// A long message with accents still fits: the scope is cut to 300
+// characters and checked in characters, not bytes.
+func TestALongAccentedMessageStillStartsWork(t *testing.T) {
+	e := newEnv(t)
+	e.agent("ag_coder", "Coder")
+	th := e.chat("agent:ag_coder", "ag_coder", "", strings.Repeat("Fin de semana tranquilo en Oporto — café, paseo… ", 12))
+	e.run()
+	if v := e.view(th); len(v.Tickets) != 1 || slices.Contains(kinds(v), store.DecisionRefused) {
+		t.Fatalf("tickets %d, decisions %v", len(v.Tickets), kinds(v))
+	}
+}

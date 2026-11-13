@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -573,7 +574,7 @@ func (a *applier) reply(j *judged, ticketID, text string) error {
 	return a.tx.CreateEffect(store.AddressReply(store.Effect{
 		// It goes back the way the message came: a person writing in a
 		// job's thread from the app is answered in the app, not by the job.
-		TicketID: ticketID, ThreadID: a.th.ID, Source: j.trigger.Source, Kind: "message",
+		TicketID: ticketID, ThreadID: a.th.ID, Source: string(core.ReplySource(core.SourceKind(j.trigger.Source))), Kind: "message",
 		Reach: string(reach), Body: text, Status: store.EffectPending, CreatedAt: a.now,
 	}, j.input.Trigger.Actor, j.admission.Role == core.RoleOwner))
 }
@@ -649,8 +650,14 @@ func (a *applier) route(r Route) error {
 
 func (a *applier) accept(valid []string, primary *judged, r Route, note string) error {
 	scope := strings.TrimSpace(r.Scope)
-	if scope == "" || len(scope) > 300 {
+	if scope == "" || utf8.RuneCountInString(scope) > 300 {
 		return a.refuse(valid, primary, "", "the work needs a scope of up to 300 characters")
+	}
+	if len(primary.chat) > 1 {
+		// In a group each member answers with what may be used; asking for
+		// more would only end in a refusal shown to everyone.
+		allowed := allowedToolsets(a.pol, primary.admission)
+		r.Toolsets = slices.DeleteFunc(slices.Clone(r.Toolsets), func(ts core.Toolset) bool { return !slices.Contains(allowed, ts) })
 	}
 	m, err := gate.Accept(a.pol, primary.input, primary.admission, gate.AcceptRequest{
 		Scope: scope, MatchedRules: r.MatchedRules, Toolsets: r.Toolsets, Agent: r.Agent, Job: r.Job, At: a.now,
@@ -906,7 +913,9 @@ func direct(c Candidate, js []judged) ([]Route, Candidate) {
 		}
 		// A chat with a task at work: whether the message belongs to it is
 		// for the router to judge.
-		busy := slices.ContainsFunc(c.Tickets, func(tk TicketSummary) bool { return tk.Open && !tk.Stopped && tk.Stage == core.StageWorking })
+		// A teammate's request names its member already.
+		led := slices.ContainsFunc(js, func(j judged) bool { return j.trigger.ID == t.ID && j.trigger.LeadAgent != "" })
+		busy := !led && slices.ContainsFunc(c.Tickets, func(tk TicketSummary) bool { return tk.Open && !tk.Stopped && tk.Stage == core.StageWorking })
 		if len(chat) != 1 || busy || t.Owned || t.Job != "" || t.HandedBack != "" || t.Strength != core.Explicit || !slices.Contains(t.Agents, chat[0]) {
 			rest.Triggers = append(rest.Triggers, t)
 			continue

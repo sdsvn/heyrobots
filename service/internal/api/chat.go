@@ -269,6 +269,10 @@ func (s *Server) GetThread(w http.ResponseWriter, r *http.Request, threadID stri
 		}
 	}
 	for _, t := range v.Triggers {
+		if t.Source == string(core.SourceAgent) {
+			// A member's request to another shows as that member's reply.
+			continue
+		}
 		from, text := t.ActorSource+":"+t.ActorID, t.Text
 		out.Items = append(out.Items, gen.ThreadItem{Kind: gen.Message, Id: t.ID, At: t.At, From: &from, Text: &text})
 	}

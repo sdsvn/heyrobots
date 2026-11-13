@@ -114,7 +114,8 @@ func (tx *Tx) Activity(threadID, deviceID string, me core.Identity) (Activity, e
 	readAt = r.ReadAt
 	inThread := "id IN (SELECT trigger_id FROM trigger_threads WHERE thread_id = ?)"
 	var ts []Trigger
-	if err := tx.db.Where(inThread, threadID).Order("at DESC, created_at DESC").Limit(1).Find(&ts).Error; err != nil {
+	// A member's request to another shows as that member's reply, not as a message.
+	if err := tx.db.Where(inThread, threadID).Where("source <> 'agent'").Order("at DESC, created_at DESC").Limit(1).Find(&ts).Error; err != nil {
 		return a, err
 	}
 	if len(ts) == 1 {

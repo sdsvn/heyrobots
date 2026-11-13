@@ -1,0 +1,71 @@
+{
+  "doc": {
+    "slug": "index.markdown",
+    "title": "Let everyone in a group hear every message, one member claim the work, and no message wait behind another",
+    "version": 1,
+    "markdown": "---\nco-review: design\n---\n# Let everyone in a group hear every message, one member claim the work, and no message wait behind another\n\n## Context\nIn a group chat today, the router (one quick model call) reads each message and picks which member answers. That one call is behind every group bug so far: it answered in its own voice, gave a member tools it couldn't use, and sent \"both of you\" to one member. Each answer is also a fresh task with its own session, so a member forgets what was said in the group a minute ago unless it is in the same task.\n\nThe change: in a group, every member hears every message. Each one decides for itself whether to answer, and real work is claimed by one member so it is never done twice. Each member keeps one running conversation per group, kept small, so it remembers the group without carrying everything else it knows.\n\n## Design\n- A group message reaches every member, with no router\n  - the eval engine skips the router for group chats: each message is delivered to each member's group conversation\n  - an @mention still reaches only that member\n  - the router stays for everything that isn't a group: the main Bit chat, mail, other people's messages\n  - what can go wrong: a big group means many turns for every message; groups of more than 4 members keep the router, and the group screen says so\n- Each member first decides, cheaply, whether to answer\n  - the decision sees only the last few messages, the member's purpose and who has claimed what, not the whole conversation\n  - it runs on the quick-calls model; with your own agent (omp or Claude Code) as the quick model, all members' decisions for one message go in one call\n  - the answer is one of: stay quiet, answer, or claim the work\n  - staying quiet shows nothing, so \"thanks\" gets no replies\n  - what can go wrong: every member stays quiet on a real request\n    - when nobody answers or claims in the decision round, the member whose purpose fits best answers, so a message never goes unanswered\n    - when none fits, the first member in the group's order answers\n- A message for everyone gets an answer from everyone\n  - \"introduce yourselves\", \"both of you, what can you do?\" or \"what does each of you think?\" asks each member: every member answers, and nobody claims\n  - the decision step reads this from the message, the same way it reads an @mention\n- Work is claimed by one member\n  - only work that should happen once is claimed: a search, a draft, a booking; a question to everyone is not\n  - a member that will do real work (search, write, send, change something) claims the message first; the claim is a short entry in the group (\"Coder is on it\")\n  - claims are settled by order: the first claim wins, the others see it and stay out unless you ask them in\n  - this reuses the rule the machines already use to settle who routes a message\n  - what can go wrong: two members claim at the same moment; the store takes them in one transaction, so exactly one is first and the other is told it lost\n- Members coordinate in the group, in the open\n  - a member can post to the group and @mention another member, to split work (\"Researcher, find the hotels; I'll do flights\"), ask for a piece, or hand over a result\n  - a mentioned member hears it like a message from you and answers or does that piece, under its own claim\n  - you see every such message in the chat, so coordination is never hidden\n  - what can go wrong: two members talk in a loop; after 6 member messages in a row without you, the group pauses and waits for you\n  - what can go wrong: one member asks another to send or change something outward; that still waits for your OK, as it does today, and a member can never approve for you\n- A new message never waits behind a task that's already running, in any chat\n  - today a message in a chat with a running task goes to that task, waits for its current step, and only then is handed back if it asks for something else\n  - instead, when it arrives, a quick check reads it with the running task's scope and says: about that task, or new\n  - about the task: it goes to the task as now, and is read at its next step\n  - new: it starts at once as a new task on a free slot of the same agent (one slot is always kept for your messages), with the chat's recent messages as context\n  - this holds in a direct chat and in a group alike\n  - what can go wrong: the check guesses wrong\n    - \"stop\" and \"cancel\" always go to the running task, never to a new one\n    - a task that gets a message it can't use still hands it back, as today, so a wrong guess costs a step, not the message\n- Each member keeps one conversation per group\n  - a new kind of session, keyed by agent and group, holds the group's messages as they arrive, the other members' replies included\n  - it only ever grows, so the provider's cached prefix stays valid from one turn to the next\n  - when it gets long, older turns are folded into a short summary at the top, and the latest turns stay word for word; the fold happens rarely, at a fixed size, so caching is lost only then\n  - what can go wrong: a member was added to the group later; it starts from the summary and the latest turns, not the whole history\n- A member's context has three layers, and only the middle one grows\n  - who it is: purpose, your instructions, its skills list and tools, fixed and cached, exactly as today\n  - this group: the group conversation above\n  - this piece of work: a claimed task keeps its own task session, files and tools, as today; the group conversation only gets \"I'm on the flight search\", and later the result\n  - what it knows from other chats stays out; it looks things up when needed, through its memory notes or the team tool\n- Your own agent keeps one session open per group\n  - for omp and Claude Code, the member's ACP session for the group stays open between messages, instead of a new process per task\n  - it stops re-reading its instructions on every message, which also makes answers faster\n  - what can go wrong: an idle session holds memory; sessions close after 30 minutes of quiet and reopen from the saved conversation\n- The app shows who is answering\n  - while members decide, the thinking bubble shows each member's face\n  - a claim shows as a small line in the chat, like \"Coder is on it\"; quiet members show nothing\n\n## Alternatives\n- Keep the router for groups and keep fixing its mistakes: one call per message, but every fix so far has been a patch around a model guessing for the members.\n- Send every message to every member with no claims: simplest, but two members would both book the same flight. Claims cost one short entry and stop that.\n- One shared conversation for the whole group instead of one per member: smaller, but every member would then see the others' tool calls and private notes, and a member's own instructions couldn't stay at the cached top.\n\n## Open Questions\n- Is 4 members the right limit before a group falls back to the router?\n- Should quiet members show anything, such as a faded \"read\" mark under the message, or stay fully hidden?\n"
+  },
+  "threads": [
+    {
+      "id": "t1",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Work is claimed by one member",
+        "source": "Work is claimed by one member"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "14:01",
+          "body": "The task is for everyone like asking, introduce yourself for something of that"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "14:01",
+          "body": "Yes. A message meant for everyone, like \"introduce yourselves\" or \"both of you, what can you do?\", now gets an answer from every member, and nobody claims it. Claims are only for work that should happen once, such as a search, a draft or a booking. I've added both points to the design."
+        }
+      ]
+    },
+    {
+      "id": "t2",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Work is claimed by one member",
+        "source": "Work is claimed by one member"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "14:05",
+          "body": "I think memeners must be able to coordinate as well wirhibn a group"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "14:06",
+          "body": "Agreed. Members can now post to the group and @mention each other, to split work, ask for a piece or hand over a result, and a mentioned member answers under its own claim. It all happens in the chat where you can see it. After 6 member messages in a row without you, the group pauses and waits for you, so two agents can't talk in a loop. Anything outward still waits for your OK, and no member can approve for you. I've added this as its own section."
+        }
+      ]
+    }
+  ],
+  "seq": 2,
+  "review": {
+    "decision": "approve",
+    "summary": "",
+    "submittedAt": "16:05",
+    "count": 1
+  }
+}

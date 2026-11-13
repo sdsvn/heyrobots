@@ -582,6 +582,7 @@ func (r *run) inputMessage() string {
 	}
 	var b strings.Builder
 	b.WriteString(r.memorySection())
+	b.WriteString(r.chatSection())
 	if r.gw != nil {
 		for _, m := range r.gw.Missing() {
 			b.WriteString("Note from the host: " + m + "\n\n")
