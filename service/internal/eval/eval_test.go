@@ -192,7 +192,8 @@ func TestOwnerRequestBecomesATicketWithAMandateAndAReply(t *testing.T) {
 	if m.Strength != core.Explicit || m.Requester != owner || m.Scope != "Summarise the article" || m.PolicyVersion != 2 {
 		t.Fatalf("mandate = %+v", m)
 	}
-	if len(v.Effects) != 1 || v.Effects[0].Reach != string(core.ReachOwner) || v.Effects[0].Body != "On it." {
+	// The agent confirms in its own words; the router's note isn't sent too.
+	if len(v.Effects) != 0 {
 		t.Fatalf("effects = %+v", v.Effects)
 	}
 	if v.Triggers[0].EvalState != store.EvalDone {

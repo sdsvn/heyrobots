@@ -215,6 +215,7 @@ func (e *Engine) RunOnce(ctx context.Context) (bool, error) {
 			// that lead can use; offering more just ends in a refusal.
 			cand.Triggers[i].Toolsets = withinAgents(cand.Triggers[i].Toolsets, cand.Triggers[i].Agents, team)
 		}
+		cand.Triggers[i].Group = isChat && !led && len(chat) > 1
 	}
 	// A person talking to one agent, or work another machine already
 	// handed to one, goes straight to that agent: there is nothing to route.
@@ -475,7 +476,7 @@ func (e *Engine) apply(ctx context.Context, th store.Thread, evalID string, eval
 			_, err := tx.ReleaseEval(th.ID, evalID, false)
 			return err
 		}
-		a := &applier{tx: tx, jobs: e.Jobs, handOff: e.HandOff, th: th, evalID: evalID, pol: pol, now: now, byID: map[string]*judged{}, decided: map[string]bool{}}
+		a := &applier{tx: tx, jobs: e.Jobs, handOff: e.HandOff, th: th, evalID: evalID, pol: pol, now: now, byID: map[string]*judged{}, decided: map[string]bool{}, ledBy: map[string][]string{}}
 		for i := range js {
 			a.byID[js[i].trigger.ID] = &js[i]
 		}
@@ -544,6 +545,9 @@ type applier struct {
 	now      time.Time
 	byID     map[string]*judged
 	decided  map[string]bool
+	// ledBy is who took each Trigger accepted so far. In a group, one
+	// message may go to several members ("both of you…").
+	ledBy map[string][]string
 }
 
 func (a *applier) decision(kind string, triggerIDs []string, ticketID, note, reason string) error {
@@ -567,7 +571,9 @@ func (a *applier) reply(j *judged, ticketID, text string) error {
 		reach = core.ReachOwner
 	}
 	return a.tx.CreateEffect(store.AddressReply(store.Effect{
-		TicketID: ticketID, ThreadID: a.th.ID, Source: a.th.Source, Kind: "message",
+		// It goes back the way the message came: a person writing in a
+		// job's thread from the app is answered in the app, not by the job.
+		TicketID: ticketID, ThreadID: a.th.ID, Source: j.trigger.Source, Kind: "message",
 		Reach: string(reach), Body: text, Status: store.EffectPending, CreatedAt: a.now,
 	}, j.input.Trigger.Actor, j.admission.Role == core.RoleOwner))
 }
@@ -592,7 +598,10 @@ func (a *applier) route(r Route) error {
 	var valid []string
 	for _, id := range r.TriggerIDs {
 		j, ok := a.byID[id]
-		if !ok || a.decided[id] || j.admission.Strength == core.NotAdmitted || slices.Contains(valid, id) {
+		if !ok || j.admission.Strength == core.NotAdmitted || slices.Contains(valid, id) {
+			continue
+		}
+		if a.decided[id] && !a.anotherMember(j, r) {
 			continue
 		}
 		valid = append(valid, id)
@@ -689,6 +698,9 @@ func (a *applier) accept(valid []string, primary *judged, r Route, note string) 
 		if err := a.decision(store.DecisionAccept, valid, "", note, "handed to "+ag.Name); err != nil {
 			return err
 		}
+		for _, id := range valid {
+			a.ledBy[id] = append(a.ledBy[id], ag.ID)
+		}
 		return a.reply(primary, "", note)
 	}
 	ticketID := ids.New("tk")
@@ -704,11 +716,19 @@ func (a *applier) accept(valid []string, primary *judged, r Route, note string) 
 		return err
 	}
 	a.accepted = append(a.accepted, acceptedTask{id: ticketID, m: m})
-	if primary.trigger.LeadAgent != "" {
-		// The machine that handed it over already told the person.
-		return nil
+	for _, id := range valid {
+		a.ledBy[id] = append(a.ledBy[id], m.LeadAgent())
 	}
-	return a.reply(primary, ticketID, note)
+	// The agent confirms in its own words (its ack), and the app shows it
+	// thinking meanwhile, so a note here would only say it twice.
+	return nil
+}
+
+// anotherMember reports whether a Route sends an already accepted group
+// message to one more of the group's members.
+func (a *applier) anotherMember(j *judged, r Route) bool {
+	led, ok := a.ledBy[j.trigger.ID]
+	return ok && r.Action == ActionAccept && len(j.chat) > 1 && slices.Contains(j.chat, r.Agent) && !slices.Contains(led, r.Agent)
 }
 
 // mayActOn reports whether the requester may attach to or stop a Ticket:

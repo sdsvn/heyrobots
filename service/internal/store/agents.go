@@ -164,3 +164,10 @@ func (tx *Tx) Agent(id string) (Agent, error) {
 	}
 	return a, err
 }
+
+// OpenTickets returns the open Tickets, most recently changed first.
+func (s *Store) OpenTickets(limit int) ([]Ticket, error) {
+	var out []Ticket
+	err := s.db.Where("open").Order("updated_at DESC").Limit(limit).Find(&out).Error
+	return out, err
+}

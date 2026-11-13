@@ -42,6 +42,9 @@ type CandidateTrigger struct {
 	// Owned is true for a person's follow-up that a Ticket already took.
 	// The router may only stop that Ticket.
 	Owned bool
+	// Group is set for a message in a group chat, where the members
+	// answer and one message may go to several of them.
+	Group bool
 	// Toolsets are the toolsets this sender may ask for.
 	Toolsets []core.Toolset
 	// Agents are the ids of the agents this sender's work may go to.

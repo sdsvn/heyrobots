@@ -113,6 +113,8 @@ func render(c eval.Candidate) (string, error) {
 		Role     core.Role     `json:"role"`
 		Strength core.Strength `json:"strength"`
 		Owned    bool          `json:"owned,omitempty"`
+		// Group is set for a message in a group chat.
+		Group bool `json:"group,omitempty"`
 		// HandedBack says why a task returned this message; never attach it back there.
 		HandedBack     string         `json:"handed_back,omitempty"`
 		HandedBackFrom string         `json:"handed_back_from,omitempty"`
@@ -166,7 +168,7 @@ func render(c eval.Candidate) (string, error) {
 		out.Rules = append(out.Rules, rule{r.Name, r.Text})
 	}
 	for _, t := range c.Triggers {
-		out.Triggers = append(out.Triggers, trig{ID: t.ID, Role: t.Role, Strength: t.Strength, Owned: t.Owned,
+		out.Triggers = append(out.Triggers, trig{ID: t.ID, Role: t.Role, Strength: t.Strength, Owned: t.Owned, Group: t.Group,
 			HandedBack: t.HandedBack, HandedBackFrom: t.HandedBackFrom, Toolsets: t.Toolsets, Agents: t.Agents, Job: t.Job, At: t.At, Text: t.Text})
 	}
 	for _, a := range c.Agents {

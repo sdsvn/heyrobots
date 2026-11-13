@@ -98,3 +98,43 @@ func TestAChatOffersOnlyToolsetsItsLeadCanUse(t *testing.T) {
 		t.Fatal("granted nothing")
 	}
 }
+
+// A message to everyone in a group goes to each member once, and never to
+// someone outside the group.
+func TestAGroupMessageCanGoToEachMember(t *testing.T) {
+	e := newEnv(t)
+	e.agent("ag_coder", "Coder")
+	e.agent("ag_writer", "Writer")
+	if err := e.store.Tx(func(tx *store.Tx) error {
+		return tx.SaveGroup(store.Group{ID: "gr_1", Name: "Team", Members: `["ag_coder","ag_writer"]`})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	e.router.decide = func(c Candidate) ([]Route, error) {
+		id := []string{c.Triggers[0].ID}
+		return []Route{
+			{Action: ActionAccept, TriggerIDs: id, Scope: "say what you can do", Agent: "ag_coder"},
+			{Action: ActionAccept, TriggerIDs: id, Scope: "say what you can do", Agent: "ag_coder"},
+			{Action: ActionAccept, TriggerIDs: id, Scope: "say what you can do", Agent: "ag_writer"},
+			{Action: ActionAccept, TriggerIDs: id, Scope: "say what you can do", Agent: core.GeneralAgent},
+		}, nil
+	}
+	group := e.chat("group:gr_1", "", "gr_1", "both of you, what can you do?")
+	e.run()
+	var leads []string
+	for _, tk := range e.view(group).Tickets {
+		leads = append(leads, tk.AgentID)
+	}
+	slices.Sort(leads)
+	if !slices.Equal(leads, []string{"ag_coder", "ag_writer"}) {
+		t.Fatalf("tickets led by %v; want one each for Coder and Writer", leads)
+	}
+
+	// In a direct chat a message still has one lead.
+	e.router.decide = nil
+	direct := e.chat("agent:ag_coder", "ag_coder", "", "and you?")
+	e.run()
+	if v := e.view(direct); len(v.Tickets) != 1 {
+		t.Fatalf("direct chat tickets = %+v", v.Tickets)
+	}
+}

@@ -365,6 +365,11 @@ func (r *run) work(ctx context.Context) (report, error) {
 		return report{State: "failed", Summary: "The worker couldn't start."}, err
 	}
 	tools = append(tools, makers...)
+	team, err := r.teamTool()
+	if err != nil {
+		return report{State: "failed", Summary: "The worker couldn't start."}, err
+	}
+	tools = append(tools, team)
 	if e.Memory != "" {
 		mem, err := r.memoryTool()
 		if err != nil {

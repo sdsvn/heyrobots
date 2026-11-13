@@ -65,10 +65,10 @@ func TestChatMessageIsStoredOnceAndRouted(t *testing.T) {
 	rec := h.do("GET", "/api/v1/threads/"+first.ThreadId, owner, nil, "")
 	var th gen.ThreadDetail
 	json.Unmarshal(rec.Body.Bytes(), &th)
-	if rec.Code != http.StatusOK || len(th.Items) != 3 || len(th.Tickets) != 1 {
+	if rec.Code != http.StatusOK || len(th.Items) != 2 || len(th.Tickets) != 1 {
 		t.Fatalf("thread: %d %s", rec.Code, rec.Body)
 	}
-	if th.Items[0].Kind != gen.Message || th.Items[1].Kind != gen.Decision || *th.Items[1].Decision != "accept" || th.Items[2].Kind != gen.Reply || *th.Items[2].Status != "pending" {
+	if th.Items[0].Kind != gen.Message || th.Items[1].Kind != gen.Decision || *th.Items[1].Decision != "accept" {
 		t.Fatalf("items = %s", rec.Body)
 	}
 	if th.Tickets[0].Scope != "Find a ramen place nearby" || !th.Tickets[0].Open {
