@@ -904,7 +904,10 @@ func direct(c Candidate, js []judged) ([]Route, Candidate) {
 				chat = j.chat
 			}
 		}
-		if len(chat) != 1 || t.Owned || t.Job != "" || t.HandedBack != "" || t.Strength != core.Explicit || !slices.Contains(t.Agents, chat[0]) {
+		// A chat with a task at work: whether the message belongs to it is
+		// for the router to judge.
+		busy := slices.ContainsFunc(c.Tickets, func(tk TicketSummary) bool { return tk.Open && !tk.Stopped && tk.Stage == core.StageWorking })
+		if len(chat) != 1 || busy || t.Owned || t.Job != "" || t.HandedBack != "" || t.Strength != core.Explicit || !slices.Contains(t.Agents, chat[0]) {
 			rest.Triggers = append(rest.Triggers, t)
 			continue
 		}

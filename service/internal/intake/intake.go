@@ -189,6 +189,11 @@ func (in *Intake) fanOut(tx *store.Tx, t store.Trigger, threadIDs []string, now 
 			}
 			sub := subs[i]
 			switch {
+			case tk.Open && chat && !t.IsBot && !sub.ContextOnly && core.TicketStage(tk.Stage) == core.StageWorking:
+				// The task is busy. Whether this message is about it or new
+				// work is for Eval to judge, so new work needn't wait behind
+				// it; Eval attaches it here when it belongs.
+				continue
 			case tk.Open:
 				if err := tx.AddTicketInput(tk.ID, t.ID, now); err != nil {
 					return err

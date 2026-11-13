@@ -2,6 +2,7 @@ package eval
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"heyrobots/service/internal/core"
@@ -189,5 +190,43 @@ func TestInAGroupTheMembersAnswerWithWhatTheyCanUse(t *testing.T) {
 		if m, _ := tk.DecodeMandate(); tk.AgentID == "ag_search" && slices.Contains(m.Toolsets, core.ToolsetWriting) {
 			t.Fatalf("search got a toolset it can't use: %v", m.Toolsets)
 		}
+	}
+}
+
+// A message in a chat whose task is still working doesn't wait behind it:
+// the router says whether it belongs to that task or is new work.
+func TestANewMessageNeverWaitsBehindARunningTask(t *testing.T) {
+	e := newEnv(t)
+	e.agent("ag_coder", "Coder")
+	var asked int
+	e.router.decide = func(c Candidate) ([]Route, error) {
+		asked++
+		id := []string{c.Triggers[0].ID}
+		if strings.Contains(c.Triggers[0].Text, "also") {
+			return []Route{{Action: ActionAttach, TriggerIDs: id, TicketID: c.Tickets[0].ID}}, nil
+		}
+		return []Route{{Action: ActionAccept, TriggerIDs: id, Scope: c.Triggers[0].Text, Agent: "ag_coder"}}, nil
+	}
+	th := e.chat("agent:ag_coder", "ag_coder", "", "fix the build")
+	e.run()
+	if asked != 0 {
+		t.Fatal("the first message in a direct chat needs no routing")
+	}
+	e.chat("agent:ag_coder", "ag_coder", "", "write the release notes")
+	e.run()
+	e.chat("agent:ag_coder", "ag_coder", "", "also check the tests")
+	e.run()
+	v := e.view(th)
+	if asked != 2 || len(v.Tickets) != 2 {
+		t.Fatalf("router asked %d times, %d tickets; want 2 and 2", asked, len(v.Tickets))
+	}
+	var inputs []store.TicketInput
+	_ = e.store.Tx(func(tx *store.Tx) error {
+		var err error
+		inputs, err = tx.TicketInputs(v.Tickets[0].ID)
+		return err
+	})
+	if len(inputs) != 2 {
+		t.Fatalf("the first task has %d inputs; want its own and the one about it", len(inputs))
 	}
 }
