@@ -627,6 +627,16 @@ func (a *applier) route(r Route) error {
 	case ActionStop:
 		return a.stop(valid, primary, r, note)
 	case ActionIgnore:
+		// In a group the members answer, never the router: a message the
+		// router would have answered itself goes to each member instead.
+		if len(primary.chat) > 1 && note != "" && primary.admission.Strength == core.Explicit {
+			for _, member := range primary.chat {
+				if err := a.accept(valid, primary, Route{Action: ActionAccept, TriggerIDs: valid, Scope: trimRunes(primary.trigger.Text, 300), Agent: member}, ""); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
 		// Nothing to do, but a person who spoke to Bit still gets an answer.
 		if err := a.decision(store.DecisionIgnore, valid, "", note, r.Reason); err != nil {
 			return err
@@ -681,6 +691,11 @@ func (a *applier) accept(valid []string, primary *judged, r Route, note string) 
 		return a.refuse(valid, primary, "", "that agent isn't available")
 	case err != nil:
 		return err
+	}
+	if len(primary.chat) > 1 {
+		// A group message goes to each member with what that member can use;
+		// one that can't help says so itself.
+		m.Toolsets = slices.DeleteFunc(m.Toolsets, func(ts core.Toolset) bool { return !ag.Allows(ts) })
 	}
 	for _, ts := range m.Toolsets {
 		if !ag.Allows(ts) {

@@ -138,3 +138,56 @@ func TestAGroupMessageCanGoToEachMember(t *testing.T) {
 		t.Fatalf("direct chat tickets = %+v", v.Tickets)
 	}
 }
+
+// In a group the members answer: a message the router would answer itself
+// goes to each member, and a member gets only the toolsets it can use.
+func TestInAGroupTheMembersAnswerWithWhatTheyCanUse(t *testing.T) {
+	e := newEnv(t)
+	e.agent("ag_coder", "Coder")
+	if err := e.store.SaveAgent(store.Agent{ID: "ag_search", Name: "search", Toolsets: `["research"]`, Capacity: 1, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.store.Tx(func(tx *store.Tx) error {
+		return tx.SaveGroup(store.Group{ID: "gr_1", Name: "Trip", Members: `["ag_coder","ag_search"]`})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	leads := func(th string) (out []string) {
+		for _, tk := range e.view(th).Tickets {
+			out = append(out, tk.AgentID)
+		}
+		slices.Sort(out)
+		return out
+	}
+
+	e.router.decide = func(c Candidate) ([]Route, error) {
+		return []Route{{Action: ActionIgnore, TriggerIDs: []string{c.Triggers[0].ID}, Note: "Just here and ready!"}}, nil
+	}
+	group := e.chat("group:gr_1", "", "gr_1", "what are you doing")
+	e.run()
+	if got := leads(group); !slices.Equal(got, []string{"ag_coder", "ag_search"}) {
+		t.Fatalf("tickets led by %v; want both members, not the router", got)
+	}
+	if v := e.view(group); len(v.Effects) != 0 {
+		t.Fatalf("the router answered in the group: %+v", v.Effects)
+	}
+
+	e.router.decide = func(c Candidate) ([]Route, error) {
+		id := []string{c.Triggers[0].ID}
+		ws := []core.Toolset{core.ToolsetWriting}
+		return []Route{
+			{Action: ActionAccept, TriggerIDs: id, Scope: "say what you can do", Agent: "ag_coder", Toolsets: ws},
+			{Action: ActionAccept, TriggerIDs: id, Scope: "say what you can do", Agent: "ag_search", Toolsets: ws},
+		}, nil
+	}
+	e.chat("group:gr_1", "", "gr_1", "both of you, what can you do?")
+	e.run()
+	if got := kinds(e.view(group)); slices.Contains(got, store.DecisionRefused) {
+		t.Fatalf("decisions = %v; a member that can't write should still answer", got)
+	}
+	for _, tk := range e.view(group).Tickets {
+		if m, _ := tk.DecodeMandate(); tk.AgentID == "ag_search" && slices.Contains(m.Toolsets, core.ToolsetWriting) {
+			t.Fatalf("search got a toolset it can't use: %v", m.Toolsets)
+		}
+	}
+}
