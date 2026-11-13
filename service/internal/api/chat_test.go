@@ -142,3 +142,33 @@ func TestPolicyIsOwnerOnlyAndValidated(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// The owner deletes a conversation for good; a delegate can't.
+func TestDeletingAConversation(t *testing.T) {
+	h := newHarness(t, nil)
+	owner := h.completeSetup()
+	delegate := h.pair(h.inviteDelegate(owner, "partner"), "partner phone")
+	_, msg := h.send(owner, "m-1", "", "find me a good ramen place nearby")
+	h.evalAll(routeFunc(func(c eval.Candidate) ([]eval.Route, error) {
+		return []eval.Route{{Action: eval.ActionAccept, TriggerIDs: []string{c.Triggers[0].ID}, Scope: "Find ramen", Toolsets: []core.Toolset{core.ToolsetResearch}}}, nil
+	}))
+	_, other := h.send(owner, "m-2", "", "and something else")
+
+	if rec := h.do("DELETE", "/api/v1/threads/"+msg.ThreadId, delegate, nil, ""); rec.Code != http.StatusForbidden {
+		t.Fatalf("delegate deleted: %d", rec.Code)
+	}
+	if rec := h.do("DELETE", "/api/v1/threads/"+msg.ThreadId, owner, nil, ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete: %d %s", rec.Code, rec.Body)
+	}
+	if rec := h.do("GET", "/api/v1/threads/"+msg.ThreadId, owner, nil, ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("still there: %d", rec.Code)
+	}
+	var list gen.ThreadList
+	json.Unmarshal(h.do("GET", "/api/v1/threads", owner, nil, "").Body.Bytes(), &list)
+	if len(list.Threads) != 1 || list.Threads[0].Id != other.ThreadId {
+		t.Fatalf("threads after delete = %+v", list.Threads)
+	}
+	if rec := h.do("DELETE", "/api/v1/threads/"+msg.ThreadId, owner, nil, ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("deleted twice: %d", rec.Code)
+	}
+}

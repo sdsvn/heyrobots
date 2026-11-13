@@ -131,6 +131,10 @@ class _ChatsTabState extends State<ChatsTab> {
         : ThreadScreen(key: ValueKey('thread:${t.id}'), state: s, threadId: t.id);
   }
 
+  Future<void> _delete(ThreadSummary t) async {
+    if (await deleteChat(context, s, t.id, _name(t)) && _openId == t.id) setState(() => _openId = null);
+  }
+
   void _openThread(ThreadSummary t) {
     if (_wide) {
       setState(() => _openId = t.id);
@@ -245,6 +249,7 @@ class _ChatsTabState extends State<ChatsTab> {
                                     last: i == threads.length - 1,
                                     selected: _wide && threads[i].id == (_openId ?? s.threads.firstOrNull?.id),
                                     onTap: () => _openThread(threads[i]),
+                                    onDelete: s.isOwner ? () => _delete(threads[i]) : null,
                                   ),
                                 ),
                         ),
@@ -398,7 +403,7 @@ class _Fab extends StatelessWidget {
 }
 
 class _ChatRow extends StatelessWidget {
-  const _ChatRow({required this.thread, required this.last, required this.onTap, this.selected = false});
+  const _ChatRow({required this.thread, required this.last, required this.onTap, this.onDelete, this.selected = false});
 
   final ThreadSummary thread;
   final bool last;
@@ -406,6 +411,9 @@ class _ChatRow extends StatelessWidget {
   /// The chat open beside the list.
   final bool selected;
   final VoidCallback onTap;
+
+  /// Deletes the chat; a long press or a right click asks first.
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -427,6 +435,8 @@ class _ChatRow extends StatelessWidget {
       child: InkWell(
         key: Key('chat:${t.id}'),
         onTap: onTap,
+        onLongPress: onDelete,
+        onSecondaryTap: onDelete,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 11, 20, 0),
           child: Row(

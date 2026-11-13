@@ -60,6 +60,17 @@ void main() {
     expect(find.text('Launch v2'), findsOneWidget);
   });
 
+  testWidgets('a long press deletes a chat after asking', (tester) async {
+    await show(tester, ChatsTab(state: state));
+    await tester.longPress(find.byKey(const Key('chat:th_group')));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete Launch v2?'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('confirm-delete')));
+    await settle(tester);
+    expect(server.requests.where((r) => r.method == 'DELETE' && r.url.path == '/api/v1/threads/th_group'), hasLength(1));
+    expect(find.text('Launch v2'), findsNothing);
+  });
+
   testWidgets('on a wide screen the open chat sits beside the list', (tester) async {
     await show(tester, ChatsTab(state: state));
     tester.view.physicalSize = const Size(2800, 1800);

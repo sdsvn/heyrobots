@@ -147,3 +147,64 @@ func (tx *Tx) Activity(threadID, deviceID string, me core.Identity) (Activity, e
 	a.Unread, a.Typing = int(fromOthers+replies), running > 0
 	return a, nil
 }
+
+// ErrBusy means an agent is still working in the conversation.
+var ErrBusy = errors.New("an agent is still working here")
+
+// DeleteThread removes a conversation for good: its messages, replies,
+// decisions and the tasks it started. A group chat's group goes with it.
+// Spending records stay. It refuses while an agent works on one of its
+// tasks, so no running task writes into a conversation that is gone.
+func (tx *Tx) DeleteThread(id string, now time.Time) error {
+	th, err := tx.Thread(id)
+	if err != nil {
+		return err
+	}
+	tickets := tx.db.Model(&Ticket{}).Select("id").Where("origin_thread_id = ?", id)
+	var running int64
+	if err := tx.db.Model(&Assignment{}).Where("status = ? AND ticket_id IN (?)", AssignmentRunning, tickets).Count(&running).Error; err != nil {
+		return err
+	}
+	if running > 0 {
+		return ErrBusy
+	}
+	triggers := tx.db.Table("trigger_threads").Select("trigger_id").Where("thread_id = ?", id)
+	steps := []struct {
+		model any
+		where string
+		arg   any
+	}{
+		{&TicketInput{}, "ticket_id IN (?)", tickets},
+		{&Assignment{}, "ticket_id IN (?)", tickets},
+		{&Subscription{}, "ticket_id IN (?) OR thread_id = ?", nil},
+		{&Effect{}, "thread_id = ?", id},
+		{&Decision{}, "thread_id = ?", id},
+		{&ThreadRead{}, "thread_id = ?", id},
+		// Only triggers no other conversation shares.
+		{&Trigger{}, "id IN (?) AND id NOT IN (SELECT trigger_id FROM trigger_threads WHERE thread_id <> ?)", nil},
+	}
+	for _, s := range steps {
+		q := tx.db.Where(s.where, s.arg)
+		switch s.model.(type) {
+		case *Subscription:
+			q = tx.db.Where(s.where, tickets, id)
+		case *Trigger:
+			q = tx.db.Where(s.where, triggers, id)
+		}
+		if err := q.Delete(s.model).Error; err != nil {
+			return err
+		}
+	}
+	if err := tx.db.Exec("DELETE FROM trigger_threads WHERE thread_id = ?", id).Error; err != nil {
+		return err
+	}
+	if err := tx.db.Where("origin_thread_id = ?", id).Delete(&Ticket{}).Error; err != nil {
+		return err
+	}
+	if th.GroupID != "" {
+		if err := tx.db.Model(&Group{}).Where("id = ? AND removed_at IS NULL", th.GroupID).Update("removed_at", now).Error; err != nil {
+			return err
+		}
+	}
+	return tx.db.Delete(&Thread{}, "id = ?", id).Error
+}

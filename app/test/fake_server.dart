@@ -297,6 +297,10 @@ class FakeServer {
       return _json(200, s);
     }
     final thread = RegExp(r'^/api/v1/threads/([^/]+)$').firstMatch(path);
+    if (thread != null && r.method == 'DELETE') {
+      threads.removeWhere((t) => t['id'] == thread[1]);
+      return http.Response('', 204);
+    }
     if (thread != null && r.method == 'GET') {
       final d = threadDetails[thread[1]];
       return d == null ? _error(404, 'no such conversation') : _json(200, d);

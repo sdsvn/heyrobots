@@ -6,6 +6,7 @@ import 'agent_avatar.dart';
 import 'agents_screen.dart' show toolsetLabel;
 import 'bit.dart';
 import 'chat_screen.dart';
+import 'common.dart';
 import 'theme.dart';
 import 'thread_screen.dart';
 
@@ -444,4 +445,28 @@ void openAgentChat(BuildContext context, AppState state, AgentRef agent, {String
   Navigator.of(context).push(MaterialPageRoute<void>(
     builder: (_) => ChatScreen(state: state, threadId: existing?.id, agent: agent, draft: draft),
   ));
+}
+
+/// Asks, then deletes a conversation for good. Answers whether it went.
+Future<bool> deleteChat(BuildContext context, AppState s, String threadId, String name) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Delete $name?'),
+      content: const Text('Its messages and the tasks it started are deleted for good. A group goes with its chat.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        FilledButton(key: const Key('confirm-delete'), onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+      ],
+    ),
+  );
+  if (ok != true) return false;
+  try {
+    await s.api.deleteThread(threadId: threadId);
+  } catch (e) {
+    if (context.mounted) showMessage(context, describeError(e));
+    return false;
+  }
+  await s.refresh();
+  return true;
 }

@@ -721,11 +721,23 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: p.ground,
                   onPressed: _profile,
                 ),
+              if (s.isOwner && _threadId != null)
+                PopupMenuButton<String>(
+                  key: const Key('chat-menu'),
+                  tooltip: 'More',
+                  icon: Icon(Icons.more_vert_rounded, color: p.ink),
+                  onSelected: (_) => _delete(name),
+                  itemBuilder: (_) => const [PopupMenuItem(key: Key('delete-chat'), value: 'delete', child: Text('Delete chat'))],
+                ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _delete(String name) async {
+    if (await deleteChat(context, s, _threadId!, name) && mounted && !widget.embedded) Navigator.of(context).maybePop();
   }
 
   Widget _composer(Palette p, String name, double side) {

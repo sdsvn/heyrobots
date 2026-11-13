@@ -618,6 +618,54 @@ class ApiClient {
     });
   }
 
+  /// Deletes a conversation for good, with its messages, replies and the tasks it started; a group chat's group goes too. Owner devices only. Refused while an agent is working in it.
+  Future<void> deleteThread({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://127.0.0.1:7340"},
+      ],
+      "openapi.security": [
+        {"deviceToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "deviceToken": {"type": "http", "scheme": "bearer"},
+      },
+    },
+    Future<void>? abortTrigger,
+    HttpRequestOptions? options,
+    required String threadId,
+  }) async {
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(threadId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    var _url = Uri.parse(
+      _base + ("/api/v1/threads/" + Uri.encodeComponent(threadId)),
+    );
+    final request = http.AbortableRequest(
+      "DELETE",
+      _url,
+      abortTrigger: abortTrigger,
+    );
+    request.headers.addAll(
+      <String, Object?>{
+        ...?options?.headers,
+        'Accept': "application/json",
+      }.map((key, value) => MapEntry(key, value.toString())),
+    );
+    if (options?.followRedirects case final value?)
+      request.followRedirects = value;
+    if (options?.maxRedirects case final value?) request.maxRedirects = value;
+    prepareRequest?.call(request, extra);
+    final response = await _transport.send(request);
+    final _status = response.statusCode;
+    if (!(_status == 204)) {
+      await response.stream.listen(null).cancel();
+      throw http.ClientException('HTTP $_status', _url);
+    }
+    await response.stream.drain<void>();
+  }
+
   /// The current policy. Owner devices only.
   Future<models.PolicyView> getPolicy({
     Map<String, Object?> extra = const {

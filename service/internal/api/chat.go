@@ -502,3 +502,22 @@ func shorten(s string, n int) string {
 	r := []rune(s)
 	return string(r[:n-1]) + "…"
 }
+
+// DeleteThread deletes a conversation for good. Owner devices only.
+func (s *Server) DeleteThread(w http.ResponseWriter, r *http.Request, threadID string) {
+	if _, ok := requireOwner(w, r); !ok {
+		return
+	}
+	err := s.opts.Store.Tx(func(tx *store.Tx) error { return tx.DeleteThread(threadID, s.opts.Now().UTC()) })
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		writeError(w, http.StatusNotFound, "no such conversation")
+	case errors.Is(err, store.ErrBusy):
+		writeError(w, http.StatusConflict, "an agent is still working in this chat; stop its task or wait until it finishes")
+	case err != nil:
+		s.internal(w, "delete thread", err)
+	default:
+		s.opts.Log.Info("conversation deleted", "thread", threadID)
+		w.WriteHeader(http.StatusNoContent)
+	}
+}

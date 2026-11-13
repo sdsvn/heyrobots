@@ -1667,6 +1667,9 @@ type ServerInterface interface {
 	// (GET /api/v1/threads)
 	ListThreads(w http.ResponseWriter, r *http.Request)
 
+	// (DELETE /api/v1/threads/{threadId})
+	DeleteThread(w http.ResponseWriter, r *http.Request, threadId string)
+
 	// (GET /api/v1/threads/{threadId})
 	GetThread(w http.ResponseWriter, r *http.Request, threadId string)
 
@@ -2656,6 +2659,32 @@ func (siw *ServerInterfaceWrapper) ListThreads(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteThread operation middleware
+func (siw *ServerInterfaceWrapper) DeleteThread(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "threadId" -------------
+	var threadId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "threadId", r.PathValue("threadId"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "threadId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteThread(w, r, threadId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetThread operation middleware
 func (siw *ServerInterfaceWrapper) GetThread(w http.ResponseWriter, r *http.Request) {
 
@@ -2851,6 +2880,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/events", wrapper.StreamEvents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/messages", wrapper.SendMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/threads", wrapper.ListThreads)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/threads/{threadId}", wrapper.DeleteThread)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/threads/{threadId}", wrapper.GetThread)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/policy", wrapper.GetPolicy)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/policy", wrapper.UpdatePolicy)
