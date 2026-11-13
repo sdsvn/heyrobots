@@ -89,7 +89,7 @@ func TestListAppsShowsConnectedGmailAndMCPServers(t *testing.T) {
 		t.Fatalf("gmail = %+v", gmail)
 	}
 	lin := findApp(apps, "linear")
-	if !lin.Connected || lin.Status != gen.AppStatusReview || lin.NewTools != 1 || len(lin.Agents) != 1 || lin.Agents[0].Name != "PM" {
+	if !lin.Connected || lin.Status != gen.AppStatusOn || lin.NewTools != 0 || len(lin.Agents) != 1 || lin.Agents[0].Name != "PM" {
 		t.Fatalf("linear = %+v", lin)
 	}
 	if tr := findApp(apps, "tracker"); tr.Name != "Acme Tracker" || tr.Kind != gen.Mcp || tr.Mark != "AT" || !tr.Connected {
@@ -102,15 +102,15 @@ func TestListAppsShowsConnectedGmailAndMCPServers(t *testing.T) {
 		t.Fatalf("q = %+v", got)
 	}
 
-	// An unreviewed tool shows as off until the owner chooses.
+	// A tool that isn't read-only starts out asking first; the owner can switch it off.
 	detail := getJSON[gen.AppDetail](t, h, "/api/v1/apps/linear", owner)
-	if len(detail.Tools) != 1 || detail.Tools[0].Mode != gen.AppToolModeOff || detail.Tools[0].Title != "Create issue" {
+	if len(detail.Tools) != 1 || detail.Tools[0].Mode != gen.AppToolModeAfterOk || detail.Tools[0].Title != "Create issue" {
 		t.Fatalf("detail = %+v", detail)
 	}
-	rec := h.putJSON("/api/v1/apps/linear/tools/create_issue", owner, gen.AppToolUpdate{Mode: gen.AppToolUpdateModeAfterOk})
+	rec := h.putJSON("/api/v1/apps/linear/tools/create_issue", owner, gen.AppToolUpdate{Mode: gen.AppToolUpdateModeOff})
 	var tool gen.AppTool
 	json.Unmarshal(rec.Body.Bytes(), &tool)
-	if rec.Code != http.StatusOK || tool.Mode != gen.AppToolModeAfterOk {
+	if rec.Code != http.StatusOK || tool.Mode != gen.AppToolModeOff {
 		t.Fatalf("set tool = %d %s", rec.Code, rec.Body)
 	}
 }
@@ -294,7 +294,7 @@ func TestConnectingAnOAuthMCPAppSignsInAndConnects(t *testing.T) {
 	rec = h.postJSON("/api/v1/apps/tracker/connect/finish", owner, gen.GoogleConnectFinish{RedirectUrl: back})
 	res = gen.ConnectResult{}
 	json.Unmarshal(rec.Body.Bytes(), &res)
-	if rec.Code != http.StatusOK || res.App.Status != gen.AppStatusReview || res.App.NewTools != 1 {
+	if rec.Code != http.StatusOK || res.App.Status != gen.AppStatusOn || res.App.NewTools != 0 {
 		t.Fatalf("finish = %d %s", rec.Code, rec.Body)
 	}
 	raw, _ := h.vault.Get(gateway.SecretsKey("tracker"))

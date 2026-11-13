@@ -84,6 +84,9 @@ func (g *Gateway) Open(ctx context.Context, task Task, env toolsets.Env) (*Sessi
 				s.missing = append(s.missing, fmt.Sprintf("The %s tools aren't working right now (%s). Do what you can without them. If the request needs them, tell the owner to reconnect %s under Settings, then Add-ons, and say that in your reply.", server, shorten(err.Error(), 200), server))
 				continue
 			}
+			if len(tools) == 0 {
+				s.missing = append(s.missing, fmt.Sprintf("%s is connected, but all its tools are switched off, so you have none of them. Tell the owner to turn them on under Settings, then Add-ons, then %s, and say that in your reply.", server, server))
+			}
 			s.tools = append(s.tools, tools...)
 			s.closers = append(s.closers, closer)
 			continue

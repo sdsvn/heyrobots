@@ -94,7 +94,8 @@ func TestATaskUsesItsMCPToolsThroughTheGateway(t *testing.T) {
 		t.Fatalf("searched %d, created %d", searched.Load(), created.Load())
 	}
 	acts := e.actions(res.ThreadIDs[0])
-	if len(acts) != 1 || acts[0].Source != "mcp" || acts[0].Action != "tracker/create_issue" || acts[0].Status != store.EffectAwaitingApproval {
+	// A tool nobody reviewed asks first too, like every tool that isn't read-only.
+	if len(acts) != 2 || acts[1].Source != "mcp" || acts[1].Action != "tracker/create_issue" || acts[0].Status != store.EffectAwaitingApproval || acts[1].Status != store.EffectAwaitingApproval {
 		t.Fatalf("actions = %+v", acts)
 	}
 	if tk := e.ticket(res.ThreadIDs[0]); tk.Stage != string(core.StageReady) {

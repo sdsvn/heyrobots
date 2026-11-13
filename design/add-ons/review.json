@@ -1,0 +1,125 @@
+{
+  "doc": {
+    "slug": "index.markdown",
+    "title": "Rethink add-ons: any MCP server, skills from skills.sh, and an IT agent",
+    "version": 1,
+    "markdown": "---\nco-review: design\n---\n# Rethink add-ons: any MCP server, skills from skills.sh, and an IT agent\n\n## Context\nAdd-ons today are a hand-written list of 15 apps in the server's catalogue file, 6 of them greyed as \"coming\". Any other MCP server needs a pasted link. Skills come from a short built-in list or a pasted GitHub link. When an app connects, every one of its tools starts switched off until you review each one: Linear brought 78 tools and Notion 77, none were on, so an agent asked to \"check Linear\" had nothing to call and asked you to connect Linear, which you already had. Setting any of this up is your job alone; no agent helps.\n\nThe change: the catalogue comes from the official MCP registry, so any server listed there can be found and connected, as well as any you paste. Skills are searched on skills.sh. Tools work as soon as an app connects, under safe defaults. An IT agent on the team, or any agent you give the setup toolset, does most of this for you in a chat.\n\n## Design\n- Add-ons are found in the official MCP registry, with a short featured list on top\n  - the server searches `registry.modelcontextprotocol.io` (latest versions only) and keeps results for a day\n    - each result shows its name, what it does, its publisher (the namespace, such as `com.notion`) and how it runs: on the publisher's servers, or as a package on this computer\n    - the catalogue file shrinks to a starter set for a team doing everyday work, each pinned to its publisher's own registry entry, plus what the registry can't list: your Google account and apps on this Mac (Messages, Calendar, Claude Code)\n  - the starter set, all checked in the registry today\n    - mail and calendar: Gmail and Google Calendar (your Google account)\n    - tasks and projects: Linear, Jira and Confluence (Atlassian), monday.com, Todoist\n    - notes and data: Notion, Airtable\n    - code: GitHub, Supabase\n    - design: Figma, Canva\n    - money: Stripe\n    - research: Exa for the web, Context7 for code docs\n    - a browser: Playwright, a package that runs on this computer\n    - everything else: Zapier, which reaches thousands of apps through one connection\n    - Slack has no server of its own in the registry yet, so it stays findable by search and through Zapier\n  - look-alikes are common: searching \"notion\" returns Notion's own server and four third-party ones\n    - a server whose publisher matches its address (`com.notion` serving from `mcp.notion.com`) is marked official and ranked first\n    - the publisher is always shown, so you can tell them apart\n  - when the registry is down, the featured list and pasting a link still work\n- Any MCP server can be connected, in three ways, all built in this change\n  - a server run by its publisher: connect over HTTP, signing in with the server's own sign-in or a pasted token when it asks for one\n    - sign-ins still return to `127.0.0.1` on the server, so they start on the server's computer; a phone can browse but not sign in\n  - a package (npm or PyPI): run on this computer as a local server, through `npx` or `uvx`\n    - the registry lists the settings it needs; secrets go into the vault, never into the database\n    - it runs code as your user, so the sheet shows the exact command and \"runs on this computer\" before you confirm\n    - container packages wait until heyrobots has a container runtime\n  - anything else: paste an address or a command, as today\n- Tools work as soon as an app connects, under defaults you can change\n  - each tool starts from what the server says about it: a tool marked read-only is accepted and reads on its own; every other tool waits for your OK on each call, in Plans\n  - an app's sheet changes all its tools at once (reads on their own / everything asks / off) or one tool at a time\n  - a tool whose description changes after you connected goes back to asking, rather than off, until you look\n  - what can go wrong: the read-only mark is the publisher's own claim\n    - reads already run in quarantine, so their results are treated as untrusted\n    - a tool that only claims to read could still change something without asking, so the sheet offers \"everything asks\" for apps you trust less\n  - Linear's and Notion's tools, never reviewed today, get the same defaults when the server updates\n- An agent says exactly what is missing\n  - if a task's app has every tool off, or its sign-in ended, the agent is told in plain words and passes on how to fix it (\"Linear is connected, but its tools are off: turn them on in Add-ons → Linear\")\n- Skills are searched on skills.sh\n  - the server asks skills.sh's search for the name, the GitHub repository and the install count\n  - adding one fetches its folder from GitHub, as a pasted link does today: same size limits, pinned to the commit it was fetched at, never updated on its own\n  - a skill is instructions an agent follows with its own tools, so the sheet shows the repository and install count before you add it\n- Setting up is a teammate's job: an IT agent on the Team tab, and any agent you trust with it\n  - setup is a new toolset, \"setup\", that any agent can be given, such as your Chief of staff or a CTO\n  - a built-in \"IT\" agent comes with it, shown on the Team tab like General; you can rename it or switch it off\n  - it knows the setup: which add-ons and skills are connected, which agent has what, and what each needs; the lead sends \"connect…\", \"add a skill for…\" and \"give the Coder GitHub\" to an agent with the setup toolset\n  - its tools search add-ons and skills, connect an add-on, change tool access, add a skill and give an add-on or skill to an agent\n    - searching is free; each change is proposed and waits for your OK, like a new rule today\n    - connecting answers a sign-in link, which opens on the server's computer; on a phone the agent says to open it there\n  - only your own direct requests can change setup; a task that read outside content can't, as with rules today\n  - the Add-ons and Skills screens get a \"Set up with an agent\" button that opens a chat with the IT agent\n- The app's Add-ons and Skills screens become search-first\n  - one search box over the featured list and the registry, or skills.sh for skills; sections and chips stay for browsing\n  - mockups first, in the \"heyrobots app — cute redesign\" canvas, for your sign-off before building\n\n## Alternatives\n- Other registries (Smithery, Glama, PulseMCP): most need an account or a key, and Smithery already publishes into the official registry. The official one is free, open and the standard.\n- Keep every tool off until reviewed: safest on paper, but it is why Linear did nothing today. With every non-read call waiting for your OK, the defaults are no less safe than before.\n- Setup tools only on a hidden agent: simpler, but you couldn't hand setup to the Chief of staff or a CTO you already trust. A toolset lets any agent take it on.\n\n## Open Questions\n"
+  },
+  "threads": [
+    {
+      "id": "t1",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Should packages that run code on this computer (npm, PyPI) be allowed now, or on",
+        "source": "Should packages that run code on this computer (npm, PyPI) be allowed now, or only servers run by their publishers at first?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "10:21",
+          "body": "Both"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "10:21",
+          "body": "Agreed, both ship together: servers run by their publishers, and npm/PyPI packages that run on this computer. Before you confirm a package, its sheet shows the exact command. I took the question out and the design now says all three ways are built in this change."
+        }
+      ]
+    },
+    {
+      "id": "t2",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Add-ons are found in the official MCP registry, with a short featured list on to",
+        "source": "Add-ons are found in the official MCP registry, with a short featured list on top"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "10:24",
+          "body": "Start with a set of MCPs that makes sense for a generic team of agents and for work"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "10:24",
+          "body": "Added a starter set for everyday work. Each app is pinned to its publisher's own entry, and I checked every one in the registry today: Gmail and Google Calendar; Linear, Atlassian (Jira and Confluence), monday.com and Todoist; Notion and Airtable; GitHub and Supabase; Figma and Canva; Stripe; Exa for web research and Context7 for code docs; Playwright as a browser; and Zapier for everything else. Slack has no official server in the registry yet, so you can still find it by search or reach it through Zapier."
+        }
+      ]
+    },
+    {
+      "id": "t3",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Are the tool defaults right: reads on their own, everything else asks? Or should",
+        "source": "Are the tool defaults right: reads on their own, everything else asks? Or should everything ask until you change it?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "10:31",
+          "body": "READ accepted by default"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "10:31",
+          "body": "Settled: read-only tools are on from the start and run by themselves, and every other tool asks for your OK on each call. I took the question out and the design now says this directly."
+        }
+      ]
+    },
+    {
+      "id": "t4",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Should Setup be its own agent on the Team tab, or stay hidden and only appear wh",
+        "source": "Should Setup be its own agent on the Team tab, or stay hidden and only appear when you open it from Add-ons or Skills?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "10:32",
+          "body": "Chief if staff or the CTO agent or the IT Guy agent can do most setup an knows about it ."
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "10:32",
+          "body": "Done: setting up is now a toolset called \"setup\" that any agent can have, such as your Chief of staff or a CTO. A built-in \"IT\" agent comes with it on the Team tab; you can rename it or turn it off. The lead sends \"connect…\" and \"add a skill…\" requests to an agent that has the toolset, and the \"Set up with an agent\" button opens a chat with IT."
+        }
+      ]
+    }
+  ],
+  "seq": 4,
+  "review": {
+    "decision": "approve",
+    "summary": "",
+    "submittedAt": "10:34",
+    "count": 1
+  }
+}

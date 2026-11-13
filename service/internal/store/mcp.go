@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"heyrobots/service/internal/core"
 	"time"
 
 	"gorm.io/gorm"
@@ -69,6 +70,15 @@ type MCPTool struct {
 	Removed bool
 }
 
+// DefaultMode is how a tool starts: a read-only tool reads on its own,
+// anything else asks the owner first on each call.
+func DefaultMode(readOnly bool) (mode, reach string) {
+	if readOnly {
+		return MCPToolRead, ""
+	}
+	return MCPToolOutward, string(core.ReachOthers)
+}
+
 // Usable reports whether tasks may see the tool.
 func (t MCPTool) Usable() bool {
 	return !t.Removed && (t.Mode == MCPToolRead || t.Mode == MCPToolOutward) && t.ReviewedHash != "" && t.ReviewedHash == t.Hash
@@ -126,10 +136,12 @@ func (tx *Tx) MCPTools(server string) ([]MCPTool, error) {
 	return ts, tx.db.Where("server = ?", server).Order("name").Find(&ts).Error
 }
 
-// SyncMCPTools records the tools a server offers now. A known tool keeps
-// its review; if its description or schema changed, the review no longer
-// matches and the tool is off until the owner looks again. Tools the server
-// no longer offers are marked removed.
+// SyncMCPTools records the tools a server offers now. A new tool, or one
+// never reviewed, starts from what the server says: a read-only tool reads
+// on its own; anything else waits for the owner's OK on each call. A known
+// tool keeps its review, except that one whose description or schema
+// changed goes back to asking. A switched-off tool stays off. Tools the
+// server no longer offers are marked removed.
 func (tx *Tx) SyncMCPTools(server string, offered []MCPTool, now time.Time) error {
 	known, err := tx.MCPTools(server)
 	if err != nil {
@@ -145,6 +157,13 @@ func (tx *Tx) SyncMCPTools(server string, offered []MCPTool, now time.Time) erro
 		t.Server, t.SeenAt, t.Removed = server, now, false
 		if old, ok := byName[t.Name]; ok {
 			t.Mode, t.Reach, t.ReviewedHash = old.Mode, old.Reach, old.ReviewedHash
+		}
+		switch {
+		case t.Mode == "":
+			t.Mode, t.Reach = DefaultMode(t.ReadOnlyHint)
+			t.ReviewedHash = t.Hash
+		case t.Mode != MCPToolBlocked && t.ReviewedHash != t.Hash:
+			t.Mode, t.Reach, t.ReviewedHash = MCPToolOutward, string(core.ReachOthers), t.Hash
 		}
 		if err := tx.db.Save(&t).Error; err != nil {
 			return err
