@@ -569,6 +569,11 @@ func (r *run) inputMessage() string {
 	}
 	var b strings.Builder
 	b.WriteString(r.memorySection())
+	if r.gw != nil {
+		for _, m := range r.gw.Missing() {
+			b.WriteString("Note from the host: " + m + "\n\n")
+		}
+	}
 	if r.c.Assignment.Recovered {
 		b.WriteString("Note from the host: your previous turn on this task was interrupted, for example because the server restarted. Check what you already did (your notes and files) before repeating anything.\n\n")
 	}

@@ -276,16 +276,20 @@ func TestDelegateTaskNeedsApprovalEvenForOwnerReach(t *testing.T) {
 	}
 }
 
-func TestUnreachableServerBlocksTheTask(t *testing.T) {
+// An app that's down, or whose sign-in ended, doesn't stop the task: it
+// goes on without those tools and is told why, so a chat never jams.
+func TestUnreachableServerLeavesTheTaskWithoutItsTools(t *testing.T) {
 	h := newHarness(t)
 	h.mcp.Connect = func(context.Context, store.MCPServer) (*mcp.ClientSession, error) {
 		return nil, errors.New("connection refused")
 	}
 	m := core.Mandate{Role: core.RoleOwner, Toolsets: []core.Toolset{core.MCPToolset("tracker")}}
-	_, err := h.gw.Open(context.Background(), Task{Mandate: m}, toolsets.Env{})
-	u, ok := IsUnavailable(err)
-	if !ok || !u.Blocked || !strings.Contains(u.Reason, "connection refused") {
+	s, err := h.gw.Open(context.Background(), Task{Mandate: m}, toolsets.Env{})
+	if err != nil {
 		t.Fatalf("err = %v", err)
+	}
+	if len(s.Tools()) != 0 || len(s.Missing()) != 1 || !strings.Contains(s.Missing()[0], "connection refused") || !strings.Contains(s.Missing()[0], "reconnect tracker") {
+		t.Fatalf("tools %d, missing %v", len(s.Tools()), s.Missing())
 	}
 	var srv store.MCPServer
 	_ = h.st.Tx(func(tx *store.Tx) error { srv, _ = tx.MCPServer("tracker"); return nil })

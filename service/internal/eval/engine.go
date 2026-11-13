@@ -603,9 +603,11 @@ func (a *applier) route(r Route) error {
 	primary := a.byID[valid[0]]
 	note := trimWords(r.Note, MaxNoteWords)
 
-	// A follow-up a Ticket already owns may only stop that Ticket.
+	// A follow-up a Ticket already owns may only stop that Ticket. Anything
+	// else the router suggests changes nothing: the Ticket answers it, so
+	// it is noted quietly rather than shown as a refusal.
 	if primary.trigger.Owned && r.Action != ActionStop {
-		return a.refuse(valid, nil, "", "a follow-up owned by a Ticket can only stop it")
+		return a.decision(store.DecisionIgnore, valid, "", "", "the open task takes this message")
 	}
 
 	switch r.Action {

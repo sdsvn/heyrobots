@@ -95,3 +95,27 @@ func localAddr(listen string) string {
 	}
 	return net.JoinHostPort(host, port)
 }
+
+// withLoopback adds 127.0.0.1 on the first address's port unless the server
+// already listens on this machine's own address. Sign-ins to Google and
+// other apps come back to http://127.0.0.1:<port>, so without it a server
+// listening only on a network address could never finish one.
+func withLoopback(listen []string) []string {
+	if len(listen) == 0 {
+		return listen
+	}
+	_, port, err := net.SplitHostPort(listen[0])
+	if err != nil {
+		return listen
+	}
+	for _, a := range listen {
+		host, p, err := net.SplitHostPort(a)
+		if err != nil || p != port {
+			continue
+		}
+		if ip, err := netip.ParseAddr(host); host == "localhost" || err == nil && (ip.IsLoopback() || ip.IsUnspecified()) {
+			return listen
+		}
+	}
+	return append(slices.Clone(listen), net.JoinHostPort("127.0.0.1", port))
+}

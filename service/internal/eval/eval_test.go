@@ -397,7 +397,8 @@ func TestFollowUpGoesToItsTicketAndCanOnlyStopIt(t *testing.T) {
 	e.router.decide = acceptAll("Shorten", core.ToolsetWriting)
 	e.run()
 	v := e.view(first.ThreadIDs[0])
-	if len(v.Tickets) != 1 || kinds(v)[len(kinds(v))-1] != store.DecisionRefused {
+	// It changes nothing, and isn't shown as a refusal: the Ticket answers.
+	if len(v.Tickets) != 1 || kinds(v)[len(kinds(v))-1] != store.DecisionIgnore {
 		t.Fatalf("an owned follow-up must not start new work: decisions %v tickets %d", kinds(v), len(v.Tickets))
 	}
 	var inputs []store.TicketInput

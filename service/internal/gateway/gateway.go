@@ -64,6 +64,7 @@ type Session struct {
 	task    Task
 	tools   []tool.Tool
 	closers []io.Closer
+	missing []string
 }
 
 // Open gathers the tools of the task's toolsets. Close the Session when the
@@ -78,8 +79,10 @@ func (g *Gateway) Open(ctx context.Context, task Task, env toolsets.Env) (*Sessi
 			}
 			tools, closer, err := g.MCP.Tools(ctx, server)
 			if err != nil {
-				s.Close()
-				return nil, &Unavailable{Toolset: ts, Blocked: true, Reason: fmt.Sprintf("I couldn't reach the %s tools: %s", server, shorten(err.Error(), 200))}
+				// One app that's down, or whose sign-in ended, doesn't stop
+				// the task: it goes on without those tools, and is told why.
+				s.missing = append(s.missing, fmt.Sprintf("The %s tools aren't working right now (%s). Do what you can without them. If the request needs them, tell the owner to reconnect %s under Settings, then Add-ons, and say that in your reply.", server, shorten(err.Error(), 200), server))
+				continue
 			}
 			s.tools = append(s.tools, tools...)
 			s.closers = append(s.closers, closer)
@@ -97,6 +100,9 @@ func (g *Gateway) Open(ctx context.Context, task Task, env toolsets.Env) (*Sessi
 	slices.SortFunc(s.tools, func(a, b tool.Tool) int { return strings.Compare(a.Name(), b.Name()) })
 	return s, nil
 }
+
+// Missing says which of the task's apps couldn't be reached, and why.
+func (s *Session) Missing() []string { return s.missing }
 
 // Tools are the task's tools.
 func (s *Session) Tools() []tool.Tool { return s.tools }

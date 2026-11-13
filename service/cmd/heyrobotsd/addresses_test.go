@@ -48,3 +48,14 @@ func TestOneServerPerDataFolder(t *testing.T) {
 		t.Fatal("a locked folder reads as free")
 	}
 }
+
+func TestSignInsCanAlwaysComeBackToThisMachine(t *testing.T) {
+	if got := withLoopback([]string{"192.168.1.110:7340"}); !slices.Equal(got, []string{"192.168.1.110:7340", "127.0.0.1:7340"}) {
+		t.Fatalf("network address only: %v", got)
+	}
+	for _, already := range [][]string{{"127.0.0.1:7340"}, {"192.168.1.110:7340", "127.0.0.1:7340"}, {"localhost:7340"}} {
+		if got := withLoopback(already); !slices.Equal(got, already) {
+			t.Fatalf("%v became %v", already, got)
+		}
+	}
+}

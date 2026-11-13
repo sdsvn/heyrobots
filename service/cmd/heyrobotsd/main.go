@@ -216,6 +216,9 @@ func run() error {
 	googleRedirect := "http://127.0.0.1:" + port + "/oauth/google/callback"
 	// Listen on this machine's tailnet address too, when it has one: only the
 	// owner's own devices can reach it, and pairing codes lead with it.
+	if !cfg.Public {
+		cfg.Listen = withLoopback(cfg.Listen)
+	}
 	if ips := tailnetIPs(); len(ips) > 0 && !cfg.Public {
 		cfg.Listen = withTailnet(cfg.Listen, ips)
 		log.Info("listening on the tailnet too", "addrs", ips)
