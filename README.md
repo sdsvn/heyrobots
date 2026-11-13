@@ -191,15 +191,33 @@ A machine without a reachable address, such as a laptop, can still join. It only
 ## Install the app
 
 - **In a browser.** Open the server's address, such as `http://127.0.0.1:7340`. The server serves the app itself, so there's nothing to install.
-- **On macOS.** Unzip `heyrobots-app-*-macos.zip` and move `heyrobots.app` to Applications. The build isn't signed by Apple, so macOS blocks the first open. Either run `xattr -cr /Applications/heyrobots.app` once, or try to open it, then go to **System Settings**, **Privacy & Security**, and click **Open Anyway**.
+- **On macOS.** Unzip `heyrobots-app-*-macos.zip` and move `heyrobots.app` to Applications. See [Opening the macOS app](#opening-the-macos-app) for the one extra step the first time.
 - **On Linux.** Extract `heyrobots-app-*-linux-x64.tar.gz` and run `./heyrobots` inside the folder. It needs GTK 3, libsecret and a keyring service to keep its pairing, which most desktops have; on Debian or Ubuntu, `sudo apt install libgtk-3-0 libsecret-1-0 gnome-keyring`. There's no fingerprint check on Linux, so actions that need one are approved from your phone.
 - **On Android.** Copy `heyrobots-app-*-android.apk` to the phone and open it. Android asks once to allow installs from that source.
 
-Then pair the app: scan the QR code from the setup page, or from **Settings**, then **Add a phone**, on a device that's already paired. You can also type the address and the code by hand.
+Then pair the app. Every time the server starts, its terminal shows a QR code, the addresses to open and a one-time pairing code. Scan the QR code with the app, or open one of the addresses and enter the code. A device that's already paired can make another code under **Settings**, then **Add a phone**. You can also type the address and the code by hand.
 
 Connecting an add-on, such as Gmail or Notion, opens a sign-in that returns to the server's own machine. So add apps from a browser or the desktop app on that machine. The phone app shows what's connected but doesn't start sign-ins.
 
 Setting up Gmail and Google Calendar is in [docs/setup/google.md](docs/setup/google.md).
+
+### Opening the macOS app
+
+The first time you open it, macOS may say **"The application “heyrobots” can’t be opened."** The app isn't broken. It's built for both Apple silicon and Intel, and its signature is valid, but it's only signed locally (ad-hoc), not by Apple. Your browser also marks every download as quarantined, and macOS refuses a quarantined app that Apple hasn't signed.
+
+Clear the mark once, then open it:
+
+```bash
+xattr -cr /Applications/heyrobots.app && open /Applications/heyrobots.app
+```
+
+Use `~/Downloads/heyrobots.app` instead if you haven't moved it.
+
+Or, without the terminal: after the failed open, go to **System Settings**, then **Privacy & Security**. Scroll down to the line about "heyrobots" being blocked, click **Open Anyway**, and confirm.
+
+Once it opens, pair it, then quit and reopen it to check it's still paired. An app that Apple hasn't signed sometimes can't keep its pairing in the Keychain. If it asks to pair again every time, open an issue.
+
+Every new download needs this step once, until the app is signed and notarized (see [CI and releases](#ci-and-releases)).
 
 ## Build from source
 
@@ -254,7 +272,7 @@ The servers are built for every platform on one Linux runner, since they're pure
 
 Signing isn't set up yet:
 
-- **macOS.** The server and the app aren't signed or notarized, so macOS asks once before opening them, as described above. Signing needs an Apple Developer ID certificate in the workflow's secrets.
+- **macOS.** The server and the app are only signed locally (ad-hoc), not by Apple, and aren't notarized. So macOS refuses them until the quarantine mark is cleared, as described in [Opening the macOS app](#opening-the-macos-app). Signing and notarizing need an Apple Developer account, about $99 a year, with its Developer ID certificate and an app-specific password in the workflow's secrets.
 - **Android.** The APK is signed with a debug key that each CI run makes afresh. It installs directly, but a newer release won't install over an older one: uninstall the old app first, which also unpairs it. The Play Store won't accept it either. Both need a fixed keystore in the workflow's secrets and a `signingConfig` that uses it in `app/android/app/build.gradle.kts`.
 
 ## Where things are
