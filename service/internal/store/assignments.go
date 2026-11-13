@@ -49,6 +49,11 @@ type Claimed struct {
 	PausedAt string
 }
 
+// backgroundSQL is true for a Ticket nobody asked for just now: a standing
+// job, a schedule, or proactive work under a rule.
+const backgroundSQL = "(COALESCE(json_extract(tickets.mandate, '$.Job'), '') <> '' OR " +
+	"json_extract(tickets.mandate, '$.Strength') = 'inferred' OR json_extract(tickets.mandate, '$.Received.Source') = 'schedule')"
+
 // ClaimAssignment picks one open Ticket that has new input, or whose last
 // Assignment was interrupted, and no running Assignment, and starts an
 // Assignment for it. A Ticket that never had an Assignment is new work;
@@ -64,10 +69,13 @@ func (tx *Tx) ClaimAssignment(id string, now time.Time, lease time.Duration, all
 		return Claimed{}, ErrNotFound
 	}
 	// Each agent works on at most its capacity of tasks at once; the rest
-	// wait in its queue.
+	// wait in its queue. Background work (standing jobs and work the agent
+	// started on its own) leaves one slot free, so a request from a person
+	// never waits behind it.
 	q := tx.db.Model(&Ticket{}).Where("open AND NOT EXISTS (SELECT 1 FROM assignments a WHERE a.ticket_id = tickets.id AND a.status = ?)", AssignmentRunning).
 		Where("(SELECT COUNT(*) FROM assignments a WHERE a.agent_id = tickets.agent_id AND a.status = ?) < "+
-			"COALESCE((SELECT capacity FROM agents g WHERE g.id = tickets.agent_id), 1)", AssignmentRunning).
+			"(COALESCE((SELECT capacity FROM agents g WHERE g.id = tickets.agent_id), 1) - CASE WHEN "+backgroundSQL+
+			" AND COALESCE((SELECT capacity FROM agents g WHERE g.id = tickets.agent_id), 1) > 1 THEN 1 ELSE 0 END)", AssignmentRunning).
 		Where("EXISTS (SELECT 1 FROM ticket_inputs i WHERE i.ticket_id = tickets.id AND i.delivered_at IS NULL) OR "+
 			"(SELECT a.state FROM assignments a WHERE a.ticket_id = tickets.id ORDER BY a.started_at DESC LIMIT 1) = ?", StateInterrupted)
 	hasPrev := "EXISTS (SELECT 1 FROM assignments a WHERE a.ticket_id = tickets.id)"

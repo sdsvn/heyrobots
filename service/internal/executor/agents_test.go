@@ -160,3 +160,59 @@ func TestAnAgentWorksOnItsCapacityAtOnce(t *testing.T) {
 		t.Fatalf("load = %+v", l)
 	}
 }
+
+// Background work leaves one of an agent's slots free, so a request from
+// a person starts at once instead of waiting behind standing jobs.
+func TestBackgroundWorkLeavesASlotForYou(t *testing.T) {
+	e := newEnv(t)
+	e.addResearcher()
+	ag, _ := e.store.Agent("ag_research")
+	ag.Capacity = 2
+	if err := e.store.SaveAgent(ag); err != nil {
+		t.Fatal(err)
+	}
+	e.eval.Router = agentRouter{agent: "ag_research", toolsets: []core.Toolset{core.ToolsetResearch}}
+	e.setPolicy(func(p *policy.Policy) { p.Toolsets = append(p.Toolsets, core.ToolsetResearch) })
+	res := e.say(owner, "c1", "find me a train")
+	e.evalAll()
+	mine := e.ticket(res.ThreadIDs[0])
+	var input string
+	_ = e.store.Tx(func(tx *store.Tx) error {
+		in, err := tx.TicketInputs(mine.ID)
+		if len(in) > 0 {
+			input = in[0].TriggerID
+		}
+		return err
+	})
+	// Two standing-job tasks, older than the request.
+	start := mine.UpdatedAt.Add(-time.Hour)
+	for i, id := range []string{"tk_job1", "tk_job2"} {
+		if err := e.store.Tx(func(tx *store.Tx) error {
+			m := core.Mandate{Scope: "brief", Strength: core.Inferred, Role: core.RoleOwner, Agent: "ag_research", Job: "brief"}
+			if err := tx.CreateTicket(store.Ticket{ID: id, Open: true, Stage: string(core.StageWorking), OriginThreadID: res.ThreadIDs[0]}, m, res.ThreadIDs[0], start.Add(time.Duration(i)*time.Minute)); err != nil {
+				return err
+			}
+			return tx.AddTicketInput(id, input, start)
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	claim := func(id string) (string, error) {
+		var c store.Claimed
+		err := e.store.Tx(func(tx *store.Tx) error {
+			var err error
+			c, err = tx.ClaimAssignment(id, time.Now(), time.Hour, true, true)
+			return err
+		})
+		return c.Ticket.ID, err
+	}
+	if got, err := claim("as_1"); err != nil || got != "tk_job1" {
+		t.Fatalf("first claim = %s %v; want the oldest job", got, err)
+	}
+	if got, err := claim("as_2"); err != nil || got != mine.ID {
+		t.Fatalf("second claim = %s %v; want the person's request, not the second job", got, err)
+	}
+	if got, err := claim("as_3"); err != store.ErrNotFound {
+		t.Fatalf("third claim = %s %v; the agent is full", got, err)
+	}
+}

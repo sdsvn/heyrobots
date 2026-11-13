@@ -450,7 +450,7 @@ var migrations = []migration{
 		if err := tx.Exec(`INSERT INTO agents (id, name, purpose, instructions, toolsets, any_toolset, skills, provider, model, base_url,
 			capacity, color, badge, builtin, enabled, created_at, updated_at, home)
 			SELECT 'ag_it', 'IT', 'Sets up the team: finds and connects apps, adds skills and gives them to the agents who need them.', '',
-				'["setup"]', false, '[]', '', '', '', 1, 'sky', 'bolt', true, true, ?, ?, ''
+				'["setup"]', false, '[]', '', '', '', 3, 'sky', 'bolt', true, true, ?, ?, ''
 			WHERE NOT EXISTS (SELECT 1 FROM agents WHERE id = 'ag_it' OR (name = 'IT' AND home = ''))`, now, now).Error; err != nil {
 			return err
 		}
@@ -476,6 +476,11 @@ var migrations = []migration{
 			return err
 		}
 		return tx.Exec("INSERT INTO policy_versions (version, body, created_at) VALUES (?, ?, ?)", last.Version+1, string(body), now).Error
+	}},
+	{18, "built-in agents work on three things at once", func(tx *gorm.DB) error {
+		// One slot always stays free for a person's request, so three means
+		// up to two background jobs and a message from you at once.
+		return tx.Exec("UPDATE agents SET capacity = 3 WHERE builtin AND capacity < 3").Error
 	}},
 }
 

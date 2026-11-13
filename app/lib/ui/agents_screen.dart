@@ -51,7 +51,7 @@ class _AgentEditScreenState extends State<AgentEditScreen> {
   late final Set<String> _skills = {...?a?.skills};
   late final Set<String> _delegates = {...?a?.delegates};
   late final Set<String> _rules = {...?a?.rules};
-  late int _capacity = a?.capacity ?? 1;
+  late int _capacity = a?.capacity ?? 3;
   late bool _enabled = a?.enabled ?? true;
   late bool _ownModel = a?.model != null;
   late String _provider = a?.provider ?? 'anthropic';
@@ -309,7 +309,7 @@ class _AgentEditScreenState extends State<AgentEditScreen> {
                   decoration: const InputDecoration(labelText: 'API key (leave empty to use the saved one)'),
                 ),
               ],
-              _section('Tasks at once', 'More lets it work on several tasks in parallel, and costs more at once.'),
+              _section('Tasks at once', 'It works on this many things at a time. One is always kept free for your messages, so jobs never make you wait.'),
               Row(
                 children: [
                   IconButton(onPressed: _capacity > 1 ? () => setState(() => _capacity--) : null, icon: const Icon(Icons.remove_circle_outline)),
