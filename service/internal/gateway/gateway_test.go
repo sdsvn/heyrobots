@@ -346,3 +346,19 @@ func TestAnAppWithEveryToolOffIsNamed(t *testing.T) {
 		t.Fatalf("tools %v, missing %v", names(s), m)
 	}
 }
+
+// A tool with its own question argument keeps it; the reader's question
+// gets another name, so no name appears twice (providers reject that).
+func TestTheReadersQuestionNeverClashesWithTheTools(t *testing.T) {
+	schema := map[string]any{"type": "object", "properties": map[string]any{"question": map[string]any{"type": "string"}}, "required": []any{"question"}}
+	if got := addQuestion(schema); got != "reader_question" {
+		t.Fatalf("added %q", got)
+	}
+	req := schema["required"].([]any)
+	if len(req) != 2 || req[0] != "question" || req[1] != "reader_question" {
+		t.Fatalf("required = %v", req)
+	}
+	if got := addQuestion(map[string]any{"type": "object"}); got != "question" {
+		t.Fatalf("a plain tool got %q", got)
+	}
+}

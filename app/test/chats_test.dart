@@ -147,12 +147,12 @@ void main() {
     expect(find.text('Message the group…'), findsOneWidget);
   });
 
-  testWidgets('the team tab shows a working agent', (tester) async {
+  testWidgets('the agents tab shows a working agent', (tester) async {
     await show(tester, TeamTab(state: state));
-    expect(find.text('Team'), findsOneWidget);
+    expect(find.text('Agents'), findsOneWidget);
     expect(find.descendant(of: find.byKey(const Key('team:General')), matching: find.text('Working')), findsOneWidget);
     expect(find.text('Plan Lisbon'), findsOneWidget);
-    expect(find.text('Idle'), findsOneWidget);
+    expect(find.textContaining('Idle'), findsOneWidget);
   });
 
   testWidgets('plans show what is running and the scheduled jobs', (tester) async {

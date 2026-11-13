@@ -65,7 +65,7 @@ void main() {
 
     await pairByHand(tester);
     final nav = find.byKey(const Key('main-nav'));
-    for (final t in ['Chats', 'Team', 'Plans']) {
+    for (final t in ['Chats', 'Agents', 'Plans']) {
       expect(find.descendant(of: nav, matching: find.text(t)), findsOneWidget);
     }
     expect(find.descendant(of: nav, matching: find.text('1')), findsOneWidget);

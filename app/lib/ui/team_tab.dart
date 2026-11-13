@@ -50,7 +50,7 @@ class _TeamTabState extends State<TeamTab> {
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
               child: Row(
                 children: [
-                  const Expanded(child: Text('Team', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -.4))),
+                  const Expanded(child: Text('Agents', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -.4))),
                   if (s.isOwner)
                     Tooltip(
                       message: 'Add an agent',
@@ -263,8 +263,8 @@ class _IdleCard extends StatelessWidget {
         ? 'Working'
         : jobs > 0
         ? 'Idle · $jobs job${jobs == 1 ? '' : 's'}'
-        : a.builtin || a.anyToolset
-        ? 'Idle · anything else'
+        : a.purpose.isNotEmpty
+        ? 'Idle · ${a.purpose}'
         : 'Idle';
     final card = EdgeCard(
       key: Key('team:${a.name}'),
@@ -273,7 +273,7 @@ class _IdleCard extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          ColorDot(color: a.color.toJson(), size: 36),
+          AgentAvatar(color: a.color.toJson(), badge: a.badge.toJson(), size: 40, name: a.name, seed: a.id, showBadge: false, mood: a.enabled ? BitMood.idle : BitMood.sleeping),
           const SizedBox(width: 10),
           Expanded(
             child: Column(

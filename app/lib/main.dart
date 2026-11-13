@@ -230,7 +230,7 @@ class MainTabs extends StatelessWidget {
                 children: [
                   for (final (i, (label, glyph, badge, badgeColor)) in [
                     ('Chats', Glyph.chat, unread, p.online),
-                    ('Team', Glyph.team, 0, p.online),
+                    ('Agents', Glyph.agent, 0, p.online),
                     ('Plans', Glyph.plans, state.attention.length, const Color(0xFFE07A45)),
                   ].indexed)
                     Expanded(

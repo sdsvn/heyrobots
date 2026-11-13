@@ -22,6 +22,8 @@ class Glyph {
   static const plus = Glyph._(['M12 5v14M5 12h14']);
   static const chat = Glyph._(['M20 12a8 8 0 0 1-11.8 7L4 20l1-4.2A8 8 0 1 1 20 12z']);
   static final team = Glyph._([_circle(9, 8, 3.5), 'M2.5 20a6.5 6.5 0 0 1 13 0', _circle(17, 9, 2.5), 'M16 14.2a5 5 0 0 1 5.5 4.8']);
+  /// An agent: Bit's head, with its antenna and two eyes.
+  static final agent = Glyph._([_rect(4, 8, 16, 12, 4.5), 'M12 8V5.5', _circle(12, 4, 1.5), _circle(9.5, 14, .9), _circle(14.5, 14, .9)]);
   static final plans = Glyph._([_rect(4, 5, 16, 16, 3), 'M8 3v4M16 3v4M4 10h16M8 14h3M8 17h6']);
   static final terminal = Glyph._([_rect(3, 4, 18, 16, 3), 'm7 9 3 3-3 3M12 15h5']);
   static const cloud = Glyph._(['M12 3a9 9 0 1 0 9 9', 'M12 8v4l3 2']);
