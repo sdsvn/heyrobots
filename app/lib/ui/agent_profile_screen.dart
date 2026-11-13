@@ -24,6 +24,9 @@ class AgentProfileScreen extends StatefulWidget {
   State<AgentProfileScreen> createState() => _AgentProfileScreenState();
 }
 
+/// How wide the profile gets on a big screen, so lines stay readable.
+const _maxWidth = 720.0;
+
 class _AgentProfileScreenState extends State<AgentProfileScreen> {
   int _version = 0;
   bool _pausing = false;
@@ -92,7 +95,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
     final (_, soft) = agentColors(a.color.toJson(), p);
     final ink = agentInk(a.color.toJson(), p);
     final busy = a.working.isNotEmpty;
-    final reach = [...reachLabels(a), for (final sk in a.skills) 'Skill: $sk'];
+    final reach = reachLabels(a);
     final model = a.model ?? "Worker's model";
     final purpose = a.purpose.trim().replaceAll(RegExp(r'\.$'), '');
     final about = [if (purpose.isNotEmpty) '$purpose.', '$model · ${a.capacity == 1 ? '1 task' : '${a.capacity} tasks'} at a time'].join(' ');
@@ -104,189 +107,265 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
         children: [
           Container(
             color: soft,
+            alignment: Alignment.topCenter,
             child: SafeArea(
               bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        if (widget.onClose != null)
-                          SquareButton(
-                            key: const Key('close-panel'),
-                            icon: Icon(Icons.close_rounded, size: 22, color: p.ink),
-                            label: 'Close',
-                            width: 40,
-                            height: 40,
-                            radius: 14,
-                            edge: 0,
-                            onPressed: widget.onClose!,
-                          )
-                        else
-                          SquareButton(
-                            icon: LineIcon(Glyph.back, size: 22, color: p.ink, stroke: 2.6),
-                            label: 'Back to team',
-                            width: 40,
-                            height: 40,
-                            radius: 14,
-                            edge: 0,
-                            onPressed: () => Navigator.of(context).maybePop(),
-                          ),
-                        const Spacer(),
-                        if (widget.onClose == null)
-                          Tooltip(
-                            message: 'Change anything about this agent by asking it',
-                            child: EdgeCard(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: _maxWidth),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          if (widget.onClose != null)
+                            SquareButton(
+                              key: const Key('close-panel'),
+                              icon: Icon(Icons.close_rounded, size: 22, color: p.ink),
+                              label: 'Close',
+                              width: 40,
+                              height: 40,
                               radius: 14,
                               edge: 0,
-                              onTap: () => openAgentChat(context, s, ref),
-                              child: Container(
-                                height: 40,
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.chat_bubble_outline_rounded, size: 16, color: p.accent),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Ask to change',
-                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: p.accent),
-                                    ),
-                                  ],
+                              onPressed: widget.onClose!,
+                            )
+                          else
+                            SquareButton(
+                              icon: LineIcon(Glyph.back, size: 22, color: p.ink, stroke: 2.6),
+                              label: 'Back to team',
+                              width: 40,
+                              height: 40,
+                              radius: 14,
+                              edge: 0,
+                              onPressed: () => Navigator.of(context).maybePop(),
+                            ),
+                          const Spacer(),
+                          if (widget.onClose == null)
+                            Tooltip(
+                              message: 'Change anything about this agent by asking it',
+                              child: EdgeCard(
+                                radius: 14,
+                                edge: 0,
+                                onTap: () => openAgentChat(context, s, ref),
+                                child: Container(
+                                  height: 40,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.chat_bubble_outline_rounded, size: 16, color: p.accent),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Ask to change',
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: p.accent),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          AgentAvatar(
+                            color: ref.color,
+                            badge: ref.badge,
+                            size: 64,
+                            fill: p.card,
+                            name: a.name,
+                            seed: a.id,
+                            mood: busy ? BitMood.thinking : (a.enabled ? BitMood.idle : BitMood.sleeping),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  a.name,
+                                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: p.ink),
+                                ),
+                                Text(a.enabled ? about : 'Paused · $about', style: TextStyle(fontSize: 13, color: ink)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          // Beside its chat, messaging it is the chat itself.
+                          if (widget.onClose == null) ...[
+                            Expanded(
+                              child: _HeaderButton(
+                                key: const Key('message-agent'),
+                                label: 'Message',
+                                icon: Icons.chat_bubble_outline_rounded,
+                                primary: true,
+                                onTap: () => openAgentChat(context, s, ref),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                            child: _HeaderButton(
+                              key: const Key('give-job'),
+                              label: 'Give it a job',
+                              onTap: () => openAgentChat(context, s, ref, draft: 'Give you a job: '),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Tooltip(
+                            message: a.enabled ? 'Pause this agent' : 'Let this agent work again',
+                            child: Material(
+                              color: p.card,
+                              shape: const CircleBorder(),
+                              child: InkWell(
+                                key: const Key('pause'),
+                                customBorder: const CircleBorder(),
+                                onTap: _pausing ? null : () => _togglePause(a),
+                                child: SizedBox(
+                                  width: 42,
+                                  height: 42,
+                                  child: Icon(a.enabled ? Icons.pause_rounded : Icons.play_arrow_rounded, color: p.ink, size: 22),
                                 ),
                               ),
                             ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        AgentAvatar(
-                          color: ref.color,
-                          badge: ref.badge,
-                          size: 64,
-                          fill: p.card,
-                          name: a.name,
-                          seed: a.id,
-                          mood: busy ? BitMood.thinking : (a.enabled ? BitMood.idle : BitMood.sleeping),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                a.name,
-                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: p.ink),
-                              ),
-                              Text(a.enabled ? about : 'Paused · $about', style: TextStyle(fontSize: 13, color: ink)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        // Beside its chat, messaging it is the chat itself.
-                        if (widget.onClose == null) ...[
-                          Expanded(
-                            child: _HeaderButton(
-                              key: const Key('message-agent'),
-                              label: 'Message',
-                              icon: Icons.chat_bubble_outline_rounded,
-                              primary: true,
-                              onTap: () => openAgentChat(context, s, ref),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
                         ],
-                        Expanded(
-                          child: _HeaderButton(
-                            key: const Key('give-job'),
-                            label: 'Give it a job',
-                            onTap: () => openAgentChat(context, s, ref, draft: 'Give you a job: '),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Tooltip(
-                          message: a.enabled ? 'Pause this agent' : 'Let this agent work again',
-                          child: Material(
-                            color: p.card,
-                            shape: const CircleBorder(),
-                            child: InkWell(
-                              key: const Key('pause'),
-                              customBorder: const CircleBorder(),
-                              onTap: _pausing ? null : () => _togglePause(a),
-                              child: SizedBox(
-                                width: 42,
-                                height: 42,
-                                child: Icon(a.enabled ? Icons.pause_rounded : Icons.play_arrow_rounded, color: p.ink, size: 22),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (busy) ...[_doingNow(context, p, a), const SizedBox(height: 14)],
-                if (jobs.isNotEmpty) ...[
-                  const SectionLabel('Standing jobs · runs without a chat'),
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: edgeBox(p, radius: 20),
-                    child: Column(
-                      children: [for (var i = 0; i < jobs.length; i++) _JobRow(job: jobs[i], divider: i < jobs.length - 1)],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                ],
-                if (reach.isNotEmpty) ...[
-                  const SectionLabel('Can reach'),
-                  const SizedBox(height: 8),
-                  Wrap(spacing: 6, runSpacing: 6, children: [for (final r in reach) ReachChip(r, height: 28, tintOutward: true)]),
-                  const SizedBox(height: 14),
-                ],
-                if (recent.isNotEmpty) ...[
-                  const SectionLabel('Recently'),
-                  const SizedBox(height: 6),
-                  for (final (at, text) in recent)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            width: 42,
-                            child: Text(
-                              chatTime(at) == 'Yesterday' ? 'Yest.' : chatTime(at),
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: p.muted),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: _maxWidth),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (busy)
+                      _doingNow(context, p, a)
+                    else
+                      _note(p, a.enabled ? 'Not working on anything right now.' : 'Paused: it takes no new work until you let it.'),
+                    const SizedBox(height: 16),
+                    const SectionLabel('Instructions'),
+                    const SizedBox(height: 8),
+                    a.instructions.trim().isEmpty
+                        ? _empty(
+                            p,
+                            'Only its purpose so far. Tell it how you like things done.',
+                            'Add instructions',
+                            () => openAgentChat(context, s, ref, draft: 'From now on, '),
+                          )
+                        : _note(p, a.instructions.trim()),
+                    const SizedBox(height: 16),
+                    const SectionLabel('Can reach'),
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 6, runSpacing: 6, children: [for (final r in reach) ReachChip(r, height: 28, tintOutward: true)]),
+                    if (reach.isEmpty)
+                      _empty(
+                        p,
+                        'Nothing yet, so it can only think and write in chat.',
+                        'Give it an app',
+                        () => openAgentChat(context, s, ref, draft: 'Give yourself access to '),
+                      ),
+                    const SizedBox(height: 16),
+                    const SectionLabel('Skills'),
+                    const SizedBox(height: 8),
+                    a.skills.isEmpty
+                        ? _empty(
+                            p,
+                            'No skills yet. A skill teaches it a way of working, such as writing release notes.',
+                            'Find a skill',
+                            () => openAgentChat(context, s, ref, draft: 'Find a skill that helps you '),
+                          )
+                        : Wrap(spacing: 6, runSpacing: 6, children: [for (final sk in a.skills) ReachChip(sk, height: 28)]),
+                    const SizedBox(height: 16),
+                    const SectionLabel('Standing jobs · runs without a chat'),
+                    const SizedBox(height: 8),
+                    jobs.isEmpty
+                        ? _empty(
+                            p,
+                            'None. Ask for one in plain words, like "every weekday at 9, brief me".',
+                            'Give it a job',
+                            () => openAgentChat(context, s, ref, draft: 'Give you a job: '),
+                          )
+                        : Container(
+                            decoration: edgeBox(p, radius: 20),
+                            child: Column(
+                              children: [for (var i = 0; i < jobs.length; i++) _JobRow(job: jobs[i], divider: i < jobs.length - 1)],
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
-                        ],
+                    const SizedBox(height: 16),
+                    const SectionLabel('Who can ask it'),
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 6, runSpacing: 6, children: [const ReachChip('You', height: 28), for (final d in a.delegates) ReachChip(d, height: 28)]),
+                    const SizedBox(height: 16),
+                    const SectionLabel('Recently'),
+                    const SizedBox(height: 6),
+                    if (recent.isEmpty) Text('Nothing yet.', style: TextStyle(fontSize: 13, color: p.muted)),
+                    for (final (at, text) in recent)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 5),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 42,
+                              child: Text(
+                                chatTime(at) == 'Yesterday' ? 'Yest.' : chatTime(at),
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: p.muted),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
+                          ],
+                        ),
                       ),
-                    ),
-                ],
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
+  /// A short note in a card.
+  Widget _note(Palette p, String text) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: edgeBox(p, radius: 20),
+    child: Text(text, style: TextStyle(fontSize: 13, color: p.ink)),
+  );
+
+  /// An empty section: what's missing, and one tap to fill it by asking.
+  Widget _empty(Palette p, String text, String action, VoidCallback onTap) => Container(
+    padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+    decoration: edgeBox(p, radius: 20),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(text, style: TextStyle(fontSize: 13, color: p.muted)),
+        ),
+        const SizedBox(width: 8),
+        TextButton(
+          onPressed: onTap,
+          child: Text(
+            action,
+            style: TextStyle(fontWeight: FontWeight.w900, color: p.accent),
+          ),
+        ),
+      ],
+    ),
+  );
 
   /// What the agent did lately: its standing jobs' runs and what it asked you.
   List<(DateTime, String)> _recent(Agent a, List<Job> jobs) {

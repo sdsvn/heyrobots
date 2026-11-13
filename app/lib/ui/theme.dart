@@ -174,9 +174,15 @@ ThemeData buildTheme(Brightness brightness) {
       showCheckmark: false,
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
       labelPadding: EdgeInsets.zero,
-      labelStyle: WidgetStateTextStyle.resolveWith(
-        (s) => TextStyle(fontFamily: fontFamily, fontSize: 13, fontWeight: FontWeight.w800, color: s.contains(WidgetState.selected) ? Colors.white : p.ink),
+      // Chips resolve the label's colour by state, not the whole style:
+      // white on a picked (accent) chip, ink on an unpicked (white) one.
+      labelStyle: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 13,
+        fontWeight: FontWeight.w800,
+        color: WidgetStateColor.resolveWith((s) => s.contains(WidgetState.selected) ? Colors.white : p.ink),
       ),
+      checkmarkColor: Colors.white,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,

@@ -131,6 +131,8 @@ void main() {
     await tester.tap(find.byKey(const Key('toolset:research')));
     await tester.tap(find.text('trip-planner'));
     await tester.scrollUntilVisible(find.text('sam'), 200, scrollable: find.byType(Scrollable).last);
+    await tester.ensureVisible(find.text('sam'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('sam'));
     await tester.pump();
     await tester.scrollUntilVisible(find.byKey(const Key('save-agent')), 200, scrollable: find.byType(Scrollable).last);

@@ -323,8 +323,8 @@ class ReachChip extends StatelessWidget {
       height: height,
       padding: EdgeInsets.symmetric(horizontal: height > 26 ? 10 : 9),
       decoration: BoxDecoration(color: ask ? p.peachSoft : p.ground, borderRadius: BorderRadius.circular(999)),
-      alignment: Alignment.center,
-      child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: ask ? p.peachInk : p.ink)),
+      // As wide as its words, never the whole row.
+      child: Center(widthFactor: 1, child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: ask ? p.peachInk : p.ink))),
     );
   }
 }

@@ -20,6 +20,7 @@ String toolsetLabel(String t) {
     'calendar' => 'Calendar · invites after your OK',
     'data' => 'Data',
     'code' => 'Code',
+    'setup' => 'Sets up apps and skills · after your OK',
     _ => t,
   };
 }
