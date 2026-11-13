@@ -22,7 +22,11 @@ abstract class CredentialStore {
 /// Keeps the token in the Keychain on Apple devices and the Keystore on
 /// Android.
 class SecureCredentialStore implements CredentialStore {
-  final _storage = const FlutterSecureStorage();
+  // On macOS, the ordinary login keychain: the data protection keychain
+  // needs a keychain-access-groups entitlement, which only an app signed by
+  // an Apple developer team may hold. An ad-hoc signed app asking for it is
+  // refused at launch.
+  final _storage = const FlutterSecureStorage(mOptions: MacOsOptions(usesDataProtectionKeychain: false));
 
   static const _server = 'server';
   static const _token = 'device_token';

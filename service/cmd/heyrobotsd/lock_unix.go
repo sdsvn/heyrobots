@@ -10,6 +10,10 @@ import (
 	"syscall"
 )
 
+// held keeps the lock file referenced: an unreferenced *os.File is closed
+// by the garbage collector, which would quietly release the lock.
+var held *os.File
+
 // lockName is held by the running server, so a second one on the same data
 // folder refuses to start instead of sharing the database.
 const lockName = "heyrobotsd.lock"
@@ -31,6 +35,7 @@ func lockData(dataDir string) error {
 		return err
 	}
 	// The file stays open, and locked, until the process ends.
+	held = f
 	return nil
 }
 

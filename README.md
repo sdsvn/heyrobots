@@ -28,15 +28,22 @@ Check a download before you use it:
 shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 ```
 
-## Install the server
+## Install
 
-One line installs the latest server for your Mac or Linux machine:
+One line installs everything on your Mac or Linux machine:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sdsvn/heyrobots/main/install.sh | bash
 ```
 
-It picks the build for your system and checks it against the release's checksums. It puts `heyrobotsd` in `~/.local/bin`, and on a Mac it clears the "downloaded from the internet" mark.
+It does four things:
+
+1. **Installs the server,** `heyrobotsd`, in `~/.local/bin`, after checking it against the release's checksums.
+2. **Runs it in the background,** starting at login: a launchd service on a Mac, a systemd user service on Linux.
+3. **Installs the app** in `/Applications` on a Mac. Installed this way, macOS opens it without the "can't be opened" message.
+4. **Opens the app, already signed in.** There's no pairing step on the same machine. On Linux, the web app opens in your browser, signed in.
+
+Run it again to upgrade; it replaces everything in place and keeps your data. If you already run a server by hand, stop it first, since the installer won't start a second one on the same data.
 
 While the repository is private, an anonymous download can't reach it. Sign in with the GitHub CLI and run the script through it:
 
@@ -47,19 +54,50 @@ gh api repos/sdsvn/heyrobots/contents/install.sh -H "Accept: application/vnd.git
 Or use a token that can read the repository:
 
 ```bash
-curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" https://raw.githubusercontent.com/sdsvn/heyrobots/main/install.sh | bash
+curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" https://raw.githubusercontent.com/sdsvn/heyrobots/main/install.sh | GITHUB_TOKEN="$GITHUB_TOKEN" bash
 ```
 
 | Setting | What it does |
 |---|---|
-| `HEYROBOTS_VERSION` | Install a given release, such as `v0.1.0`, instead of the latest |
-| `HEYROBOTS_INSTALL_DIR` | Install somewhere else, such as `/usr/local/bin` |
+| `HEYROBOTS_VERSION` | Install a given release, such as `v0.2.0`, instead of the latest |
+| `HEYROBOTS_INSTALL_DIR` | Put `heyrobotsd` somewhere else, such as `/usr/local/bin` |
+| `HEYROBOTS_APP_DIR` | Put the Mac app somewhere else |
+| `HEYROBOTS_NO_SERVICE=1` | Install the server only, and run it yourself |
+| `HEYROBOTS_NO_APP=1` | Don't install or open the app |
 
-For example, `curl -fsSL … | HEYROBOTS_VERSION=v0.1.0 bash`.
+Any other `HEYROBOTS_*` setting you give the installer is passed on to the service, along with your `PATH`, so it finds `claude`, `omp`, `npx` and Docker. For example, this installs a service that uses omp and also listens on your Wi-Fi:
 
-To install by hand instead, follow the steps below.
+```bash
+curl -fsSL … | HEYROBOTS_ACP_COMMAND="omp acp --model claude-sonnet-5-5 --thinking low --no-extensions" HEYROBOTS_LISTEN="127.0.0.1:7340,192.168.1.110:7340" bash
+```
 
-### On a Mac, by hand
+**Day to day:**
+
+| On a Mac | On Linux |
+|---|---|
+| Log: `~/Library/Logs/heyrobots.log` | Log: `journalctl --user -u heyrobots` |
+| Restart: `launchctl kickstart -k gui/$(id -u)/dev.heyrobots.heyrobotsd` | Restart: `systemctl --user restart heyrobots` |
+| Is it running: `heyrobotsd status` | Is it running: `heyrobotsd status` |
+
+`heyrobotsd pair` prints a new one-time pairing code, and links that sign in the app or a browser on this machine, whenever you need one.
+
+**To uninstall** on a Mac:
+
+```bash
+launchctl bootout gui/$(id -u)/dev.heyrobots.heyrobotsd; rm -f ~/Library/LaunchAgents/dev.heyrobots.heyrobotsd.plist ~/.local/bin/heyrobotsd; rm -rf /Applications/heyrobots.app
+```
+
+On Linux:
+
+```bash
+systemctl --user disable --now heyrobots; rm -f ~/.config/systemd/user/heyrobots.service ~/.local/bin/heyrobotsd
+```
+
+Your data stays in its folder (see `HEYROBOTS_DATA_DIR` under Settings). Delete that folder too to remove everything.
+
+## Install by hand
+
+### On a Mac
 
 ```bash
 tar -xzf heyrobotsd-*-darwin-arm64.tar.gz
@@ -70,7 +108,7 @@ xattr -c heyrobotsd
 
 The `xattr` line clears the "downloaded from the internet" mark, which macOS puts on unsigned programs and then refuses to start. It does nothing if the mark isn't there. On a Mac, the server keeps its vault key in your login Keychain.
 
-### On Linux, by hand
+### On Linux
 
 ```bash
 tar -xzf heyrobotsd-*-linux-amd64.tar.gz
@@ -125,6 +163,8 @@ The server prints a setup code in the terminal:
    - **Your agent** uses an AI coding agent you already have on this machine and pay for: Claude Code, or [omp](https://omp.sh) with `HEYROBOTS_ACP_COMMAND`. You need no API key.
    - **An API key** uses Anthropic, OpenAI, DeepSeek or Gemini directly.
    - **A model on this machine** uses Ollama or LM Studio.
+
+## Running the server
 
 ### Reaching it from your phone
 
@@ -188,7 +228,9 @@ A machine without a reachable address, such as a laptop, can still join. It only
 | `HEYROBOTS_MODEL_PRICES` | Prices for models the server doesn't know, as `model=in/out,…` in dollars per million tokens | built-in prices |
 | `HEYROBOTS_DEBUG` | Any value logs every detail, including the agent's own output | off |
 
-## Install the app
+## Install the app by hand
+
+On a Mac, the one-line install already installs and signs in the app. Elsewhere:
 
 - **In a browser.** Open the server's address, such as `http://127.0.0.1:7340`. The server serves the app itself, so there's nothing to install.
 - **On macOS.** Unzip `heyrobots-app-*-macos.zip` and move `heyrobots.app` to Applications. See [Opening the macOS app](#opening-the-macos-app) for the one extra step the first time.

@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/netip"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -40,6 +41,9 @@ func TestOneServerPerDataFolder(t *testing.T) {
 	if err := lockData(dir); err != nil {
 		t.Fatal(err)
 	}
+	// A collected file would release the lock.
+	runtime.GC()
+	runtime.GC()
 	if !dataInUse(dir) {
 		t.Fatal("a locked folder reads as free")
 	}
