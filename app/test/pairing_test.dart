@@ -27,6 +27,7 @@ void main() {
       'http://[fd7a:115c:a1e0::1]:7340',
       'https://heyrobots.example.com',
       'mac-mini.tailnet.ts.net:7340',
+      'http://mac-mini.tail61b49.ts.net:7340',
     ]) {
       expect(() => parseServer(ok), returnsNormally, reason: ok);
     }
@@ -35,6 +36,7 @@ void main() {
       'http://8.8.8.8',
       'http://172.32.0.1',
       'http://100.128.0.1',
+      'http://ts.net.example.com',
       'ftp://192.168.1.2',
       'https://user:pw@example.com',
       'https://example.com/?x=1',

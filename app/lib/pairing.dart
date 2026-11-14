@@ -75,7 +75,9 @@ Uri parseServer(String input) {
 /// Reports whether a host is this machine or on a private network.
 bool isPrivateHost(String host) {
   var h = host.toLowerCase();
-  if (h == 'localhost' || h.endsWith('.local') || h.endsWith('.localhost')) {
+  // A Tailscale MagicDNS name (*.ts.net) resolves only inside the tailnet,
+  // whose traffic Tailscale encrypts.
+  if (h == 'localhost' || h.endsWith('.local') || h.endsWith('.localhost') || h.endsWith('.ts.net')) {
     return true;
   }
   if (h.startsWith('[') && h.endsWith(']')) {

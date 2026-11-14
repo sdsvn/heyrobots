@@ -14,6 +14,9 @@ import 'theme.dart';
 
 /// Settings: how much the assistant does on its own, and six rows. Anything
 /// else (digest time, quiet hours, budgets) is asked for in a chat.
+/// The release this app was built from, set by the release build.
+const appVersion = String.fromEnvironment('HEYROBOTS_VERSION', defaultValue: 'dev');
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.state});
 
@@ -160,7 +163,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-              child: Text('heyrobots 0.3 · this Mac · all data stays here', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted)),
+              child: Text('heyrobots $appVersion · this Mac · all data stays here', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted)),
             ),
           ],
         ),

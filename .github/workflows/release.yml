@@ -17,6 +17,8 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.47.9"
+  # Shown in the app's settings; "dev" for a build run by hand.
+  VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
 
 jobs:
   web:
@@ -29,7 +31,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-      - run: flutter build web --release
+      - run: flutter build web --release --dart-define=HEYROBOTS_VERSION=${VERSION#v}
         working-directory: app
       - uses: actions/upload-artifact@v4
         with:
@@ -87,7 +89,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-      - run: flutter build macos --release
+      - run: flutter build macos --release --dart-define=HEYROBOTS_VERSION=${VERSION#v}
         working-directory: app
       # Not signed or notarized: macOS asks once before opening it (see README).
       - name: Package
@@ -114,7 +116,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-      - run: flutter build linux --release
+      - run: flutter build linux --release --dart-define=HEYROBOTS_VERSION=${VERSION#v}
         working-directory: app
       - name: Package
         run: |
@@ -143,7 +145,7 @@ jobs:
           cache: true
       # Signed with Flutter's debug key, so it installs directly but not
       # from the Play Store (see README).
-      - run: flutter build apk --release
+      - run: flutter build apk --release --dart-define=HEYROBOTS_VERSION=${VERSION#v}
         working-directory: app
       - name: Package
         run: |
