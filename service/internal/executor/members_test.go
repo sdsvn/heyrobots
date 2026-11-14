@@ -2,9 +2,11 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"google.golang.org/genai"
 
@@ -105,3 +107,46 @@ func TestAGroupMemberAsksAnotherForAPiece(t *testing.T) {
 type routeFunc func(eval.Candidate) ([]eval.Route, error)
 
 func (f routeFunc) Route(_ context.Context, c eval.Candidate) ([]eval.Route, error) { return f(c) }
+
+// An agent keeps one folder per chat, so a file from an earlier message is
+// still there for a later one.
+func TestAChatKeepsItsFilesBetweenTasks(t *testing.T) {
+	e := newEnv(t)
+	var th store.Thread
+	if err := e.store.Tx(func(tx *store.Tx) error {
+		var err error
+		th, err = tx.ChatThread("agent:ag_general", "ag_general", "", owner.String(), e.clock)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	e.setPolicy(func(p *policy.Policy) { p.Toolsets = append(p.Toolsets, core.ToolsetWriting) })
+	e.eval.Router = acceptRouter{[]core.Toolset{core.ToolsetWriting}}
+	say := func(id, text string) {
+		if _, err := e.intake.Ingest(intake.Message{
+			Trigger:   core.Trigger{DeliveryID: id, Source: core.SourceApp, Actor: owner, Authenticity: core.Verified, Addressed: true, Text: text, At: e.clock},
+			ThreadIDs: []string{th.ID}, CreatedBy: owner,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		e.clock = e.clock.Add(time.Minute)
+	}
+	e.model.steps = [][]*genai.Part{
+		call("write_file", map[string]any{"path": "plan.md", "content": "Take the Eurostar."}),
+		reportCall("ready", "Wrote it.", "plan.md", ""),
+	}
+	say("d1", "plan a trip to London")
+	e.evalAll()
+	e.work()
+	e.model.steps = [][]*genai.Part{
+		call("read_file", map[string]any{"path": "plan.md"}),
+		reportCall("ready", "Here it is.", "Take the Eurostar.", ""),
+	}
+	e.model.n = 0
+	say("d2", "print all of it here")
+	e.evalAll()
+	e.work()
+	if got, _ := json.Marshal(e.model.results); !strings.Contains(string(got), "Take the Eurostar.") {
+		t.Fatalf("the second task couldn't read the first one's file: %s", got)
+	}
+}

@@ -2,9 +2,11 @@
 package main
 
 import (
+	"encoding/json"
 	"heyrobots/service/internal/cluster"
 	"heyrobots/service/internal/policy"
 	"heyrobots/service/internal/registry"
+	"slices"
 
 	"github.com/glebarez/sqlite"
 	"google.golang.org/adk/v2/model"
@@ -143,6 +145,21 @@ func run() error {
 		return fmt.Errorf("prepare session store: %w", err)
 	}
 	skillLib := &skills.Library{Dir: filepath.Join(cfg.DataDir, "skills")}
+	// Skills heyrobots ships go in once, to the agent each is for.
+	if added, err := skillLib.InstallBuiltins(ctx, filepath.Join(cfg.DataDir, "builtin-skills")); err != nil {
+		log.Warn("built-in skills", "err", err)
+	} else {
+		for _, b := range added {
+			if a, err := st.Agent(b.Agent); err == nil && !slices.Contains(a.SkillList(), b.Name) {
+				sk, _ := json.Marshal(append(a.SkillList(), b.Name))
+				a.Skills, a.UpdatedAt = string(sk), time.Now().UTC()
+				if err := st.SaveAgent(a); err != nil {
+					log.Warn("give built-in skill", "skill", b.Name, "err", err)
+				}
+			}
+			log.Info("built-in skill added", "skill", b.Name, "agent", b.Agent)
+		}
+	}
 	jobLib := &jobs.Library{Dir: filepath.Join(cfg.DataDir, "jobs")}
 	engine.Jobs = func(name string) (eval.JobSpec, error) {
 		j, _, err := jobLib.Get(name)

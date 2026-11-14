@@ -630,13 +630,17 @@ func (a *applier) route(r Route) error {
 	case ActionIgnore:
 		// In a group the members answer, never the router: a message the
 		// router would have answered itself goes to each member instead.
-		if len(primary.chat) > 1 && note != "" && primary.admission.Strength == core.Explicit {
+		if len(primary.chat) > 1 && note != "" && primary.admission.Strength == core.Explicit && !acknowledgement(primary.trigger.Text) {
 			for _, member := range primary.chat {
 				if err := a.accept(valid, primary, Route{Action: ActionAccept, TriggerIDs: valid, Scope: trimRunes(primary.trigger.Text, 300), Agent: member}, ""); err != nil {
 					return err
 				}
 			}
 			return nil
+		}
+		if len(primary.chat) > 1 {
+			// The router never speaks in a group; "ok" gets silence.
+			note = ""
 		}
 		// Nothing to do, but a person who spoke to Bit still gets an answer.
 		if err := a.decision(store.DecisionIgnore, valid, "", note, r.Reason); err != nil {
@@ -699,9 +703,9 @@ func (a *applier) accept(valid []string, primary *judged, r Route, note string) 
 	case err != nil:
 		return err
 	}
-	if len(primary.chat) > 1 {
-		// A group message goes to each member with what that member can use;
-		// one that can't help says so itself.
+	if len(primary.chat) > 0 {
+		// In a chat the agent is fixed: it works with what it can use, and
+		// says so itself if that isn't enough, rather than being refused.
 		m.Toolsets = slices.DeleteFunc(m.Toolsets, func(ts core.Toolset) bool { return !ag.Allows(ts) })
 	}
 	for _, ts := range m.Toolsets {
@@ -751,6 +755,13 @@ func (a *applier) accept(valid []string, primary *judged, r Route, note string) 
 func (a *applier) anotherMember(j *judged, r Route) bool {
 	led, ok := a.ledBy[j.trigger.ID]
 	return ok && r.Action == ActionAccept && len(j.chat) > 1 && slices.Contains(j.chat, r.Agent) && !slices.Contains(led, r.Agent)
+}
+
+// acknowledgement reports whether a message only acknowledges, such as
+// "ok" or "thanks!": a few words and no question.
+func acknowledgement(text string) bool {
+	t := strings.TrimSpace(text)
+	return !strings.Contains(t, "?") && len(strings.Fields(t)) <= 3
 }
 
 // mayActOn reports whether the requester may attach to or stop a Ticket:

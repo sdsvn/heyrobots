@@ -153,7 +153,7 @@ func TestAClaudeCodeTaskUsesTheGatewayOverMCP(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(ws, "CLAUDE.md")); !strings.Contains(string(b), "# Your task") || !strings.Contains(string(b), "heyrobots") {
 		t.Fatalf("CLAUDE.md = %q", b)
 	}
-	if b, _ := os.ReadFile(filepath.Join(ws, sessionFile)); string(b) != "fake-1" {
+	if b, _ := os.ReadFile(filepath.Join(ws, sessionFile+"-"+tk.ID)); string(b) != "fake-1" {
 		t.Fatalf("session file = %q", b)
 	}
 	msgs := messages(e.view(res.ThreadIDs[0]))

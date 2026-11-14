@@ -59,7 +59,7 @@ func (r *run) commandTool() (tool.Tool, error) {
 		Name:        "run_command",
 		Description: "Run a shell command in your task folder, such as python3 make_pdf.py or npm install. You get its output and exit code. " + commandsNote,
 	}, func(tc agent.Context, a commandArgs) (CommandResult, error) {
-		ws, err := filepath.Abs(filepath.Join(r.e.Workspaces, r.c.Ticket.ID))
+		ws, err := filepath.Abs(r.workspace())
 		if err != nil {
 			return CommandResult{}, err
 		}

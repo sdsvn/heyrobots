@@ -41,7 +41,7 @@ func (r *run) shareTool() (tool.Tool, error) {
 		if r.e.Files == "" {
 			return ControlResult{Error: "sharing files isn't set up on this server"}, nil
 		}
-		ws, err := filepath.Abs(filepath.Join(r.e.Workspaces, r.c.Ticket.ID))
+		ws, err := filepath.Abs(r.workspace())
 		if err != nil {
 			return ControlResult{}, err
 		}

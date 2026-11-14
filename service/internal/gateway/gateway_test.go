@@ -362,3 +362,15 @@ func TestTheReadersQuestionNeverClashesWithTheTools(t *testing.T) {
 		t.Fatalf("a plain tool got %q", got)
 	}
 }
+
+// An approved call sends only the arguments the tool declares.
+func TestASentCallKeepsOnlyDeclaredArguments(t *testing.T) {
+	got := declaredArgs(`{"type":"object","properties":{"title":{"type":"string"}}}`, map[string]any{"title": "x", "question": "who am I?"})
+	if len(got) != 1 || got["title"] != "x" {
+		t.Fatalf("args = %v", got)
+	}
+	open := map[string]any{"a": 1, "b": 2}
+	if got := declaredArgs(`{"type":"object","properties":{"a":{}},"additionalProperties":true}`, open); len(got) != 2 {
+		t.Fatalf("a schema that allows more kept %v", got)
+	}
+}

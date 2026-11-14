@@ -209,3 +209,25 @@ func (r *run) chatSection() string {
 	b.WriteString("</chat>\n\n")
 	return b.String()
 }
+
+// workspace is the task's folder. In a chat, an agent keeps one folder for
+// all its tasks there, so a file it made earlier in the chat is still
+// there when a later message asks about it; elsewhere each task has its own.
+//
+// ponytail: an agent working on two things at once in one chat shares the
+// folder, and each run rewrites its instructions file there; per-run
+// instruction files if that ever confuses an agent.
+func (r *run) workspace() string {
+	if r.ws != "" {
+		return r.ws
+	}
+	r.ws = filepath.Join(r.e.Workspaces, r.c.Ticket.ID)
+	_ = r.e.Store.Tx(func(tx *store.Tx) error {
+		th, err := tx.Thread(r.c.Ticket.OriginThreadID)
+		if err == nil && (th.AgentID != "" || th.GroupID != "") {
+			r.ws = filepath.Join(r.e.Workspaces, "chats", th.ID, r.agent.ID)
+		}
+		return err
+	})
+	return r.ws
+}

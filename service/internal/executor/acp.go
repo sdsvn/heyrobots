@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -33,7 +34,7 @@ You run inside Claude Code for the heyrobots server. Every tool these instructio
 // session in the task folder, with the run's tools served over MCP.
 func (r *run) runACP(ctx context.Context, tools []tool.Tool) (report, error) {
 	e := r.e
-	ws := filepath.Join(e.Workspaces, r.c.Ticket.ID)
+	ws := r.workspace()
 	if err := os.MkdirAll(ws, 0o700); err != nil {
 		return report{State: "failed", Summary: "The task's folder couldn't be made."}, err
 	}
@@ -41,6 +42,7 @@ func (r *run) runACP(ctx context.Context, tools []tool.Tool) (report, error) {
 	if r.mayRun() {
 		instructions += "\n" + commandsNote + "\n"
 	}
+	instructions += r.skillsNote()
 	if err := os.WriteFile(filepath.Join(ws, "CLAUDE.md"), []byte(instructions), 0o600); err != nil {
 		return report{State: "failed", Summary: "The task's instructions couldn't be written."}, err
 	}
@@ -57,7 +59,7 @@ func (r *run) runACP(ctx context.Context, tools []tool.Tool) (report, error) {
 		Headers: []sdk.HttpHeader{{Name: "Authorization", Value: "Bearer " + tok}}}}}
 
 	r.taintFromHistory(ctx, r.c.Ticket.ID)
-	loadID, _ := os.ReadFile(filepath.Join(ws, sessionFile))
+	loadID, _ := os.ReadFile(filepath.Join(ws, sessionFile+"-"+r.c.Ticket.ID))
 	client := &acpClient{r: r, ws: ws, ctx: ctx, spans: map[sdk.ToolCallId]trace.Span{}}
 	rctx, cancel := context.WithTimeout(ctx, e.RunLimit)
 	defer cancel()
@@ -70,7 +72,7 @@ func (r *run) runACP(ctx context.Context, tools []tool.Tool) (report, error) {
 		return report{State: "failed", Summary: "Claude Code couldn't start: " + shorten(err.Error(), 200)}, err
 	}
 	defer sess.Close()
-	_ = os.WriteFile(filepath.Join(ws, sessionFile), []byte(sess.ID), 0o600)
+	_ = os.WriteFile(filepath.Join(ws, sessionFile+"-"+r.c.Ticket.ID), []byte(sess.ID), 0o600)
 
 	msg := r.inputMessage()
 	if len(loadID) > 0 && !sess.Loaded {
@@ -143,6 +145,28 @@ func (r *run) copySkills(ws string) error {
 		}
 	}
 	return nil
+}
+
+// skillsNote names the agent's skills and where to read them, so an agent
+// that doesn't look in .claude/skills by itself still knows it has them.
+func (r *run) skillsNote() string {
+	if r.e.Skills == nil {
+		return ""
+	}
+	lib, err := r.e.Skills.List(context.Background())
+	if err != nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, sk := range lib {
+		if slices.Contains(r.agent.SkillList(), sk.Name) {
+			fmt.Fprintf(&b, "- %s: %s Read .claude/skills/%s/SKILL.md before using it.\n", sk.Name, sk.Description, sk.Name)
+		}
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	return "\n# Your skills\n\nYou have these skills. When a request fits one, use it, even if it's outside your usual job:\n" + b.String()
 }
 
 func (r *run) hasToolset(ts core.Toolset) bool {

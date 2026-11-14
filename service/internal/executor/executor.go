@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -245,6 +244,7 @@ type run struct {
 	acks    int
 	calls   int
 	inputs  map[string]bool
+	ws      string
 }
 
 // CancelStopped cancels running Assignments whose Ticket a person stopped.
@@ -344,7 +344,7 @@ func (r *run) work(ctx context.Context) (report, error) {
 	}
 	r.toolsets = granted.Toolsets
 
-	ws := filepath.Join(e.Workspaces, r.c.Ticket.ID)
+	ws := r.workspace()
 	env := toolsets.Env{Workspace: ws, Reader: e.Reader, Web: e.Web, Google: e.Google}
 	gs, err := e.gw.Open(ctx, gateway.Task{
 		TicketID: r.c.Ticket.ID, ThreadID: r.c.Ticket.OriginThreadID, Mandate: granted, Policy: r.pol, Trusted: r.trustedSources(),

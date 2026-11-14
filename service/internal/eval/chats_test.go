@@ -242,3 +242,44 @@ func TestALongAccentedMessageStillStartsWork(t *testing.T) {
 		t.Fatalf("tickets %d, decisions %v", len(v.Tickets), kinds(v))
 	}
 }
+
+// In a direct chat the agent works with the toolsets it has: asking for
+// one it lacks narrows the task instead of refusing it.
+func TestADirectChatNarrowsToolsetsToTheAgent(t *testing.T) {
+	e := newEnv(t)
+	if err := e.store.SaveAgent(store.Agent{ID: "ag_it", Name: "IT", Toolsets: `["setup"]`, Capacity: 3, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	e.router.decide = func(c Candidate) ([]Route, error) {
+		return []Route{{Action: ActionAccept, TriggerIDs: []string{c.Triggers[0].ID}, Scope: "weather", Agent: "ag_it", Toolsets: []core.Toolset{core.ToolsetResearch}}}, nil
+	}
+	th := e.chat("agent:ag_it", "ag_it", "", "will it rain on Saturday?")
+	e.run()
+	// A second message while the first task works goes to the router, which asks for research.
+	e.chat("agent:ag_it", "ag_it", "", "and in Lisbon?")
+	e.run()
+	v := e.view(th)
+	if slices.Contains(kinds(v), store.DecisionRefused) || len(v.Tickets) != 2 {
+		t.Fatalf("decisions %v, tickets %d", kinds(v), len(v.Tickets))
+	}
+}
+
+// "ok" in a group starts nothing and gets no reply.
+func TestAnAcknowledgementInAGroupStartsNothing(t *testing.T) {
+	e := newEnv(t)
+	e.agent("ag_coder", "Coder")
+	e.agent("ag_writer", "Writer")
+	if err := e.store.Tx(func(tx *store.Tx) error {
+		return tx.SaveGroup(store.Group{ID: "gr_1", Name: "Team", Members: `["ag_coder","ag_writer"]`})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	e.router.decide = func(c Candidate) ([]Route, error) {
+		return []Route{{Action: ActionIgnore, TriggerIDs: []string{c.Triggers[0].ID}, Note: "Glad to help!"}}, nil
+	}
+	th := e.chat("group:gr_1", "", "gr_1", "ok thanks")
+	e.run()
+	if v := e.view(th); len(v.Tickets) != 0 || len(v.Effects) != 0 {
+		t.Fatalf("tickets %d, effects %+v", len(v.Tickets), v.Effects)
+	}
+}

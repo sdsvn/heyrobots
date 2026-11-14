@@ -666,7 +666,7 @@ func (s Sender) Send(ctx context.Context, e store.Effect) (string, error) {
 		return "", err
 	}
 	defer cs.Close()
-	res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: c.Tool, Arguments: c.Args})
+	res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: c.Tool, Arguments: declaredArgs(row.Schema, c.Args)})
 	if err != nil {
 		return "", outbox.Uncertain(err)
 	}
@@ -690,6 +690,27 @@ func unique(in []string) []string {
 		if !seen[s] {
 			seen[s] = true
 			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// declaredArgs keeps only the arguments a tool's schema declares, when it
+// lists them and doesn't allow others. A model sometimes adds one of
+// heyrobots' own, such as the reader's question, which a strict server
+// refuses.
+func declaredArgs(schema string, args map[string]any) map[string]any {
+	var sc struct {
+		Properties           map[string]any `json:"properties"`
+		AdditionalProperties any            `json:"additionalProperties"`
+	}
+	if json.Unmarshal([]byte(schema), &sc) != nil || len(sc.Properties) == 0 || sc.AdditionalProperties == true {
+		return args
+	}
+	out := map[string]any{}
+	for k, v := range args {
+		if _, ok := sc.Properties[k]; ok {
+			out[k] = v
 		}
 	}
 	return out
