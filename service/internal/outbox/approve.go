@@ -89,6 +89,11 @@ func Decide(tx *store.Tx, d Decision) (store.Effect, error) {
 	if err := tx.TouchThread(e.ThreadID, now); err != nil {
 		return e, err
 	}
+	if !d.Approve {
+		if err := afterDeclined(tx, e, d.Note); err != nil {
+			return e, err
+		}
+	}
 	if !d.Approve && e.TicketID != "" {
 		tk, err := tx.Ticket(e.TicketID)
 		if err != nil {

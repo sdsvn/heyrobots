@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/json"
+	"heyrobots/service/internal/brain"
 	"heyrobots/service/internal/cluster"
 	"heyrobots/service/internal/policy"
 	"heyrobots/service/internal/registry"
@@ -208,7 +209,6 @@ func run() error {
 		Skills:     skillLib,
 		Jobs:       jobLib,
 		Registry:   mcpRegistry,
-		Memory:     filepath.Join(cfg.DataDir, "memory"),
 		// An agent with its own model runs on it, metered like the rest.
 		AgentModel: func(ctx context.Context, a store.Agent) (model.LLM, error) {
 			return router.Metered(func(ctx context.Context) (model.LLM, error) {
@@ -352,6 +352,13 @@ func run() error {
 		ob.Kick()
 		pusher.Kick()
 	}
+	brainRunner := &brain.Runner{Store: st, Log: log, Now: time.Now, Replies: mail.Replies{Google: gg}, Kick: workers.Kick,
+		OnChanged: func(threadID string) { srv.ThreadUpdated(threadID); pusher.Kick() }}
+	if n, err := brain.ImportNotes(st, filepath.Join(cfg.DataDir, "memory"), time.Now().UTC()); err != nil {
+		log.Warn("import agents' notes", "err", err)
+	} else if n > 0 {
+		log.Info("agents' notes moved into their brains", "facts", n)
+	}
 	ob.OnChanged = func(threadID string) {
 		srv.ThreadUpdated(threadID)
 		pusher.Kick()
@@ -440,6 +447,7 @@ func run() error {
 	go mailSrc.Run(ctx)
 	go calSrc.Run(ctx)
 	go schedSrc.Run(ctx)
+	go brainRunner.Run(ctx)
 	var chosen []any
 	for _, role := range models.Roles {
 		if c, err := resolver.Choice(role); err == nil {

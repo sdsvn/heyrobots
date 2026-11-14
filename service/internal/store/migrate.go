@@ -482,6 +482,79 @@ var migrations = []migration{
 		// up to two background jobs and a message from you at once.
 		return tx.Exec("UPDATE agents SET capacity = 3 WHERE builtin AND capacity < 3").Error
 	}},
+	{19, "each agent's brain: facts, diary and follow-ups", func(tx *gorm.DB) error {
+		type brainFact struct {
+			ID        int64  `gorm:"primaryKey"`
+			AgentID   string `gorm:"index:idx_brain_facts_owner"`
+			Person    string `gorm:"index:idx_brain_facts_owner"`
+			Kind      string
+			Subject   string
+			Text      string
+			Source    string
+			ThreadID  string
+			CreatedAt time.Time
+			UpdatedAt time.Time
+			OldAt     *time.Time
+		}
+		type brainDiary struct {
+			ID        int64  `gorm:"primaryKey"`
+			AgentID   string `gorm:"index:idx_brain_diary_owner"`
+			Person    string `gorm:"index:idx_brain_diary_owner"`
+			TicketID  string `gorm:"index"`
+			ThreadID  string
+			Text      string
+			Outcome   string
+			CreatedAt time.Time
+			OldAt     *time.Time
+		}
+		type brainFollowUp struct {
+			ID        string `gorm:"primaryKey"`
+			AgentID   string `gorm:"index"`
+			Person    string
+			Kind      string
+			Mandate   string
+			Tainted   bool
+			ThreadID  string
+			TicketID  string
+			What      string
+			Why       string
+			Check     string
+			Key       string `gorm:"index"`
+			Ref       string
+			Nudges    int
+			DueAt     time.Time `gorm:"index"`
+			State     string    `gorm:"index"`
+			Outcome   string
+			CreatedAt time.Time
+			UpdatedAt time.Time
+			FiredAt   *time.Time
+		}
+		if err := tx.Table("brain_facts").AutoMigrate(&brainFact{}); err != nil {
+			return err
+		}
+		if err := tx.Table("brain_diaries").AutoMigrate(&brainDiary{}); err != nil {
+			return err
+		}
+		if err := tx.Table("brain_follow_ups").AutoMigrate(&brainFollowUp{}); err != nil {
+			return err
+		}
+		for _, s := range []string{
+			`ALTER TABLE agents ADD COLUMN follow_ups_off numeric NOT NULL DEFAULT false`,
+			`CREATE VIRTUAL TABLE brain_facts_fts USING fts5(subject, text, content='brain_facts', content_rowid='id', tokenize='porter unicode61')`,
+			`CREATE TRIGGER brain_facts_ai AFTER INSERT ON brain_facts BEGIN INSERT INTO brain_facts_fts(rowid, subject, text) VALUES (new.id, new.subject, new.text); END`,
+			`CREATE TRIGGER brain_facts_ad AFTER DELETE ON brain_facts BEGIN INSERT INTO brain_facts_fts(brain_facts_fts, rowid, subject, text) VALUES ('delete', old.id, old.subject, old.text); END`,
+			`CREATE TRIGGER brain_facts_au AFTER UPDATE ON brain_facts BEGIN INSERT INTO brain_facts_fts(brain_facts_fts, rowid, subject, text) VALUES ('delete', old.id, old.subject, old.text); INSERT INTO brain_facts_fts(rowid, subject, text) VALUES (new.id, new.subject, new.text); END`,
+			`CREATE VIRTUAL TABLE brain_diary_fts USING fts5(text, content='brain_diaries', content_rowid='id', tokenize='porter unicode61')`,
+			`CREATE TRIGGER brain_diary_ai AFTER INSERT ON brain_diaries BEGIN INSERT INTO brain_diary_fts(rowid, text) VALUES (new.id, new.text); END`,
+			`CREATE TRIGGER brain_diary_ad AFTER DELETE ON brain_diaries BEGIN INSERT INTO brain_diary_fts(brain_diary_fts, rowid, text) VALUES ('delete', old.id, old.text); END`,
+			`CREATE TRIGGER brain_diary_au AFTER UPDATE ON brain_diaries BEGIN INSERT INTO brain_diary_fts(brain_diary_fts, rowid, text) VALUES ('delete', old.id, old.text); INSERT INTO brain_diary_fts(rowid, text) VALUES (new.id, new.text); END`,
+		} {
+			if err := tx.Exec(s).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}},
 }
 
 type schemaMigration struct {

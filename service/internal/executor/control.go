@@ -172,8 +172,8 @@ func (r *run) finish(rep report) error {
 		}
 		if cur.StoppedBy != "" {
 			// A person stopped the task while it ran: keep it stopped and
-			// send nothing more.
-			return nil
+			// send nothing more, but remember that it was stopped.
+			return r.stoppedBrain(tx, now)
 		}
 		open, stage := true, core.StageWaiting
 		var text string
@@ -207,6 +207,24 @@ func (r *run) finish(rep report) error {
 		}
 		if err := tx.SetTicketState(r.c.Ticket.ID, open, stage, "", now); err != nil {
 			return err
+		}
+		footer, err := r.endBrain(tx, rep, now)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(text) != "" {
+			text += footer
+		}
+		if r.mandate.Received.Source == core.SourceFollowUp && stage != core.StageQuestion && stage != core.StageBlocked {
+			// A follow-up that needed nothing from the person closes
+			// quietly: what it found goes to the digest, not the chat.
+			if n, err := tx.TicketAwaiting(r.c.Ticket.ID); err != nil || n == 0 {
+				if strings.TrimSpace(text) == "" || err != nil {
+					return err
+				}
+				return tx.CreateEffect(store.Effect{TicketID: r.c.Ticket.ID, ThreadID: r.c.Ticket.OriginThreadID, Source: string(core.SourceApp),
+					Kind: "digest", Reach: string(core.ReachOwner), Body: r.agent.Name + ": " + text, Status: store.EffectHeld, CreatedAt: now})
+			}
 		}
 		if stage == core.StageQuestion && len(rep.Choices) > 0 {
 			if err := tx.SetTicketChoices(r.c.Ticket.ID, rep.Choices); err != nil {

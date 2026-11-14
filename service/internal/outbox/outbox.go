@@ -339,10 +339,14 @@ func (o *Outbox) send(ctx context.Context, c claim) {
 	now := o.Now().UTC()
 	terr := o.Store.Tx(func(tx *store.Tx) error {
 		if err == nil {
-			_, err := tx.UpdateEffect(e.ID, store.EffectSending, map[string]any{
+			ok, err := tx.UpdateEffect(e.ID, store.EffectSending, map[string]any{
 				"status": store.EffectSent, "sent_at": now, "ref": ref, "lease_until": nil, "last_error": "",
 			})
-			return err
+			if err != nil || !ok {
+				return err
+			}
+			e.Ref = ref
+			return afterSent(tx, e, now)
 		}
 		if ctx.Err() != nil {
 			// The server is stopping; the lease runs out and Recover decides.
@@ -487,7 +491,11 @@ func (o *Outbox) Digest() (*store.Digest, error) {
 			return nil
 		}
 		held, err := tx.HeldForDigest()
-		if err != nil || len(held) == 0 {
+		if err != nil {
+			return err
+		}
+		waiting, err := waitingOn(tx, l.Location())
+		if err != nil || (len(held) == 0 && waiting == "") {
 			return err
 		}
 		var b strings.Builder
@@ -510,6 +518,7 @@ func (o *Outbox) Digest() (*store.Digest, error) {
 			idsOut = append(idsOut, e.ID)
 			threads = append(threads, e.ThreadID)
 		}
+		b.WriteString(waiting)
 		d := store.Digest{ID: ids.New("dg"), Body: strings.TrimSpace(b.String()), Count: len(held), CreatedAt: now}
 		if err := tx.CreateDigest(d, idsOut); err != nil {
 			return err

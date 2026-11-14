@@ -269,8 +269,9 @@ func (s *Server) GetThread(w http.ResponseWriter, r *http.Request, threadID stri
 		}
 	}
 	for _, t := range v.Triggers {
-		if t.Source == string(core.SourceAgent) {
-			// A member's request to another shows as that member's reply.
+		if t.Source == string(core.SourceAgent) || t.Source == string(core.SourceFollowUp) {
+			// A member's request to another shows as that member's reply,
+			// and a follow-up coming due speaks only through its result.
 			continue
 		}
 		from, text := t.ActorSource+":"+t.ActorID, t.Text
@@ -285,7 +286,12 @@ func (s *Server) GetThread(w http.ResponseWriter, r *http.Request, threadID stri
 		}
 		out.Items = append(out.Items, item)
 	}
+	chat := v.Thread.AgentID != "" || v.Thread.GroupID != ""
 	for _, e := range v.Effects {
+		if chat && e.Kind == "digest" {
+			// What a quiet follow-up found goes to the digest, not the chat.
+			continue
+		}
 		id, text, status := apiEffectID(e.ID), e.Body, e.Status
 		item := gen.ThreadItem{Kind: gen.Reply, Id: id, At: e.CreatedAt, Text: &text, Status: &status, Agent: onTicket[e.TicketID]}
 		if a, ok := team[e.AgentID]; ok && e.Origin != "" {

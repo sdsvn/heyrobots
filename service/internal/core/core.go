@@ -25,12 +25,15 @@ const (
 	// SourceAgent is a group member asking another member for a piece of
 	// work, with the authority of the task it came from.
 	SourceAgent SourceKind = "agent"
+	// SourceFollowUp is a follow-up an agent set coming due, with the
+	// authority of the task that set it.
+	SourceFollowUp SourceKind = "followup"
 )
 
 // ReplySource is where an answer to a message from src goes: a member's
 // request lives in the app's chat, so its answer does too.
 func ReplySource(src SourceKind) SourceKind {
-	if src == SourceAgent {
+	if src == SourceAgent || src == SourceFollowUp {
 		return SourceApp
 	}
 	return src
@@ -188,6 +191,27 @@ type Mandate struct {
 	// schedule or trigger started. Empty for free-form work.
 	Job        string `json:",omitempty"`
 	AcceptedAt time.Time
+}
+
+// Person names whose brain the work reads and writes: "owner", or
+// "delegate-<name>" for a delegate's work, so what an agent learns for one
+// person never reaches another's tasks.
+func (m Mandate) Person() string {
+	if m.Role != RoleDelegate {
+		return "owner"
+	}
+	var b strings.Builder
+	dash := false
+	for _, r := range strings.ToLower(m.Delegate) {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			b.WriteRune(r)
+			dash = false
+		} else if !dash && b.Len() > 0 {
+			b.WriteByte('-')
+			dash = true
+		}
+	}
+	return "delegate-" + strings.TrimRight(b.String(), "-")
 }
 
 // GeneralAgent is the id of the built-in agent that can do anything a task

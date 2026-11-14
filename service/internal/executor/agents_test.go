@@ -2,8 +2,6 @@ package executor
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -53,11 +51,10 @@ func TestATaskRunsAsItsAgent(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.exec.Skills = lib
-	e.exec.Memory = filepath.Join(t.TempDir(), "memory")
 	e.eval.Router = agentRouter{agent: "ag_research", toolsets: []core.Toolset{core.ToolsetResearch}}
 
 	e.model.steps = [][]*genai.Part{
-		call("remember", map[string]any{"note": "Prefers aisle seats"}),
+		call("remember", map[string]any{"note": "Prefers aisle seats", "told": true}),
 		reportCall("ready", "Found it.", "Lisbon has trains.", ""),
 	}
 	res := e.say(owner, "c1", "how do I get around Lisbon?")
@@ -107,8 +104,10 @@ func TestATaskRunsAsItsAgent(t *testing.T) {
 	if strings.Contains(e.model.users[len(e.model.users)-1], "Prefers aisle seats") {
 		t.Fatal("the owner's memory reached a delegate's task")
 	}
-	if _, err := os.Stat(filepath.Join(e.exec.Memory, "ag_research", "owner.md")); err != nil {
-		t.Fatal(err)
+	var facts []store.BrainFact
+	_ = e.store.Tx(func(tx *store.Tx) error { facts, _ = tx.Facts("ag_research", "owner", false, 10); return nil })
+	if len(facts) != 1 || facts[0].Source != store.FromPerson {
+		t.Fatalf("facts = %+v", facts)
 	}
 }
 

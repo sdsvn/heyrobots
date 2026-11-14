@@ -90,8 +90,6 @@ type Engine struct {
 	MCP *gateway.MCP
 	// Skills is the owner's skills library.
 	Skills *skills.Library
-	// Memory is the folder of each agent's memory, kept per person.
-	Memory string
 	// AgentModel gives an agent with its own model that model.
 	AgentModel func(ctx context.Context, a store.Agent) (model.LLM, error)
 	// Jobs is the owner's standing jobs.
@@ -245,6 +243,9 @@ type run struct {
 	calls   int
 	inputs  map[string]bool
 	ws      string
+	// setFollowUps are the follow-ups this run set, for the line that
+	// tells the person.
+	setFollowUps []store.BrainFollowUp
 }
 
 // CancelStopped cancels running Assignments whose Ticket a person stopped.
@@ -335,6 +336,7 @@ func (r *run) work(ctx context.Context) (report, error) {
 		return report{State: "failed", Summary: "The agent that had this task was removed."}, err
 	}
 	trace.SpanFromContext(ctx).SetAttributes(telemetry.GenAIAgentName.String(r.agent.Name), telemetry.AgentID.String(r.agent.ID))
+	r.startFollowUps()
 	granted := m
 	granted.Toolsets = nil
 	for _, ts := range m.Toolsets {
@@ -394,13 +396,11 @@ func (r *run) work(ctx context.Context) (report, error) {
 		}
 		tools = append(tools, setup...)
 	}
-	if e.Memory != "" {
-		mem, err := r.memoryTool()
-		if err != nil {
-			return report{State: "failed", Summary: "The worker couldn't start."}, err
-		}
-		tools = append(tools, mem)
+	mem, err := r.brainTools()
+	if err != nil {
+		return report{State: "failed", Summary: "The worker couldn't start."}, err
 	}
+	tools = append(tools, mem...)
 	if e.Extra != nil {
 		tools = append(tools, e.Extra(r.c.Ticket)...)
 	}
@@ -432,7 +432,7 @@ func (r *run) work(ctx context.Context) (report, error) {
 		Name:                     "worker",
 		Description:              "Does one task for the owner.",
 		Model:                    llm,
-		Instruction:              e.Prompt + "\n\n" + r.agentSection() + "\n\n" + r.taskSection(),
+		Instruction:              e.Prompt + "\n\n" + memoryNote + "\n\n" + r.agentSection() + "\n\n" + r.taskSection(),
 		Tools:                    tools,
 		Toolsets:                 sets,
 		DisallowTransferToParent: true,
@@ -585,6 +585,9 @@ func (r *run) inputMessage() string {
 	}
 	var msgs []msg
 	for _, t := range r.c.Inputs {
+		if t.Source == string(core.SourceFollowUp) {
+			continue
+		}
 		id := core.Identity{Source: core.SourceKind(t.ActorSource), ID: t.ActorID}
 		role, _ := r.pol.RoleOf(id)
 		trust := "untrusted"
@@ -594,7 +597,7 @@ func (r *run) inputMessage() string {
 		msgs = append(msgs, msg{ID: t.ID, From: id.String(), Role: string(role), At: t.At, Text: t.Text, IsBot: t.IsBot, Trust: trust})
 	}
 	var b strings.Builder
-	b.WriteString(r.memorySection())
+	b.WriteString(r.brainSection())
 	b.WriteString(r.chatSection())
 	if r.gw != nil {
 		for _, m := range r.gw.Missing() {
@@ -604,7 +607,11 @@ func (r *run) inputMessage() string {
 	if r.c.Assignment.Recovered {
 		b.WriteString("Note from the host: your previous turn on this task was interrupted, for example because the server restarted. Check what you already did (your notes and files) before repeating anything.\n\n")
 	}
+	b.WriteString(r.followUpNote())
 	if len(msgs) == 0 {
+		if strings.Contains(b.String(), "<follow-up>") {
+			return b.String()
+		}
 		b.WriteString("There are no new messages. Continue the task.")
 		return b.String()
 	}

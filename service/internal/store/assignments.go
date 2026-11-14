@@ -52,7 +52,7 @@ type Claimed struct {
 // backgroundSQL is true for a Ticket nobody asked for just now: a standing
 // job, a schedule, or proactive work under a rule.
 const backgroundSQL = "(COALESCE(json_extract(tickets.mandate, '$.Job'), '') <> '' OR " +
-	"json_extract(tickets.mandate, '$.Strength') = 'inferred' OR json_extract(tickets.mandate, '$.Received.Source') = 'schedule')"
+	"json_extract(tickets.mandate, '$.Strength') = 'inferred' OR json_extract(tickets.mandate, '$.Received.Source') IN ('schedule', 'followup'))"
 
 // ClaimAssignment picks one open Ticket that has new input, or whose last
 // Assignment was interrupted, and no running Assignment, and starts an

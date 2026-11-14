@@ -38,9 +38,12 @@ type Agent struct {
 	Enabled  bool
 	// Home is the machine that runs a teammate from another machine; empty
 	// for this machine's own agents. Such a row is only a card.
-	Home      string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	Home string
+	// FollowUpsOff holds the agent's due follow-ups until it is turned
+	// back on.
+	FollowUpsOff bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // ToolsetList returns the agent's toolsets.

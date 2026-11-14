@@ -167,6 +167,10 @@ func (f *Fake) gmail(w http.ResponseWriter, r *http.Request, p string) {
 		f.Sent = append(f.Sent, raw)
 		f.SentIn = append(f.SentIn, b.ThreadID)
 		id := fmt.Sprintf("sent-%d", len(f.Sent))
+		if b.ThreadID == "" {
+			// A new conversation, as Gmail starts one.
+			b.ThreadID = "t-" + id
+		}
 		f.history++
 		f.messages = append(f.messages, &Message{ID: id, ThreadID: b.ThreadID, Labels: []string{"SENT"}, Raw: raw, At: time.Now().UTC(), History: f.history})
 		enc.Encode(map[string]any{"id": id})

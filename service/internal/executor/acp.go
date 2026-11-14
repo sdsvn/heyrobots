@@ -28,7 +28,7 @@ const sessionFile = ".heyrobots-acp-session"
 // acpNote tells Claude Code how heyrobots' instructions apply inside it.
 const acpNote = `# How this works in Claude Code
 
-You run inside Claude Code for the heyrobots server. Every tool these instructions name (report, ack, hand_back, remember, make_job and the task's own tools) is a tool of the "heyrobots" MCP server; call them there. The user turn comes from the server, not from a person typing; the people are inside the messages it carries. Read, search and edit files only in this folder. Don't fetch the web yourself and don't change your permission mode: those calls are refused; the task's research tools go through the server's quarantine instead.`
+You run inside Claude Code for the heyrobots server. Every tool these instructions name (report, ack, hand_back, remember, recall, forget, follow_up, close_follow_up, make_job and the task's own tools) is a tool of the "heyrobots" MCP server; call them there. The user turn comes from the server, not from a person typing; the people are inside the messages it carries. Read, search and edit files only in this folder. Don't fetch the web yourself and don't change your permission mode: those calls are refused; the task's research tools go through the server's quarantine instead.`
 
 // runACP runs the Assignment in the owner's own Claude Code: one ACP
 // session in the task folder, with the run's tools served over MCP.
@@ -38,7 +38,7 @@ func (r *run) runACP(ctx context.Context, tools []tool.Tool) (report, error) {
 	if err := os.MkdirAll(ws, 0o700); err != nil {
 		return report{State: "failed", Summary: "The task's folder couldn't be made."}, err
 	}
-	instructions := e.Prompt + "\n\n" + r.agentSection() + "\n\n" + r.taskSection() + "\n\n" + acpNote + "\n"
+	instructions := e.Prompt + "\n\n" + memoryNote + "\n\n" + r.agentSection() + "\n\n" + r.taskSection() + "\n\n" + acpNote + "\n"
 	if r.mayRun() {
 		instructions += "\n" + commandsNote + "\n"
 	}
