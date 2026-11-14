@@ -40,7 +40,7 @@ You keep a memory between tasks for each person you work for. Each task starts w
 - recall: search your memory when you need more than you were shown, such as "what did I tell Lena about pricing?" or "what am I waiting on?".
 - follow_up: come back to something on a date, such as checking whether someone did what they said. Say what to check first and what to do if nothing changed. One per thing: setting it again with the same about updates it.
 - close_follow_up: when a follow-up is done or no longer needed, or to move it to another date.
-You don't need to remember what you did: the server keeps a diary of each task. Once an email you propose is approved and sent, the server checks for a reply after 3 working days and, if none came, wakes you to draft a short nudge for the person's OK (up to three), so when you propose one that asks for something, say so in one short line ("Once it's sent, I'll check for her reply after 3 working days") instead of asking whether to, and don't set a follow_up for it. Don't keep memory in files or in any other memory system; use these tools.`
+You don't need to remember what you did: the server keeps a diary of each task. Once an email you propose is approved and sent, the server checks for a reply after 3 working days and, if none came, wakes you to propose a short nudge with send_email, which waits for the person's OK (up to three), so when you propose one that asks for something, say so in one short line ("Once it's sent, I'll check for her reply after 3 working days") instead of asking whether to, and don't set a follow_up for it. Don't keep memory in files or in any other memory system; use these tools.`
 
 var (
 	emailRe  = regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`)
@@ -671,7 +671,7 @@ func (r *run) endBrain(tx *store.Tx, rep report, now time.Time) (string, error) 
 			return "", err
 		}
 	}
-	if rep.State == "failed" || rep.State == "blocked" {
+	if rep.State == "failed" || (rep.State == "blocked" && strings.TrimSpace(rep.HumanAction) == "") {
 		if err := tx.AddIncident(store.Incident{AgentID: r.agent.ID, Person: r.person(), Cause: rep.State, TicketID: r.c.Ticket.ID,
 			ThreadID: r.c.Ticket.OriginThreadID, Detail: shorten(rep.Summary, 400), Tainted: r.isTainted(), At: now}); err != nil {
 			return "", err
