@@ -24,11 +24,14 @@ import (
 	"heyrobots/service/internal/models"
 	"heyrobots/service/internal/skills"
 	"heyrobots/service/internal/store"
+	"heyrobots/service/internal/update"
 	"heyrobots/service/internal/vault"
 )
 
 // Options configures the Server.
 type Options struct {
+	// Update checks for and installs new releases; nil when off.
+	Update  *update.Updater
 	Store   *store.Store
 	Devices *devices.Service
 	Vault   *vault.Vault

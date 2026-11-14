@@ -115,6 +115,7 @@ type Engine struct {
 	gw      *gateway.Gateway
 	kick    chan struct{}
 	running atomic.Int32
+	held    atomic.Bool
 
 	mu     sync.Mutex
 	active map[string]context.CancelCauseFunc
@@ -160,7 +161,8 @@ func (e *Engine) Run(ctx context.Context) {
 	defer wg.Wait()
 	for ctx.Err() == nil {
 		n := int(e.running.Load())
-		c, err := e.claim(n < General, n < General+Reserved)
+		hold := e.held.Load()
+		c, err := e.claim(!hold && n < General, !hold && n < General+Reserved)
 		switch {
 		case err == nil:
 			e.running.Add(1)
@@ -182,6 +184,16 @@ func (e *Engine) Run(ctx context.Context) {
 		}
 	}
 }
+
+// Hold stops or restarts taking new work, as before an update; running
+// tasks go on.
+func (e *Engine) Hold(on bool) {
+	e.held.Store(on)
+	e.Kick()
+}
+
+// Running is how many tasks are running now.
+func (e *Engine) Running() int { return int(e.running.Load()) }
 
 // RunOnce claims and runs one Assignment synchronously. It reports whether
 // it found one.

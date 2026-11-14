@@ -188,4 +188,22 @@ void main() {
     expect(bodies('PUT', '/api/v1/policy').single['mode'], 'auto');
     expect(server.policyMode, 'auto');
   });
+
+  testWidgets('settings says a new version is out, and one tap updates the computer', (tester) async {
+    await show(tester, SettingsScreen(state: state));
+    await tester.ensureVisible(find.byKey(const Key('row:update')));
+    await tester.pumpAndSettle();
+    expect(find.text('0.6.0 is out'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('row:update')));
+    await settle(tester);
+    expect(find.text('Agents keep a brain.'), findsOneWidget);
+    expect(find.textContaining('1 task is running'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('update:start')));
+    // The progress bar runs until the update ends, so nothing settles.
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    await tester.pump();
+    expect(server.requests.where((r) => r.method == 'POST' && r.url.path == '/api/v1/update'), hasLength(1));
+    expect(find.byKey(const Key('update:progress')), findsOneWidget);
+    expect(find.byKey(const Key('update:start')), findsNothing);
+  });
 }

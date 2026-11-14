@@ -428,6 +428,34 @@ paths:
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
+  /api/v1/update:
+    get:
+      operationId: getUpdate
+      description: This server's version, the latest release, and how an update from the app is going. Asks GitHub only when check is set or the last answer is a day old.
+      parameters:
+        - name: check
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: The update status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UpdateStatus" }
+        "401": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: startUpdate
+      description: Installs the latest release - the server and, on a Mac, the app beside it - once running tasks are done, then restarts the server. Returns at once; follow it with getUpdate. Owner devices only.
+      responses:
+        "202":
+          description: The update started.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UpdateStatus" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
   /api/v1/agents/{agentId}/brain:
     parameters:
       - name: agentId
@@ -979,6 +1007,22 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
   schemas:
+    UpdateStatus:
+      type: object
+      required: [version, newer, can_update, state]
+      properties:
+        version: { type: string, description: 'This server''s version, or "dev" for a build from source.' }
+        latest: { type: string, description: The latest release, when known. }
+        newer: { type: boolean }
+        notes: { type: string, description: The latest release's notes, in Markdown. }
+        url: { type: string, description: The latest release's page. }
+        apk_url: { type: string, description: The latest Android app download. }
+        can_update: { type: boolean, description: Whether this server can install the latest release itself. }
+        why: { type: string, description: Why this server can't update itself, when it can't. }
+        state: { type: string, description: "idle, downloading, waiting (for running tasks), restarting or failed." }
+        error: { type: string, description: What went wrong, when state is failed. }
+        working: { type: integer, description: How many tasks are running now. }
+        checked_at: { type: string, format: date-time }
     Error:
       type: object
       required: [error]

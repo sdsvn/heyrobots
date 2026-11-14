@@ -63,6 +63,7 @@ import 'models/skill_list.dart' as models show SkillList;
 import 'models/skill_request.dart' as models show SkillRequest;
 import 'models/thread_detail.dart' as models show ThreadDetail;
 import 'models/thread_list.dart' as models show ThreadList;
+import 'models/update_status.dart' as models show UpdateStatus;
 import 'models/usage_view.dart' as models show UsageView;
 
 class ApiClient {
@@ -1447,6 +1448,105 @@ class ApiClient {
       throw http.ClientException('HTTP $_status', _url);
     }
     await response.stream.drain<void>();
+  }
+
+  /// This server's version, the latest release, and how an update from the app is going. Asks GitHub only when check is set or the last answer is a day old.
+  Future<models.UpdateStatus> getUpdate({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://127.0.0.1:7340"},
+      ],
+      "openapi.security": [
+        {"deviceToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "deviceToken": {"type": "http", "scheme": "bearer"},
+      },
+    },
+    Future<void>? abortTrigger,
+    HttpRequestOptions? options,
+    bool? check,
+  }) async {
+    final _base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    var _url = Uri.parse(_base + ("/api/v1/update"));
+    final _query = _httpQuery(<String, Object?>{
+      if (check != null) "check": check,
+    });
+    if (_query.isNotEmpty) {
+      _url = _url.replace(
+        query: [_url.query, _query].where((s) => s.isNotEmpty).join('&'),
+      );
+    }
+    final request = http.AbortableRequest(
+      "GET",
+      _url,
+      abortTrigger: abortTrigger,
+    );
+    request.headers.addAll(
+      <String, Object?>{
+        ...?options?.headers,
+        'Accept': "application/json",
+      }.map((key, value) => MapEntry(key, value.toString())),
+    );
+    if (options?.followRedirects case final value?)
+      request.followRedirects = value;
+    if (options?.maxRedirects case final value?) request.maxRedirects = value;
+    prepareRequest?.call(request, extra);
+    final response = await _transport.send(request);
+    final _status = response.statusCode;
+    if (!(_status == 200)) {
+      await response.stream.listen(null).cancel();
+      throw http.ClientException('HTTP $_status', _url);
+    }
+    return await convert.utf8.decoder.bind(response.stream).join().then((text) {
+      final Object? value = convert.jsonDecode(text);
+      return models.UpdateStatus.fromJson(value as Map<String, Object?>);
+    });
+  }
+
+  /// Installs the latest release - the server and, on a Mac, the app beside it - once running tasks are done, then restarts the server. Returns at once; follow it with getUpdate. Owner devices only.
+  Future<models.UpdateStatus> startUpdate({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://127.0.0.1:7340"},
+      ],
+      "openapi.security": [
+        {"deviceToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "deviceToken": {"type": "http", "scheme": "bearer"},
+      },
+    },
+    Future<void>? abortTrigger,
+    HttpRequestOptions? options,
+  }) async {
+    final _base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    var _url = Uri.parse(_base + ("/api/v1/update"));
+    final request = http.AbortableRequest(
+      "POST",
+      _url,
+      abortTrigger: abortTrigger,
+    );
+    request.headers.addAll(
+      <String, Object?>{
+        ...?options?.headers,
+        'Accept': "application/json",
+      }.map((key, value) => MapEntry(key, value.toString())),
+    );
+    if (options?.followRedirects case final value?)
+      request.followRedirects = value;
+    if (options?.maxRedirects case final value?) request.maxRedirects = value;
+    prepareRequest?.call(request, extra);
+    final response = await _transport.send(request);
+    final _status = response.statusCode;
+    if (!(_status == 202)) {
+      await response.stream.listen(null).cancel();
+      throw http.ClientException('HTTP $_status', _url);
+    }
+    return await convert.utf8.decoder.bind(response.stream).join().then((text) {
+      final Object? value = convert.jsonDecode(text);
+      return models.UpdateStatus.fromJson(value as Map<String, Object?>);
+    });
   }
 
   /// What an agent keeps between tasks, for each person it works for - what it is waiting on, what it knows, its diary, and what went wrong lately. Owner devices only.

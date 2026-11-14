@@ -71,7 +71,7 @@ jobs:
         run: |
           name=heyrobotsd-${GITHUB_REF_NAME//\//-}-${GOOS}-${GOARCH}
           mkdir -p ../dist/$name
-          go build -trimpath -ldflags "-s -w" -o ../dist/$name/heyrobotsd ./cmd/heyrobotsd
+          go build -trimpath -ldflags "-s -w -X main.version=${VERSION#v}" -o ../dist/$name/heyrobotsd ./cmd/heyrobotsd
           cp ../README.md ../dist/$name/
           tar -C ../dist -czf ../dist/$name.tar.gz $name
       - uses: actions/upload-artifact@v4

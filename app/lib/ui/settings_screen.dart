@@ -11,12 +11,10 @@ import 'machines_screen.dart';
 import 'setup_screen.dart';
 import 'skills_screen.dart';
 import 'theme.dart';
+import 'update_screen.dart';
 
 /// Settings: how much the assistant does on its own, and six rows. Anything
 /// else (digest time, quiet hours, budgets) is asked for in a chat.
-/// The release this app was built from, set by the release build.
-const appVersion = String.fromEnvironment('HEYROBOTS_VERSION', defaultValue: 'dev');
-
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.state});
 
@@ -36,6 +34,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     if (widget.state.isOwner) _load();
+    _loadUpdate();
+  }
+
+  void _loadUpdate() {
+    widget.state.api.getUpdate().then((u) {
+      if (mounted) setState(() => _lines['update'] = updateLine(u));
+    }, onError: (_) {});
   }
 
   void _load() {
@@ -83,6 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _open(Widget screen) async {
     await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
     if (mounted && widget.state.isOwner) _load();
+    if (mounted) _loadUpdate();
   }
 
   @override
@@ -148,6 +154,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onTap: () => _open(PairingCodeScreen(state: s, request: const PairingCodeRequest(role: Role.owner))),
                         ),
                       ],
+                      _Row(key: const Key('row:update'), glyph: Glyph.bolt, tint: 'sky', title: 'Updates', line: _lines['update'], onTap: () => _open(UpdateScreen(state: s))),
                     ],
                   ),
                   const SizedBox(height: 14),

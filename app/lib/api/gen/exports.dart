@@ -108,5 +108,6 @@ export 'default_client/models/thread_list.dart';
 export 'default_client/models/thread_summary.dart';
 export 'default_client/models/ticket_spend.dart';
 export 'default_client/models/ticket_view.dart';
+export 'default_client/models/update_status.dart';
 export 'default_client/models/usage_view.dart';
 export 'http_request_options.dart';

@@ -12,6 +12,9 @@ class FakeServer {
   String pairingCode = 'ABCDE-FGHJK';
   String role = 'owner';
 
+  /// The update status: 0.5.0 runs, 0.6.0 is out.
+  Map<String, Object?> update = {'version': '0.5.0', 'latest': '0.6.0', 'newer': true, 'notes': 'Agents keep a brain.', 'can_update': true, 'state': 'idle', 'working': 1};
+
   /// The model chats use, as the chat model picker sees it.
   String chatModel = 'deepseek-chat';
 
@@ -248,6 +251,13 @@ class FakeServer {
     }
     if (path == '/api/v1/usage' && r.method == 'GET') {
       return _json(200, {'spent_usd': 4.2, 'budget_usd': 30, 'since': '2026-11-01T00:00:00Z', 'tickets': <Object?>[]});
+    }
+    if (path == '/api/v1/update' && r.method == 'GET') {
+      return _json(200, update);
+    }
+    if (path == '/api/v1/update' && r.method == 'POST') {
+      update = {...update, 'state': 'downloading'};
+      return _json(202, update);
     }
     if (path == '/api/v1/brains' && r.method == 'GET') {
       return _json(200, {...brains, 'chosen': brainsChosen});

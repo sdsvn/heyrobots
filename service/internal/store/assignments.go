@@ -54,6 +54,14 @@ type Claimed struct {
 const backgroundSQL = "(COALESCE(json_extract(tickets.mandate, '$.Job'), '') <> '' OR " +
 	"json_extract(tickets.mandate, '$.Strength') = 'inferred' OR json_extract(tickets.mandate, '$.Received.Source') IN ('schedule', 'followup'))"
 
+// InterruptRunning ends every running Assignment as interrupted, so after
+// a planned restart they are picked up again at once rather than when
+// their lease runs out. Only for when no Assignment is still running.
+func (tx *Tx) InterruptRunning(now time.Time) error {
+	return tx.db.Model(&Assignment{}).Where("status = ?", AssignmentRunning).
+		Updates(map[string]any{"status": AssignmentEnded, "state": StateInterrupted, "ended_at": now}).Error
+}
+
 // ClaimAssignment picks one open Ticket that has new input, or whose last
 // Assignment was interrupted, and no running Assignment, and starts an
 // Assignment for it. A Ticket that never had an Assignment is new work;

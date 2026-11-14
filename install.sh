@@ -127,7 +127,7 @@ say "  Server:  ${dest}/heyrobotsd"
 envs=("PATH=${PATH}")
 while IFS='=' read -r k v; do
   case "${k}" in
-    HEYROBOTS_VERSION | HEYROBOTS_INSTALL_DIR | HEYROBOTS_NO_SERVICE | HEYROBOTS_NO_APP | HEYROBOTS_APP_DIR | HEYROBOTS_REPO | HEYROBOTS_BASE_URL) ;;
+    HEYROBOTS_VERSION | HEYROBOTS_INSTALL_DIR | HEYROBOTS_NO_SERVICE | HEYROBOTS_NO_APP | HEYROBOTS_REPO | HEYROBOTS_BASE_URL) ;;
     HEYROBOTS_*) envs+=("${k}=${v}") ;;
   esac
 done < <(env)

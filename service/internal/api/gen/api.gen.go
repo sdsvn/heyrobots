@@ -1616,6 +1616,41 @@ type TicketView struct {
 	Stopped  bool      `json:"stopped"`
 }
 
+// UpdateStatus defines model for UpdateStatus.
+type UpdateStatus struct {
+	// ApkUrl The latest Android app download.
+	ApkUrl *string `json:"apk_url,omitempty"`
+
+	// CanUpdate Whether this server can install the latest release itself.
+	CanUpdate bool       `json:"can_update"`
+	CheckedAt *time.Time `json:"checked_at,omitempty"`
+
+	// Error What went wrong
+	Error *string `json:"error,omitempty"`
+
+	// Latest The latest release
+	Latest *string `json:"latest,omitempty"`
+	Newer  bool    `json:"newer"`
+
+	// Notes The latest release's notes
+	Notes *string `json:"notes,omitempty"`
+
+	// State idle, downloading, waiting (for running tasks), restarting or failed.
+	State string `json:"state"`
+
+	// Url The latest release's page.
+	Url *string `json:"url,omitempty"`
+
+	// Version This server's version, or "dev" for a build from source.
+	Version string `json:"version"`
+
+	// Why Why this server can't update itself
+	Why *string `json:"why,omitempty"`
+
+	// Working How many tasks are running now.
+	Working *int `json:"working,omitempty"`
+}
+
 // UsageView defines model for UsageView.
 type UsageView struct {
 	BudgetUsd float64       `json:"budget_usd"`
@@ -1642,6 +1677,11 @@ type GetChatModelParams struct {
 // SearchSkillsParams defines parameters for SearchSkills.
 type SearchSkillsParams struct {
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
+}
+
+// GetUpdateParams defines parameters for GetUpdate.
+type GetUpdateParams struct {
+	Check *bool `form:"check,omitempty" json:"check,omitempty"`
 }
 
 // SetGoogleClientJSONRequestBody defines body for SetGoogleClient for application/json ContentType.
@@ -1886,6 +1926,12 @@ type ServerInterface interface {
 
 	// (POST /api/v1/threads/{threadId}/read)
 	MarkThreadRead(w http.ResponseWriter, r *http.Request, threadId string)
+
+	// (GET /api/v1/update)
+	GetUpdate(w http.ResponseWriter, r *http.Request, params GetUpdateParams)
+
+	// (POST /api/v1/update)
+	StartUpdate(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/v1/usage)
 	GetUsage(w http.ResponseWriter, r *http.Request)
@@ -3148,6 +3194,53 @@ func (siw *ServerInterfaceWrapper) MarkThreadRead(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// GetUpdate operation middleware
+func (siw *ServerInterfaceWrapper) GetUpdate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetUpdateParams
+
+	// ------------- Optional query parameter "check" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "check", r.URL.Query(), &params.Check, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "check"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "check", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUpdate(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartUpdate operation middleware
+func (siw *ServerInterfaceWrapper) StartUpdate(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartUpdate(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetUsage operation middleware
 func (siw *ServerInterfaceWrapper) GetUsage(w http.ResponseWriter, r *http.Request) {
 
@@ -3309,6 +3402,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agents", wrapper.CreateAgent)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/agents/{agentId}", wrapper.DeleteAgent)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/agents/{agentId}", wrapper.UpdateAgent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/update", wrapper.GetUpdate)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/update", wrapper.StartUpdate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agents/{agentId}/brain", wrapper.GetAgentBrain)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/agents/{agentId}/brain/facts/{factId}", wrapper.DeleteAgentFact)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agents/{agentId}/brain/facts/{factId}/restore", wrapper.RestoreAgentFact)

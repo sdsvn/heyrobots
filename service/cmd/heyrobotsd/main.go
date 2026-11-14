@@ -8,6 +8,7 @@ import (
 	"heyrobots/service/internal/policy"
 	"heyrobots/service/internal/registry"
 	"slices"
+	"strings"
 
 	"github.com/glebarez/sqlite"
 	"google.golang.org/adk/v2/model"
@@ -52,6 +53,7 @@ import (
 	"heyrobots/service/internal/store"
 	"heyrobots/service/internal/telemetry"
 	"heyrobots/service/internal/toolsets"
+	"heyrobots/service/internal/update"
 	"heyrobots/service/internal/usage"
 	"heyrobots/service/internal/vault"
 	"heyrobots/service/internal/webapp"
@@ -66,9 +68,22 @@ func main() {
 			run = func() error { return pairCommand(os.Args[2:]) }
 		case "status":
 			run = statusCommand
+		case "version":
+			fmt.Println(version)
+			return
 		}
 	}
-	if err := run(); err != nil {
+	err := run()
+	if errors.Is(err, errRestart) {
+		// An update replaced this binary: become the new one, as the same
+		// process, so launchd or systemd carries on as if nothing happened.
+		exe, xerr := os.Executable()
+		if xerr == nil {
+			xerr = syscall.Exec(exe, os.Args, os.Environ())
+		}
+		err = fmt.Errorf("restart after the update: %w; start heyrobotsd again", xerr)
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "heyrobotsd:", err)
 		os.Exit(1)
 	}
@@ -278,6 +293,31 @@ func run() error {
 	calSrc := &calendar.Source{Google: gg, Intake: in, Store: st, Log: log, OnNew: engine.Kick}
 	schedSrc := &schedule.Source{Store: st, Intake: in, Log: log, Now: time.Now, OnNew: engine.Kick, Jobs: jobLib, Tools: mcpServers}
 
+	// Updates from the app: the new release replaces this binary, and this
+	// process then restarts as it once running tasks are done.
+	restarting := false
+	updater := &update.Updater{Version: version, Repo: "sdsvn/heyrobots", Log: log,
+		HTTP: netguard.Client(netguard.PublicWeb, 10*time.Minute),
+		Drain: func(dctx context.Context) func() {
+			workers.Hold(true)
+			for end := time.Now().Add(2 * time.Minute); workers.Running() > 0 && time.Now().Before(end) && dctx.Err() == nil; {
+				time.Sleep(time.Second)
+			}
+			return func() { workers.Hold(false) }
+		},
+		Restart: func() { restarting = true; stop() },
+		Working: workers.Running,
+	}
+	// Where the install script put the Mac app, when not the usual place.
+	if d := os.Getenv("HEYROBOTS_APP_DIR"); d != "" {
+		updater.AppDirs = []string{d}
+	}
+	// A release server of your own, such as a local copy for testing,
+	// in place of GitHub's API.
+	if api := os.Getenv("HEYROBOTS_UPDATE_API"); api != "" {
+		updater.API, updater.HTTP = strings.TrimRight(api, "/"), &http.Client{Timeout: 10 * time.Minute}
+	}
+
 	opts := api.Options{
 		Usage:  ledger,
 		Intake: in,
@@ -304,6 +344,7 @@ func run() error {
 		Jobs:      jobLib,
 		Broker:    api.NewBroker(),
 		Log:       log,
+		Update:    updater,
 		ServerURL: cfg.ServerURL,
 		Addresses: reachable(cfg.ServerURL, cfg.Listen, scheme, tailName),
 		ShowPairingCode: func(code string, expires time.Time, servers []string) {
@@ -441,7 +482,9 @@ func run() error {
 	}
 	go cleanupCodes(ctx, st, log)
 	go engine.Run(ctx)
-	go workers.Run(ctx)
+	workersDone := make(chan struct{})
+	go func() { workers.Run(ctx); close(workersDone) }()
+	go updater.Run(ctx)
 	go ob.Run(ctx)
 	go pusher.Run(ctx)
 	go mailSrc.Run(ctx)
@@ -468,11 +511,26 @@ func run() error {
 	for _, hs := range servers {
 		hs.Shutdown(shutdownCtx)
 	}
+	if restarting {
+		// Tasks cut short pick up again as soon as the new server starts.
+		select {
+		case <-workersDone:
+		case <-shutdownCtx.Done():
+		}
+		if err := st.Tx(func(tx *store.Tx) error { return tx.InterruptRunning(time.Now().UTC()) }); err != nil {
+			log.Warn("mark interrupted tasks", "err", err)
+		}
+		return errRestart
+	}
 	return nil
 }
 
-// version is the server's version, for traces.
-const version = "0.1.0"
+// errRestart ends run when an update asks the server to restart.
+var errRestart = errors.New("restart")
+
+// version is the server's version, set by the release build
+// (-ldflags "-X main.version=0.5.1"); "dev" for a build from source.
+var version = "dev"
 
 func firstSet(vals ...string) string {
 	for _, v := range vals {
