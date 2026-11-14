@@ -17,6 +17,9 @@ More is coming for the cluster (an elected coordinator among them), so this keep
   - `heyrobotsd status` also says how many machines are in the team and how many are online
   - the commands ask the running server, through a control socket in the data folder that only this user can open (`<data>/control.sock`, mode 0600); with no server running they say so
     - the socket gives the same access as reading the data folder, which this user has anyway
+- A machine taken out of the team hears of it
+  - the others answer its next contact with "removed", and it removes them on its side, so it stops listing them as online
+  - a new code brings it back, with the machines the team still has
 - The team's view is one function in the cluster package
   - what the app's machine list shows and what the terminal shows come from the same place, so an elected coordinator later changes it in one spot
   - the control socket is its own small file in the server's command, outside the HTTP API, so nothing about tokens or devices changes
