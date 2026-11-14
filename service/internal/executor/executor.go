@@ -380,6 +380,13 @@ func (r *run) work(ctx context.Context) (report, error) {
 		return report{State: "failed", Summary: "The worker couldn't start."}, err
 	}
 	tools = append(tools, team, share)
+	if r.mayRun() {
+		run, err := r.commandTool()
+		if err != nil {
+			return report{State: "failed", Summary: "The worker couldn't start."}, err
+		}
+		tools = append(tools, run)
+	}
 	if slices.Contains(r.toolsets, core.ToolsetSetup) {
 		setup, err := r.setupTools()
 		if err != nil {

@@ -38,6 +38,9 @@ func (r *run) runACP(ctx context.Context, tools []tool.Tool) (report, error) {
 		return report{State: "failed", Summary: "The task's folder couldn't be made."}, err
 	}
 	instructions := e.Prompt + "\n\n" + r.agentSection() + "\n\n" + r.taskSection() + "\n\n" + acpNote + "\n"
+	if r.mayRun() {
+		instructions += "\n" + commandsNote + "\n"
+	}
 	if err := os.WriteFile(filepath.Join(ws, "CLAUDE.md"), []byte(instructions), 0o600); err != nil {
 		return report{State: "failed", Summary: "The task's instructions couldn't be written."}, err
 	}
@@ -169,7 +172,7 @@ func (c *acpClient) RequestPermission(_ context.Context, p sdk.RequestPermission
 }
 
 // allowed keeps Claude Code's own tools inside the task: reads, searches
-// and edits in the folder; commands only with the code or data toolset;
+// and edits in the folder; commands when the task may run them;
 // never the web or a mode switch, which would skip the quarantine.
 func (c *acpClient) allowed(t sdk.ToolCallUpdate) bool {
 	for _, l := range t.Locations {
@@ -185,7 +188,7 @@ func (c *acpClient) allowed(t sdk.ToolCallUpdate) bool {
 	case sdk.ToolKindFetch, sdk.ToolKindSwitchMode:
 		return false
 	case sdk.ToolKindExecute:
-		return c.r.hasToolset(core.ToolsetCode) || c.r.hasToolset(core.ToolsetData)
+		return c.r.mayRun()
 	}
 	return true
 }
