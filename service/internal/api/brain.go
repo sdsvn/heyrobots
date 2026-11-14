@@ -36,7 +36,7 @@ func (s *Server) GetAgentBrain(w http.ResponseWriter, r *http.Request, agentID s
 		for _, f := range fus {
 			out.WaitingOn = append(out.WaitingOn, followUpView(f))
 		}
-		facts, err := tx.Facts(agentID, "", false, 300)
+		facts, err := tx.Facts(agentID, "", true, 300)
 		if err != nil {
 			return err
 		}
@@ -45,6 +45,7 @@ func (s *Server) GetAgentBrain(w http.ResponseWriter, r *http.Request, agentID s
 			if f.Subject != "" {
 				v.Subject = &f.Subject
 			}
+			v.PutAwayAt = f.OldAt
 			out.Facts = append(out.Facts, v)
 		}
 		lines, err := tx.Diary(agentID, "", "", time.Now().AddDate(0, -3, 0), 100)
@@ -66,7 +67,8 @@ func (s *Server) GetAgentBrain(w http.ResponseWriter, r *http.Request, agentID s
 			return err
 		}
 		for _, in := range ins {
-			if in.Cause == store.CauseSetup && a.Allows(core.Toolset(in.Key)) {
+			if (in.Cause == store.CauseSetup && a.Allows(core.Toolset(in.Key))) || in.Cause == store.CauseRouting {
+				// A hand-back is routing at work, nothing for the owner to fix.
 				continue
 			}
 			v := gen.AgentIncident{Id: in.ID, Person: in.Person, Cause: in.Cause, What: incidentWhat(in), At: in.At}
@@ -126,8 +128,34 @@ func incidentWhat(in store.Incident) string {
 	return in.Cause
 }
 
-// DeleteAgentFact makes an agent forget a fact. Owner devices only.
+// howToFor starts a how-to made from a declined action's reason.
+func howToFor(action string) string {
+	switch action {
+	case "send_email":
+		return "When drafting an email: "
+	case "create_event":
+		return "When creating a calendar event: "
+	case "answer_invite":
+		return "When answering an invitation: "
+	}
+	return "When proposing " + strings.ReplaceAll(action, "_", " ") + ": "
+}
+
+// DeleteAgentFact makes an agent forget a fact: it is put away, so the
+// owner can undo it, and outside content can't add it again. Owner
+// devices only.
 func (s *Server) DeleteAgentFact(w http.ResponseWriter, r *http.Request, agentID string, factID int64) {
+	now := time.Now().UTC()
+	s.setFactOld(w, r, agentID, factID, &now)
+}
+
+// RestoreAgentFact brings back a fact the agent forgot or corrected. Owner
+// devices only.
+func (s *Server) RestoreAgentFact(w http.ResponseWriter, r *http.Request, agentID string, factID int64) {
+	s.setFactOld(w, r, agentID, factID, nil)
+}
+
+func (s *Server) setFactOld(w http.ResponseWriter, r *http.Request, agentID string, factID int64, at *time.Time) {
 	if _, ok := requireOwner(w, r); !ok {
 		return
 	}
@@ -142,7 +170,7 @@ func (s *Server) DeleteAgentFact(w http.ResponseWriter, r *http.Request, agentID
 		if err != nil || !found {
 			return err
 		}
-		return tx.DeleteFact(agentID, factID)
+		return tx.SetFactOld(factID, at)
 	})
 	switch {
 	case err != nil:
@@ -229,7 +257,7 @@ func (s *Server) UpdateIncident(w http.ResponseWriter, r *http.Request, id int64
 				bad = "only your reason for declining can become a how-to"
 				return nil
 			}
-			text := "When drafting a " + strings.ReplaceAll(in.Key, "_", " ") + ": " + in.Note
+			text := howToFor(in.Key) + in.Note
 			if _, err := tx.AddFact(store.BrainFact{AgentID: in.AgentID, Person: in.Person, Kind: store.KindHowTo, Text: text,
 				Source: store.FromPerson, ThreadID: in.ThreadID, CreatedAt: now}); err != nil {
 				return err

@@ -288,7 +288,7 @@ func (s *Server) GetThread(w http.ResponseWriter, r *http.Request, threadID stri
 	}
 	chat := v.Thread.AgentID != "" || v.Thread.GroupID != ""
 	for _, e := range v.Effects {
-		if chat && e.Kind == "digest" {
+		if chat && e.Kind == "digest" && e.Action == store.FollowUpDigest {
 			// What a quiet follow-up found goes to the digest, not the chat.
 			continue
 		}
@@ -383,6 +383,14 @@ func (s *Server) UpdatePolicy(w http.ResponseWriter, r *http.Request) {
 		if msg != "" {
 			bad = msg
 			return nil
+		}
+		// What the agents kept for a delegate who was removed goes too.
+		for _, d := range cur.Delegates {
+			if !slices.ContainsFunc(next.Delegates, func(n policy.Delegate) bool { return n.Name == d.Name }) {
+				if err := tx.ForgetPerson(core.Mandate{Role: core.RoleDelegate, Delegate: d.Name}.Person()); err != nil {
+					return err
+				}
+			}
 		}
 		saved, err = tx.SavePolicy(next, s.opts.Now().UTC())
 		return err

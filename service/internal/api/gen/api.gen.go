@@ -1005,6 +1005,9 @@ type BrainFact struct {
 	// Person owner, or the delegate whose tasks it was learned on.
 	Person string `json:"person"`
 
+	// PutAwayAt When it was forgotten or corrected; such facts are no longer used.
+	PutAwayAt *time.Time `json:"put_away_at,omitempty"`
+
 	// Source person: they said it; seen: the agent worked it out; outside: read in mail or a page, may be wrong.
 	Source    string    `json:"source"`
 	Subject   *string   `json:"subject,omitempty"`
@@ -1731,6 +1734,9 @@ type ServerInterface interface {
 	// (DELETE /api/v1/agents/{agentId}/brain/facts/{factId})
 	DeleteAgentFact(w http.ResponseWriter, r *http.Request, agentId string, factId int64)
 
+	// (POST /api/v1/agents/{agentId}/brain/facts/{factId}/restore)
+	RestoreAgentFact(w http.ResponseWriter, r *http.Request, agentId string, factId int64)
+
 	// (GET /api/v1/approvals)
 	ListApprovals(w http.ResponseWriter, r *http.Request)
 
@@ -2040,6 +2046,41 @@ func (siw *ServerInterfaceWrapper) DeleteAgentFact(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteAgentFact(w, r, agentId, factId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestoreAgentFact operation middleware
+func (siw *ServerInterfaceWrapper) RestoreAgentFact(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "agentId" -------------
+	var agentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "agentId", r.PathValue("agentId"), &agentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "factId" -------------
+	var factId int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "factId", r.PathValue("factId"), &factId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "factId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestoreAgentFact(w, r, agentId, factId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3270,6 +3311,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/agents/{agentId}", wrapper.UpdateAgent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agents/{agentId}/brain", wrapper.GetAgentBrain)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/agents/{agentId}/brain/facts/{factId}", wrapper.DeleteAgentFact)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agents/{agentId}/brain/facts/{factId}/restore", wrapper.RestoreAgentFact)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/follow-ups/{followUpId}", wrapper.UpdateFollowUp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/incidents/{incidentId}", wrapper.UpdateIncident)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/skills", wrapper.ListSkills)

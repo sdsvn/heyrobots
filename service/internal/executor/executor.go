@@ -246,6 +246,8 @@ type run struct {
 	// setFollowUps are the follow-ups this run set, for the line that
 	// tells the person.
 	setFollowUps []store.BrainFollowUp
+	// handedBack is set when the run returned messages as not its own.
+	handedBack bool
 }
 
 // CancelStopped cancels running Assignments whose Ticket a person stopped.

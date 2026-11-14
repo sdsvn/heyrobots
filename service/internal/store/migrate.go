@@ -572,6 +572,13 @@ var migrations = []migration{
 		}
 		return tx.Table("incidents").AutoMigrate(&incident{})
 	}},
+	{21, "a task remembers it read outside content", func(tx *gorm.DB) error {
+		if err := tx.Exec("ALTER TABLE tickets ADD COLUMN tainted numeric NOT NULL DEFAULT false").Error; err != nil {
+			return err
+		}
+		// A reminder the person asked for speaks in the chat when due.
+		return tx.Exec("ALTER TABLE brain_follow_ups ADD COLUMN tell numeric NOT NULL DEFAULT false").Error
+	}},
 }
 
 type schemaMigration struct {

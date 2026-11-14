@@ -735,7 +735,7 @@ func (a *applier) accept(valid []string, primary *judged, r Route, note string) 
 	for _, ts := range m.Toolsets {
 		if !ag.Allows(ts) {
 			if err := a.tx.AddIncident(store.Incident{AgentID: ag.ID, Person: m.Person(), Cause: store.CauseSetup, Key: string(ts),
-				ThreadID: a.th.ID, Detail: "Asked for work that needs the " + string(ts) + " toolset: " + trimRunes(m.Scope, 200), At: a.now}); err != nil {
+				ThreadID: a.th.ID, Detail: "Asked for work that needs the " + string(ts) + " toolset: " + trimRunes(m.Scope, 200), Tainted: m.Role != core.RoleOwner || m.Received.Source != core.SourceApp, At: a.now}); err != nil {
 				return err
 			}
 			return a.refuse(valid, primary, "", fmt.Sprintf("%s can't use the %s toolset", ag.Name, ts))
@@ -768,7 +768,7 @@ func (a *applier) accept(valid []string, primary *judged, r Route, note string) 
 	}
 	for _, ts := range m.Removed {
 		if err := a.tx.AddIncident(store.Incident{AgentID: ag.ID, Person: m.Person(), Cause: store.CauseSetup, Key: string(ts),
-			TicketID: ticketID, ThreadID: a.th.ID, Detail: "Asked in its chat for work that needs the " + string(ts) + " toolset: " + trimRunes(m.Scope, 200), At: a.now}); err != nil {
+			TicketID: ticketID, ThreadID: a.th.ID, Detail: "Asked in its chat for work that needs the " + string(ts) + " toolset: " + trimRunes(m.Scope, 200), Tainted: m.Role != core.RoleOwner || m.Received.Source != core.SourceApp, At: a.now}); err != nil {
 			return err
 		}
 	}

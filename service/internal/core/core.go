@@ -7,6 +7,8 @@
 package core
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"slices"
 	"strings"
 	"time"
@@ -214,7 +216,17 @@ func (m Mandate) Person() string {
 			dash = true
 		}
 	}
-	return "delegate-" + strings.TrimRight(b.String(), "-")
+	slug := strings.TrimRight(b.String(), "-")
+	if slug == strings.Trim(strings.Join(strings.Fields(strings.ToLower(m.Delegate)), "-"), "-") && slug != "" {
+		return "delegate-" + slug
+	}
+	// A name with other letters, such as 陈 or Олег, gets a short hash too,
+	// so two such delegates never share a brain.
+	sum := sha256.Sum256([]byte(strings.ToLower(m.Delegate)))
+	if slug == "" {
+		return "delegate-" + hex.EncodeToString(sum[:4])
+	}
+	return "delegate-" + slug + "-" + hex.EncodeToString(sum[:4])
 }
 
 // GeneralAgent is the id of the built-in agent that can do anything a task

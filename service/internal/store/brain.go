@@ -102,7 +102,10 @@ type BrainFollowUp struct {
 	// Ref is the sent mail's message id, for a reply check.
 	Ref string
 	// Nudges counts the nudges already sent for a reply check's key.
-	Nudges    int
+	Nudges int
+	// Tell is set for a reminder the person asked for: its result goes to
+	// them in the chat, not the digest.
+	Tell      bool
 	DueAt     time.Time `gorm:"index"`
 	State     string    `gorm:"index"`
 	Outcome   string
@@ -190,20 +193,6 @@ func (tx *Tx) HowTos(agentID, person string, limit int) ([]BrainFact, error) {
 	return out, err
 }
 
-// SearchFacts finds an agent's current facts for a person that share
-// words with text, best first.
-func (tx *Tx) SearchFacts(agentID, person, text string, limit int) ([]BrainFact, error) {
-	q := matchQuery(text)
-	if q == "" {
-		return nil, nil
-	}
-	var out []BrainFact
-	err := tx.db.Raw(`SELECT f.* FROM brain_facts_fts JOIN brain_facts f ON f.id = brain_facts_fts.rowid
-		WHERE brain_facts_fts MATCH ? AND f.agent_id = ? AND f.person = ? AND f.kind = ? AND f.old_at IS NULL
-		ORDER BY bm25(brain_facts_fts, 2.0, 1.0) LIMIT ?`, q, agentID, person, KindFact, limit).Scan(&out).Error
-	return out, err
-}
-
 // Facts lists an agent's facts, newest first, for its page. With person
 // empty it lists every person's.
 func (tx *Tx) Facts(agentID, person string, withOld bool, limit int) ([]BrainFact, error) {
@@ -217,9 +206,6 @@ func (tx *Tx) Facts(agentID, person string, withOld bool, limit int) ([]BrainFac
 	var out []BrainFact
 	return out, q.Order("updated_at DESC").Limit(limit).Find(&out).Error
 }
-
-// AddDiary writes a diary line.
-func (tx *Tx) AddDiary(d BrainDiary) error { return tx.db.Create(&d).Error }
 
 // SearchDiary finds an agent's diary lines for a person that share words
 // with text, best first.
@@ -249,22 +235,23 @@ func (tx *Tx) Diary(agentID, person, threadID string, since time.Time, limit int
 	return out, q.Order("created_at DESC").Limit(limit).Find(&out).Error
 }
 
-// SetDiaryOld marks diary lines as folded into a summary.
-func (tx *Tx) SetDiaryOld(ids []int64, at time.Time) error {
-	if len(ids) == 0 {
-		return nil
-	}
-	return tx.db.Model(&BrainDiary{}).Where("id IN ?", ids).Update("old_at", at).Error
-}
+// ErrTaintedChange is returned when work that read outside content tries
+// to change a follow-up that work which hadn't set.
+var ErrTaintedChange = errors.New("a follow-up set by the person can't be changed by work that read outside content")
 
 // SaveFollowUp creates or updates a follow-up. A new open follow-up with
 // the same agent, person and key as an open one replaces that one's
-// details instead of adding a second.
+// details instead of adding a second. It keeps the taint of either.
 func (tx *Tx) SaveFollowUp(f BrainFollowUp) (BrainFollowUp, bool, error) {
 	if f.Key != "" {
 		var same BrainFollowUp
 		err := tx.db.Where("agent_id = ? AND person = ? AND key = ? AND state IN ?", f.AgentID, f.Person, f.Key, []string{FollowUpOpen, FollowUpFired}).First(&same).Error
 		if err == nil {
+			if f.Tainted && !same.Tainted && f.Kind == FollowUpTask {
+				return same, false, ErrTaintedChange
+			}
+			same.Tainted = same.Tainted || f.Tainted
+			same.Mandate, same.TicketID = f.Mandate, f.TicketID
 			same.What, same.Why, same.Check, same.DueAt, same.Ref, same.Nudges = f.What, f.Why, f.Check, f.DueAt, f.Ref, f.Nudges
 			same.State, same.UpdatedAt = FollowUpOpen, f.CreatedAt
 			if f.ThreadID != "" {
@@ -368,6 +355,17 @@ func (tx *Tx) RankedFacts(agentID, person, text string, limit int) ([]FactHit, e
 	return out, err
 }
 
+// FiredBefore are follow-ups whose task started before a time and is no
+// longer open, yet never closed them, such as one stopped before it ran. A
+// task still waiting for a free slot keeps its follow-up.
+func (tx *Tx) FiredBefore(t time.Time) ([]BrainFollowUp, error) {
+	var out []BrainFollowUp
+	err := tx.db.Where("state = ? AND fired_at < ?", FollowUpFired, t).
+		Where(`NOT EXISTS (SELECT 1 FROM triggers tr JOIN ticket_inputs i ON i.trigger_id = tr.id JOIN tickets tk ON tk.id = i.ticket_id
+			WHERE tr.source = 'followup' AND tr.delivery_id LIKE 'followup:' || brain_follow_ups.id || '@%' AND tk.open)`).Find(&out).Error
+	return out, err
+}
+
 // PinnedFacts are an agent's how-tos and the facts the person told it,
 // newest first: every task for that person sees them.
 func (tx *Tx) PinnedFacts(agentID, person string, limit int) ([]BrainFact, error) {
@@ -439,15 +437,6 @@ func (tx *Tx) NoteDiaryOutcome(ticketID, note string) error {
 	return nil
 }
 
-// LastFollowUpFor finds the newest follow-up with a key, in any state.
-func (tx *Tx) LastFollowUpFor(agentID, person, key string) (BrainFollowUp, error) {
-	var f BrainFollowUp
-	err := tx.db.Where("agent_id = ? AND person = ? AND key = ?", agentID, person, key).Order("created_at DESC").First(&f).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return f, ErrNotFound
-	}
-	return f, err
-}
 
 // ThreadBusy reports whether a task is at work on a Thread now.
 func (tx *Tx) ThreadBusy(threadID string) (bool, error) {
@@ -487,3 +476,37 @@ func shortText(s string, n int) string {
 	}
 	return string(r[:n-1]) + "…"
 }
+
+// Terms are the words of text worth searching for: no common words, none
+// shorter than three letters, each once.
+func Terms(text string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, w := range strings.FieldsFunc(strings.ToLower(text), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+		if len([]rune(w)) < 3 || stopWords[w] || seen[w] {
+			continue
+		}
+		seen[w] = true
+		out = append(out, w)
+	}
+	return out
+}
+
+// FollowUpDigest marks the digest lines follow-ups write, so the chat
+// leaves them out: they are for the digest only.
+const FollowUpDigest = "followup"
+
+// ReplyCheckFor finds an agent's reply check for a sent mail: the one for
+// that message, or the conversation it started.
+func (tx *Tx) ReplyCheckFor(agentID, person, messageID string) (BrainFollowUp, error) {
+	var f BrainFollowUp
+	err := tx.db.Where("agent_id = ? AND person = ? AND kind = ? AND (ref = ? OR key = ?)", agentID, person, FollowUpReply, messageID, "reply:"+messageID).
+		Order("created_at DESC").First(&f).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return f, ErrNotFound
+	}
+	return f, err
+}
+
+// RepliedOutcome is a reply check's outcome when the answer came.
+const RepliedOutcome = "They replied."

@@ -339,14 +339,10 @@ func (o *Outbox) send(ctx context.Context, c claim) {
 	now := o.Now().UTC()
 	terr := o.Store.Tx(func(tx *store.Tx) error {
 		if err == nil {
-			ok, err := tx.UpdateEffect(e.ID, store.EffectSending, map[string]any{
+			_, err := tx.UpdateEffect(e.ID, store.EffectSending, map[string]any{
 				"status": store.EffectSent, "sent_at": now, "ref": ref, "lease_until": nil, "last_error": "",
 			})
-			if err != nil || !ok {
-				return err
-			}
-			e.Ref = ref
-			return afterSent(tx, e, now)
+			return err
 		}
 		if ctx.Err() != nil {
 			// The server is stopping; the lease runs out and Recover decides.
@@ -375,6 +371,14 @@ func (o *Outbox) send(ctx context.Context, c claim) {
 	}
 	if terr != nil {
 		o.Log.Error("record send", "effect", e.ID, "err", terr)
+	}
+	if err == nil && terr == nil {
+		// The agent's brain notes the send apart from recording it, so a
+		// problem here never makes a sent mail look uncertain.
+		e.Ref = ref
+		if berr := o.Store.Tx(func(tx *store.Tx) error { return afterSent(tx, e, now) }); berr != nil {
+			o.Log.Warn("note a sent action in its agent's brain", "effect", e.ID, "err", berr)
+		}
 	}
 }
 
@@ -499,7 +503,7 @@ func (o *Outbox) Digest() (*store.Digest, error) {
 		if err != nil {
 			return err
 		}
-		waiting, err := waitingOn(tx, l.Location())
+		waiting, err := waitingOn(tx, l.Location(), now)
 		if err != nil {
 			return err
 		}

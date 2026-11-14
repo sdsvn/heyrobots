@@ -2,8 +2,8 @@ package outbox
 
 import (
 	"encoding/json"
-	"errors"
 	"strconv"
+	"errors"
 	"strings"
 	"time"
 
@@ -34,6 +34,7 @@ func afterSent(tx *store.Tx, e store.Effect, now time.Time) error {
 	var d struct {
 		To      []string `json:"to"`
 		Subject string   `json:"subject"`
+		ReplyTo string   `json:"reply_to_message_id"`
 	}
 	if err := json.Unmarshal([]byte(e.Payload), &d); err != nil || len(d.To) == 0 {
 		return nil
@@ -46,33 +47,26 @@ func afterSent(tx *store.Tx, e store.Effect, now time.Time) error {
 	if err != nil {
 		return nil
 	}
-	person, key := m.Person(), brain.ReplyKey(d.To, d.Subject)
-	nudges := 0
-	last, err := tx.LastFollowUpFor(tk.AgentID, person, key)
-	switch {
-	case err == nil && now.Sub(last.CreatedAt) < 60*24*time.Hour:
-		// This send is a nudge in a conversation the agent is already
-		// waiting on.
-		nudges = last.Nudges + 1
-		if last.State == store.FollowUpOpen || last.State == store.FollowUpFired {
-			last.State, last.Outcome, last.UpdatedAt = store.FollowUpDone, "Nudged them again.", now
-			if err := tx.UpdateFollowUp(last); err != nil {
-				return err
+	// A mail that answers one the agent was waiting on a reply to is a
+	// nudge in that conversation, even when the check that drafted it has
+	// closed; after a reply, or anything else, it starts a new one.
+	person, key, nudges := m.Person(), "reply:"+e.Ref, 0
+	if d.ReplyTo != "" {
+		prev, err := tx.ReplyCheckFor(tk.AgentID, person, d.ReplyTo)
+		switch {
+		case err == nil && prev.Outcome != store.RepliedOutcome && prev.State != store.FollowUpCancelled && now.Sub(prev.CreatedAt) < 30*24*time.Hour:
+			key, nudges = prev.Key, prev.Nudges+1
+			if prev.State == store.FollowUpOpen || prev.State == store.FollowUpFired {
+				prev.State, prev.Outcome, prev.UpdatedAt = store.FollowUpDone, "Nudged them again.", now
+				if err := tx.UpdateFollowUp(prev); err != nil {
+					return err
+				}
 			}
+		case err != nil && !errors.Is(err, store.ErrNotFound):
+			return err
 		}
-	case err != nil && !errors.Is(err, store.ErrNotFound):
-		return err
 	}
 	to := strings.Join(d.To, ", ")
-	if nudges > brain.MaxNudges {
-		name := "An agent"
-		if a, err := tx.Agent(tk.AgentID); err == nil {
-			name = a.Name
-		}
-		return tx.CreateEffect(store.Effect{TicketID: e.TicketID, ThreadID: e.ThreadID, Source: string(core.SourceApp), Kind: "digest",
-			Reach: string(core.ReachOwner), Body: name + ": " + to + " hasn't replied after " + strconv.Itoa(brain.MaxNudges) + " nudges about \"" + d.Subject + "\", so I stopped checking.",
-			Status: store.EffectHeld, CreatedAt: now})
-	}
 	m.Toolsets = slicesOr(m.Toolsets)
 	mj, _ := json.Marshal(m)
 	_, _, err = tx.SaveFollowUp(store.BrainFollowUp{
@@ -91,6 +85,12 @@ func afterSent(tx *store.Tx, e store.Effect, now time.Time) error {
 func afterDeclined(tx *store.Tx, e store.Effect, note string, now time.Time) error {
 	if e.TicketID == "" {
 		return nil
+	}
+	// The owner's own words stay out of a delegate's brain.
+	if tk, err := tx.Ticket(e.TicketID); err == nil {
+		if m, err := tk.DecodeMandate(); err == nil && m.Role != core.RoleOwner {
+			note = ""
+		}
 	}
 	text := "The owner declined " + describe(e)
 	if n := strings.TrimSpace(note); n != "" {
@@ -124,15 +124,25 @@ func slicesOr(ts []core.Toolset) []core.Toolset {
 	return ts
 }
 
-// waitingOn is the digest's section on what each agent is waiting on,
-// soonest first, or "" when nothing is.
-func waitingOn(tx *store.Tx, loc *time.Location) (string, error) {
-	fs, err := tx.FollowUps("", "", []string{store.FollowUpOpen, store.FollowUpFired}, 30)
-	if err != nil || len(fs) == 0 {
+// waitingOn is the digest's section on what the agents will follow up on
+// today, or "" when nothing comes due, so a quiet day makes no digest.
+func waitingOn(tx *store.Tx, loc *time.Location, now time.Time) (string, error) {
+	all, err := tx.FollowUps("", "", []string{store.FollowUpOpen, store.FollowUpFired}, 200)
+	if err != nil {
 		return "", err
 	}
+	var fs []store.BrainFollowUp
+	for _, f := range all {
+		if f.State == store.FollowUpFired || f.DueAt.Before(now.Add(24*time.Hour)) {
+			fs = append(fs, f)
+		}
+	}
+	if len(fs) == 0 {
+		return "", nil
+	}
+	later := len(all) - len(fs)
 	var b strings.Builder
-	b.WriteString("## Waiting on\n\n")
+	b.WriteString("## Coming up today\n\n")
 	names := map[string]string{}
 	for _, f := range fs {
 		name, ok := names[f.AgentID]
@@ -143,11 +153,14 @@ func waitingOn(tx *store.Tx, loc *time.Location) (string, error) {
 			}
 			names[f.AgentID] = name
 		}
-		when := f.DueAt.In(loc).Format("Mon 2 Jan")
-		if f.State == store.FollowUpFired {
+		when := "today " + f.DueAt.In(loc).Format("15:04")
+		if f.State == store.FollowUpFired || f.DueAt.Before(now) {
 			when = "now"
 		}
 		b.WriteString("- " + name + ", " + when + ": " + f.What + "\n")
+	}
+	if later > 0 {
+		b.WriteString("- and " + strconv.Itoa(later) + " more later, on each agent's page\n")
 	}
 	return b.String() + "\n", nil
 }
@@ -187,7 +200,7 @@ func teamWeek(tx *store.Tx, now time.Time) (string, error) {
 				notes = append(notes, "\""+in.Note+"\"")
 			}
 		}
-		if c["ready"]+c["failed"]+c["blocked"]+len(by) == 0 {
+		if c["ready"]+c["failed"]+c["blocked"]+by[store.CauseDeclined]+by[store.CauseStopped]+by[store.CauseSendFailed]+len(setup) == 0 {
 			continue
 		}
 		var parts []string
@@ -201,7 +214,6 @@ func teamWeek(tx *store.Tx, now time.Time) (string, error) {
 		add(c["blocked"], "blocked")
 		add(by[store.CauseDeclined], "declined by you")
 		add(by[store.CauseStopped], "stopped")
-		add(by[store.CauseRouting], "handed back")
 		add(by[store.CauseSendFailed], "couldn't be sent")
 		b.WriteString("- " + a.Name + ": " + strings.Join(parts, ", "))
 		if len(notes) > 0 {

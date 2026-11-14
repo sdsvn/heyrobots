@@ -1500,7 +1500,7 @@ class ApiClient {
     });
   }
 
-  /// Make the agent forget one fact. Owner devices only.
+  /// Make the agent forget one fact. It is put away, so it can be restored. Owner devices only.
   Future<void> deleteAgentFact({
     Map<String, Object?> extra = const {
       "openapi.servers": [
@@ -1538,6 +1538,67 @@ class ApiClient {
     );
     final request = http.AbortableRequest(
       "DELETE",
+      _url,
+      abortTrigger: abortTrigger,
+    );
+    request.headers.addAll(
+      <String, Object?>{
+        ...?options?.headers,
+        'Accept': "application/json",
+      }.map((key, value) => MapEntry(key, value.toString())),
+    );
+    if (options?.followRedirects case final value?)
+      request.followRedirects = value;
+    if (options?.maxRedirects case final value?) request.maxRedirects = value;
+    prepareRequest?.call(request, extra);
+    final response = await _transport.send(request);
+    final _status = response.statusCode;
+    if (!(_status == 204)) {
+      await response.stream.listen(null).cancel();
+      throw http.ClientException('HTTP $_status', _url);
+    }
+    await response.stream.drain<void>();
+  }
+
+  /// Bring back a fact the agent forgot or corrected. Owner devices only.
+  Future<void> restoreAgentFact({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://127.0.0.1:7340"},
+      ],
+      "openapi.security": [
+        {"deviceToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "deviceToken": {"type": "http", "scheme": "bearer"},
+      },
+    },
+    Future<void>? abortTrigger,
+    HttpRequestOptions? options,
+    required String agentId,
+    required int factId,
+  }) async {
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(agentId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    if (const {
+      '',
+      '.',
+      '..',
+    }.contains(Uri.encodeComponent(factId.toString()))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    var _url = Uri.parse(
+      _base +
+          ("/api/v1/agents/" +
+              Uri.encodeComponent(agentId) +
+              "/brain/facts/" +
+              Uri.encodeComponent(factId.toString()) +
+              "/restore"),
+    );
+    final request = http.AbortableRequest(
+      "POST",
       _url,
       abortTrigger: abortTrigger,
     );

@@ -85,7 +85,27 @@ func TestTheOwnerSeesAndCorrectsAnAgentsBrain(t *testing.T) {
 	}
 	b = gen.AgentBrain{}
 	json.Unmarshal(h.do("GET", path, owner, nil, "").Body.Bytes(), &b)
-	if len(b.WaitingOn) != 0 || len(b.WentWrong) != 1 || len(b.Facts) != 1 || b.Facts[0].Kind != "howto" || !strings.Contains(b.Facts[0].Text, "too formal") {
+	var howTo, putAway int
+	for _, f := range b.Facts {
+		if f.Kind == "howto" && f.Text == "When drafting an email: too formal" {
+			howTo++
+		}
+		if f.Id == fact.ID && f.PutAwayAt != nil {
+			putAway++
+		}
+	}
+	if len(b.WaitingOn) != 0 || len(b.WentWrong) != 1 || howTo != 1 || putAway != 1 {
 		t.Fatalf("after = %+v", b)
 	}
+	// Forgetting can be undone.
+	if c := h.do("POST", fmt.Sprintf("%s/facts/%d/restore", path, fact.ID), owner, nil, "").Code; c != 204 {
+		t.Fatalf("restore = %d", c)
+	}
+	_ = st.Tx(func(tx *store.Tx) error {
+		f, _ := tx.Fact(core.GeneralAgent, "owner", fact.ID)
+		if f.OldAt != nil {
+			t.Error("not restored")
+		}
+		return nil
+	})
 }

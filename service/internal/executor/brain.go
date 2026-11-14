@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 	"unicode/utf8"
 
 	"google.golang.org/adk/v2/agent"
@@ -41,7 +40,7 @@ You keep a memory between tasks for each person you work for. Each task starts w
 - recall: search your memory when you need more than you were shown, such as "what did I tell Lena about pricing?" or "what am I waiting on?".
 - follow_up: come back to something on a date, such as checking whether someone did what they said. Say what to check first and what to do if nothing changed. One per thing: setting it again with the same about updates it.
 - close_follow_up: when a follow-up is done or no longer needed, or to move it to another date.
-You don't need to remember what you did: the server keeps a diary of each task, and it checks for replies to emails you send by itself. Don't keep memory in files or in any other memory system; use these tools.`
+You don't need to remember what you did: the server keeps a diary of each task. Once an email you propose is approved and sent, the server checks for a reply after 3 working days and, if none came, wakes you to draft a short nudge for the person's OK (up to three), so when you propose one that asks for something, say so in one short line ("Once it's sent, I'll check for her reply after 3 working days") instead of asking whether to, and don't set a follow_up for it. Don't keep memory in files or in any other memory system; use these tools.`
 
 var (
 	emailRe  = regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`)
@@ -81,15 +80,18 @@ func (r *run) brainSection() string {
 	var wrong []string
 	_ = r.e.Store.Tx(func(tx *store.Tx) error {
 		agent, person := r.agent.ID, r.person()
-		pinned, _ = tx.PinnedFacts(agent, person, 40)
+		pins, _ := tx.PinnedFacts(agent, person, 60)
 		seen := map[int64]bool{}
 		n := 0
-		for i, f := range pinned {
-			n += len(f.Text)
-			if n > pinnedChars {
-				pinned = pinned[:i]
-				break
+		for _, f := range pins {
+			// How-tos are always there; what the person told it shares a
+			// budget, newest first.
+			if f.Kind != store.KindHowTo {
+				if n += len(f.Text); n > pinnedChars {
+					continue
+				}
 			}
+			pinned = append(pinned, f)
 			seen[f.ID] = true
 		}
 		var about []string
@@ -104,17 +106,22 @@ func (r *run) brainSection() string {
 				related = append(related, f)
 			}
 		}
-		hits, _ := tx.RankedFacts(agent, person, query.String(), relatedFacts*2)
+		hits, _ := tx.RankedFacts(agent, person, query.String(), relatedFacts*3)
 		for _, h := range hits {
 			if len(related) >= relatedFacts {
 				break
 			}
-			if !seen[h.ID] {
+			if !seen[h.ID] && relevant(query.String(), h.Subject, h.Text) {
 				seen[h.ID] = true
 				related = append(related, h.BrainFact)
 			}
 		}
-		diary, _ = tx.SearchDiary(agent, person, query.String(), relatedDiary)
+		ds, _ := tx.SearchDiary(agent, person, query.String(), relatedDiary*3)
+		for _, d := range ds {
+			if len(diary) < relatedDiary && relevant(query.String(), "", d.Text) {
+				diary = append(diary, d)
+			}
+		}
 		wrong = r.wentWrong(tx, query.String())
 		// What it is waiting on in this chat, or about the same things.
 		all, _ := tx.FollowUps(agent, person, []string{store.FollowUpOpen, store.FollowUpFired}, 100)
@@ -122,7 +129,7 @@ func (r *run) brainSection() string {
 			if len(waiting) == openFollowUps {
 				break
 			}
-			if f.ThreadID == r.c.Ticket.OriginThreadID || matchesWords(query.String(), f.What+" "+f.Why+" "+f.Key) {
+			if f.ThreadID == r.c.Ticket.OriginThreadID || relevant(query.String(), f.Key, f.What+" "+f.Why) {
 				waiting = append(waiting, f)
 			}
 		}
@@ -197,7 +204,9 @@ func (r *run) wentWrong(tx *store.Tx, query string) []string {
 		var line string
 		switch in.Cause {
 		case store.CauseDeclined:
-			if in.Note == "" || !related {
+			// The owner's reason for declining a draft is about drafts of
+			// that kind, for two weeks.
+			if in.Note == "" || !related || r.e.Now().Sub(in.At) > 14*24*time.Hour {
 				continue
 			}
 			line = r.day(in.At) + ": the owner declined your " + strings.ReplaceAll(in.Key, "_", " ") + ", saying: \"" + in.Note + "\""
@@ -279,6 +288,7 @@ type followUpArgs struct {
 	Check string `json:"check,omitempty" jsonschema:"what to look at first; if it shows the follow-up isn't needed, you close it without acting"`
 	Why   string `json:"why,omitempty" jsonschema:"one line on why, for the person"`
 	About string `json:"about,omitempty" jsonschema:"a short name for what it is about, such as 'juniper contract'; a second follow-up with the same about replaces the first"`
+	Tell  bool   `json:"tell,omitempty" jsonschema:"true when the person asked to be reminded: when due, you tell them in the chat; false for a check that only speaks up if something needs them"`
 }
 
 type closeFollowUpArgs struct {
@@ -354,8 +364,13 @@ func (r *run) brainTools() ([]tool.Tool, error) {
 					out = map[string]any{"error": "replaces takes a fact id such as f12"}
 					return nil
 				}
-				if _, err := tx.Fact(r.agent.ID, r.person(), id); err != nil {
+				old, err := tx.Fact(r.agent.ID, r.person(), id)
+				if err != nil {
 					out = map[string]any{"error": "there's no such fact"}
+					return nil
+				}
+				if r.isTainted() && old.Source != store.FromOutside {
+					out = map[string]any{"error": "this task read outside content, so it can't correct what the person told you or saw; ask them"}
 					return nil
 				}
 				now := r.e.Now().UTC()
@@ -382,12 +397,20 @@ func (r *run) brainTools() ([]tool.Tool, error) {
 		}
 		var out map[string]any
 		err := r.e.Store.Tx(func(tx *store.Tx) error {
-			if _, err := tx.Fact(r.agent.ID, r.person(), id); err != nil {
+			f, err := tx.Fact(r.agent.ID, r.person(), id)
+			if err != nil {
 				out = map[string]any{"error": "there's no such fact"}
 				return nil
 			}
+			if r.isTainted() && f.Source != store.FromOutside {
+				out = map[string]any{"error": "this task read outside content, so it can't forget what the person told you or saw; ask them"}
+				return nil
+			}
 			out = map[string]any{"ok": true}
-			return tx.DeleteFact(r.agent.ID, id)
+			// Put away, not deleted: the person can bring it back, and
+			// outside content can't add it again.
+			now := r.e.Now().UTC()
+			return tx.SetFactOld(id, &now)
 		})
 		return out, err
 	})
@@ -404,8 +427,12 @@ func (r *run) brainTools() ([]tool.Tool, error) {
 			if q := strings.TrimSpace(a.Query); q != "" {
 				seen := map[int64]bool{}
 				about, _ := tx.FactsAbout(agent, person, emailRe.FindAllString(q, -1), 10)
-				hits, _ := tx.SearchFacts(agent, person, q, 15)
-				for _, f := range append(about, hits...) {
+				ranked, _ := tx.RankedFacts(agent, person, q, 15)
+				hits := about
+				for _, h := range ranked {
+					hits = append(hits, h.BrainFact)
+				}
+				for _, f := range hits {
 					if !seen[f.ID] {
 						seen[f.ID] = true
 						facts = append(facts, r.factLine(f))
@@ -462,7 +489,7 @@ func (r *run) brainTools() ([]tool.Tool, error) {
 			ID: ids.New("fu"), AgentID: r.agent.ID, Person: r.person(), Kind: store.FollowUpTask, Mandate: string(mj), Tainted: r.isTainted(),
 			ThreadID: r.c.Ticket.OriginThreadID, TicketID: r.c.Ticket.ID, What: what,
 			Why: shorten(strings.TrimSpace(a.Why), 300), Check: shorten(strings.TrimSpace(a.Check), 300),
-			DueAt: due, State: store.FollowUpOpen, CreatedAt: now,
+			DueAt: due, State: store.FollowUpOpen, CreatedAt: now, Tell: a.Tell && !r.isTainted(),
 		}
 		if k := strings.ToLower(strings.Join(strings.Fields(a.About), " ")); k != "" {
 			f.Key = "task:" + shorten(k, 80)
@@ -473,7 +500,9 @@ func (r *run) brainTools() ([]tool.Tool, error) {
 			var err error
 			saved, created, err = tx.SaveFollowUp(f)
 			return err
-		}); err != nil {
+		}); errors.Is(err, store.ErrTaintedChange) {
+			return map[string]any{"error": "this task read outside content, so it can't change a follow-up the person set; use a different about"}, nil
+		} else if err != nil {
 			return nil, err
 		}
 		r.mu.Lock()
@@ -497,6 +526,17 @@ func (r *run) brainTools() ([]tool.Tool, error) {
 			f, err := tx.FollowUp(strings.TrimSpace(a.ID))
 			if err != nil || f.AgentID != r.agent.ID || f.Person != r.person() {
 				out = map[string]any{"error": "there's no such follow-up of yours"}
+				return nil
+			}
+			if f.State != store.FollowUpOpen && f.State != store.FollowUpFired {
+				out = map[string]any{"error": "that follow-up is already " + f.State}
+				return nil
+			}
+			r.mu.Lock()
+			mine := slices.ContainsFunc(r.setFollowUps, func(x store.BrainFollowUp) bool { return x.ID == f.ID })
+			r.mu.Unlock()
+			if r.isTainted() && !f.Tainted && !mine && !slices.Contains(r.firedFollowUps(), f.ID) {
+				out = map[string]any{"error": "this task read outside content, so it can't change a follow-up the person set"}
 				return nil
 			}
 			f.Outcome, f.UpdatedAt = shorten(strings.TrimSpace(a.Outcome), 300), r.e.Now().UTC()
@@ -526,20 +566,45 @@ func (r *run) brainTools() ([]tool.Tool, error) {
 	return []tool.Tool{remember, forget, recall, followUp, closeTool}, nil
 }
 
-// matchesWords reports whether text shares a word of four letters or more
-// with q, ignoring common words, so a follow-up about Lena shows in a
-// task about Lena.
-func matchesWords(q, text string) bool {
-	t := strings.ToLower(text)
-	for _, w := range strings.FieldsFunc(strings.ToLower(q), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
-		if len(w) >= 4 && !commonWords[w] && strings.Contains(t, w) {
+// relevant reports whether a memory bears on a message: one of the
+// message's words names its subject, or two of them are in its text. A
+// message with only one telling word, such as "Lena?", needs only that
+// one. Words are compared by their first five letters, roughly as the
+// full-text search stems them.
+func relevant(q, subject, text string) bool {
+	terms := store.Terms(q)
+	if len(terms) == 0 {
+		return false
+	}
+	has := func(in, term string) bool {
+		for _, w := range store.Terms(in) {
+			if stem(w) == stem(term) {
+				return true
+			}
+		}
+		return false
+	}
+	hits := 0
+	for _, t := range terms {
+		if subject != "" && has(subject, t) {
 			return true
 		}
+		if has(text, t) {
+			hits++
+		}
 	}
-	return false
+	return hits >= 2 || (len(terms) == 1 && hits == 1)
 }
 
-var commonWords = map[string]bool{"that": true, "this": true, "with": true, "from": true, "have": true, "what": true, "when": true, "will": true, "your": true, "they": true, "them": true, "about": true, "there": true, "their": true, "would": true, "could": true, "should": true, "please": true, "check": true, "remind": true, "owner": true}
+func stem(w string) string {
+	if r := []rune(w); len(r) > 5 {
+		return string(r[:5])
+	}
+	return w
+}
+
+// matchesWords is relevant without a subject, for a task's own lessons.
+func matchesWords(q, text string) bool { return relevant(q, "", text) }
 
 // matches reports whether text shares a word of three letters or more with q.
 func matches(q, text string) bool {
@@ -565,9 +630,13 @@ func (r *run) firedFollowUps() []string {
 	return out
 }
 
-// startFollowUps carries a fired follow-up's taint into the run, so work
-// set up after reading mail stays as limited when it comes back.
+// startFollowUps carries a fired follow-up's taint, and the task's own
+// from earlier turns, into the run, so work set up after reading mail
+// stays as limited when it comes back.
 func (r *run) startFollowUps() {
+	if r.c.Ticket.Tainted {
+		r.taint()
+	}
 	_ = r.e.Store.Tx(func(tx *store.Tx) error {
 		for _, id := range r.firedFollowUps() {
 			if f, err := tx.FollowUp(id); err == nil && f.Tainted {
@@ -589,7 +658,10 @@ func (r *run) endBrain(tx *store.Tx, rep report, now time.Time) (string, error) 
 	if line == "" {
 		line = strings.TrimSpace(rep.Result)
 	}
-	if line != "" && rep.State != "dropped" {
+	r.mu.Lock()
+	handedBack := r.handedBack
+	r.mu.Unlock()
+	if line != "" && rep.State != "dropped" && !handedBack {
 		d := store.BrainDiary{AgentID: r.agent.ID, Person: r.person(), TicketID: r.c.Ticket.ID,
 			ThreadID: r.c.Ticket.OriginThreadID, Text: shorten(line, 400), CreatedAt: now}
 		if awaiting, _ := tx.TicketAwaiting(r.c.Ticket.ID); awaiting > 0 {
@@ -610,7 +682,18 @@ func (r *run) endBrain(tx *store.Tx, rep report, now time.Time) (string, error) 
 		if err != nil || f.State != store.FollowUpFired {
 			continue
 		}
-		f.State, f.Outcome, f.UpdatedAt = store.FollowUpDone, shorten(strings.TrimSpace(rep.Summary), 300), now
+		r.mu.Lock()
+		hostFailed := r.final == nil && (rep.State == "failed" || rep.State == "blocked")
+		r.mu.Unlock()
+		switch {
+		case hostFailed && !strings.HasPrefix(f.Outcome, retryOutcome):
+			// The run broke (the model or an app was down, say): try once
+			// more tomorrow before giving up.
+			f.State, f.DueAt, f.Outcome = store.FollowUpOpen, now.Add(24*time.Hour), retryOutcome+shorten(rep.Summary, 200)
+		default:
+			f.State, f.Outcome = store.FollowUpDone, shorten(strings.TrimSpace(rep.Summary), 300)
+		}
+		f.UpdatedAt = now
 		if err := tx.UpdateFollowUp(f); err != nil {
 			return "", err
 		}
@@ -662,13 +745,35 @@ func (r *run) diaryLine(d store.BrainDiary) string {
 	return s
 }
 
+// retryOutcome starts the outcome of a follow-up whose run broke and is
+// tried once more.
+const retryOutcome = "Trying again after: "
+
+// quietFollowUp reports whether a follow-up's result goes to the digest
+// rather than the chat: a check for the owner that ended with nothing for
+// them to do. A reminder they asked for, a failure, a question or anything
+// waiting for their OK speaks in the chat, and a delegate's always reaches
+// the delegate.
+func (r *run) quietFollowUp(tx *store.Tx, stage core.TicketStage) bool {
+	if r.mandate.Received.Source != core.SourceFollowUp || r.mandate.Role != core.RoleOwner || stage != core.StageReady {
+		return false
+	}
+	for _, id := range r.firedFollowUps() {
+		if f, err := tx.FollowUp(id); err == nil && f.Tell {
+			return false
+		}
+	}
+	n, err := tx.TicketAwaiting(r.c.Ticket.ID)
+	return err == nil && n == 0
+}
+
 // followUpNote is how a fired follow-up reaches the agent: as a note from
 // the server, not as a message from a person.
 func (r *run) followUpNote() string {
 	var b strings.Builder
 	for _, t := range r.c.Inputs {
 		if t.Source == string(core.SourceFollowUp) {
-			b.WriteString("Note from the host: a follow-up you set has come due. Do the check first; if nothing needs doing, close it with close_follow_up and report ready with a one-line result. If something needs the person, say so in one or two sentences and offer answers they can tap.\n<follow-up>\n" + t.Text + "\n</follow-up>\n\n")
+			b.WriteString("Note from the host: a follow-up you set has come due. If it is a reminder the person asked for, remind them in one or two friendly sentences. Otherwise do the check first; if nothing needs doing, close it with close_follow_up and report ready with a one-line result, which goes to their digest. If something needs the person, say so in one or two sentences and offer answers they can tap.\n<follow-up>\n" + t.Text + "\n</follow-up>\n\n")
 		}
 	}
 	return b.String()

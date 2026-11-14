@@ -155,9 +155,18 @@ type Ticket struct {
 	Choices string
 	// AgentID is the agent that does the work, copied from the Mandate so
 	// the dispatcher can keep each agent to its capacity.
-	AgentID   string
+	AgentID string
+	// Tainted is set once the Ticket's work read outside content, so a
+	// later turn starts as limited even when its history isn't the
+	// server's to read, as in Claude Code.
+	Tainted   bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+// MarkTainted records that a Ticket's work read outside content.
+func (tx *Tx) MarkTainted(id string) error {
+	return tx.db.Model(&Ticket{}).Where("id = ?", id).Update("tainted", true).Error
 }
 
 // ChoiceList returns the answers the person can tap, if any.

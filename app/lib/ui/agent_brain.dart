@@ -38,6 +38,38 @@ class _AgentBrainSectionsState extends State<AgentBrainSections> {
 
   AppState get s => widget.state;
 
+  /// Two days after it was due, or after now when it is already overdue.
+  DateTime _later(DateTime due) {
+    final now = DateTime.now();
+    return (due.isBefore(now) ? now : due).add(const Duration(days: 2)).toUtc();
+  }
+
+  /// Forgets a fact, with a way to take it back.
+  Future<void> _forget(BrainFact f) async {
+    setState(() => _busy = true);
+    try {
+      await s.api.deleteAgentFact(agentId: widget.agent.id, factId: f.id);
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: const Text('Forgotten'),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () => _act(() => s.api.restoreAgentFact(agentId: widget.agent.id, factId: f.id), 'Remembered again'),
+            ),
+          ),
+        );
+      widget.onChanged();
+    } catch (e) {
+      if (mounted) showMessage(context, describeError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _act(Future<void> Function() f, String done) async {
     setState(() => _busy = true);
     try {
@@ -85,7 +117,8 @@ class _AgentBrainSectionsState extends State<AgentBrainSections> {
     final p = Palette.of(context);
     final b = widget.brain;
     final off = widget.agent.followUpsOff ?? false;
-    final facts = [...b.facts]..sort((x, y) => (x.kind == 'howto' ? 0 : 1).compareTo(y.kind == 'howto' ? 0 : 1));
+    final facts = [...b.facts.where((f) => f.putAwayAt == null)]..sort((x, y) => (x.kind == 'howto' ? 0 : 1).compareTo(y.kind == 'howto' ? 0 : 1));
+    final putAway = b.facts.where((f) => f.putAwayAt != null).toList();
     final shown = _allFacts ? facts : facts.take(6).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -107,7 +140,10 @@ class _AgentBrainSectionsState extends State<AgentBrainSections> {
         const SizedBox(height: 4),
         if (off) ...[_hint(p, 'Follow-ups are on hold: due ones wait until you resume them.'), const SizedBox(height: 6)],
         if (b.waitingOn.isEmpty)
-          _hint(p, 'Nothing. When it sends an email, it checks for a reply after 3 working days. Ask it to check back on anything.')
+          _hint(
+            p,
+            'Nothing. When it sends an email, it checks for a reply after 3 working days; mail you send from your own mail app isn\'t seen. Ask it to check back on anything.',
+          )
         else
           _card(p, [for (final f in b.waitingOn) _followUp(p, f)]),
         const SizedBox(height: 16),
@@ -127,6 +163,18 @@ class _AgentBrainSectionsState extends State<AgentBrainSections> {
                 style: TextStyle(fontWeight: FontWeight.w900, color: p.accent),
               ),
             ),
+          ),
+        if (putAway.isNotEmpty)
+          ExpansionTile(
+            key: const Key('put-away'),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+            title: Text(
+              'Forgotten or corrected (${putAway.length})',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: p.muted),
+            ),
+            children: [
+              _card(p, [for (final f in putAway) _fact(p, f)]),
+            ],
           ),
         if (b.wentWrong.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -204,7 +252,7 @@ class _AgentBrainSectionsState extends State<AgentBrainSections> {
                 : _act(
                     () => s.api.updateFollowUp(
                       followUpId: f.id,
-                      body: FollowUpUpdate(action: 'snooze', until: (now ? DateTime.now() : f.dueAt).add(const Duration(days: 2)).toUtc()),
+                      body: FollowUpUpdate(action: 'snooze', until: _later(f.dueAt)),
                     ),
                     'Moved 2 days later',
                   ),
@@ -246,12 +294,22 @@ class _AgentBrainSectionsState extends State<AgentBrainSections> {
               ],
             ),
           ),
-          IconButton(
-            key: Key('forget:${f.id}'),
-            tooltip: 'Forget this',
-            onPressed: _busy ? null : () => _act(() => s.api.deleteAgentFact(agentId: widget.agent.id, factId: f.id), 'Forgotten'),
-            icon: Icon(Icons.close_rounded, size: 18, color: p.muted),
-          ),
+          if (f.putAwayAt != null)
+            TextButton(
+              key: Key('restore:${f.id}'),
+              onPressed: _busy ? null : () => _act(() => s.api.restoreAgentFact(agentId: widget.agent.id, factId: f.id), 'Remembered again'),
+              child: Text(
+                'Restore',
+                style: TextStyle(fontWeight: FontWeight.w900, color: p.accent),
+              ),
+            )
+          else
+            IconButton(
+              key: Key('forget:${f.id}'),
+              tooltip: 'Forget this',
+              onPressed: _busy ? null : () => _forget(f),
+              icon: Icon(Icons.close_rounded, size: 18, color: p.muted),
+            ),
         ],
       ),
     );

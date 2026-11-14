@@ -182,7 +182,9 @@ func (s *Server) saveAgent(w http.ResponseWriter, r *http.Request, a store.Agent
 		return
 	}
 	a.AnyToolset = req.AnyToolset != nil && *req.AnyToolset
-	a.FollowUpsOff = req.FollowUpsOff != nil && *req.FollowUpsOff
+	if req.FollowUpsOff != nil {
+		a.FollowUpsOff = *req.FollowUpsOff
+	}
 	var ts []core.Toolset
 	for _, t := range req.Toolsets {
 		if !core.Toolset(t).IsToolset() {

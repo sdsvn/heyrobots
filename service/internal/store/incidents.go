@@ -52,13 +52,13 @@ type Incident struct {
 	ResolvedAt *time.Time
 }
 
-// AddIncident records an incident. An incident for the same Ticket, cause
-// and key is recorded once.
+// AddIncident records an incident. A setup gap is recorded once per
+// Ticket and toolset, however often its messages are routed again.
 func (tx *Tx) AddIncident(in Incident) error {
 	if in.AgentID == "" {
 		return nil
 	}
-	if in.TicketID != "" {
+	if in.TicketID != "" && in.Cause == CauseSetup {
 		var n int64
 		if err := tx.db.Model(&Incident{}).Where("ticket_id = ? AND cause = ? AND key = ?", in.TicketID, in.Cause, in.Key).Count(&n).Error; err != nil || n > 0 {
 			return err

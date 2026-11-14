@@ -15,6 +15,9 @@ class BrainFact {
     /// person: they said it; seen: the agent worked it out; outside: read in mail or a page, may be wrong.
     required this.source,
     required this.updatedAt,
+
+    /// When it was forgotten or corrected; such facts are no longer used.
+    this.putAwayAt,
     this.additionalProperties = const {},
   });
 
@@ -26,6 +29,9 @@ class BrainFact {
     text: json["text"] as String,
     source: json["source"] as String,
     updatedAt: DateTime.parse(json["updated_at"] as String).toUtc(),
+    putAwayAt: json.containsKey("put_away_at")
+        ? DateTime.parse(json["put_away_at"] as String).toUtc()
+        : null,
     additionalProperties: {
       for (final entry in json.entries)
         if (!_knownKeys.contains(entry.key)) entry.key: entry.value,
@@ -49,6 +55,9 @@ class BrainFact {
 
   final DateTime updatedAt;
 
+  /// When it was forgotten or corrected; such facts are no longer used.
+  final DateTime? putAwayAt;
+
   static const _knownKeys = <String>{
     "id",
     "person",
@@ -57,6 +66,7 @@ class BrainFact {
     "text",
     "source",
     "updated_at",
+    "put_away_at",
   };
 
   final Map<String, Object?> additionalProperties;
@@ -71,5 +81,7 @@ class BrainFact {
     "text": this.text,
     "source": this.source,
     "updated_at": this.updatedAt.toUtc().toIso8601String(),
+    if (this.putAwayAt != null)
+      "put_away_at": this.putAwayAt?.toUtc().toIso8601String(),
   };
 }

@@ -458,9 +458,27 @@ paths:
         schema: { type: integer, format: int64 }
     delete:
       operationId: deleteAgentFact
-      description: Make the agent forget one fact. Owner devices only.
+      description: Make the agent forget one fact. It is put away, so it can be restored. Owner devices only.
       responses:
         "204": { description: Forgotten. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/agents/{agentId}/brain/facts/{factId}/restore:
+    parameters:
+      - name: agentId
+        in: path
+        required: true
+        schema: { type: string }
+      - name: factId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    post:
+      operationId: restoreAgentFact
+      description: Bring back a fact the agent forgot or corrected. Owner devices only.
+      responses:
+        "204": { description: Restored. }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
@@ -1476,6 +1494,7 @@ components:
         text: { type: string }
         source: { type: string, description: "person: they said it; seen: the agent worked it out; outside: read in mail or a page, may be wrong." }
         updated_at: { type: string, format: date-time }
+        put_away_at: { type: string, format: date-time, description: When it was forgotten or corrected; such facts are no longer used. }
     DiaryLine:
       type: object
       required: [id, person, text, at]

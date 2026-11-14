@@ -123,6 +123,9 @@ func (r *run) controlTools() ([]tool.Tool, error) {
 		if n == 0 {
 			return ControlResult{Error: "those messages can't be handed back"}, nil
 		}
+		r.mu.Lock()
+		r.handedBack = true
+		r.mu.Unlock()
 		if r.e.OnHandBack != nil {
 			r.e.OnHandBack()
 		}
@@ -164,6 +167,11 @@ func (r *run) finish(rep report) error {
 	err := r.e.Store.Tx(func(tx *store.Tx) error {
 		if err := tx.EndAssignment(r.c.Assignment.ID, rep.State, rep.Summary, rep.HumanAction, rep.Result, now); err != nil {
 			return err
+		}
+		if r.isTainted() && !r.c.Ticket.Tainted {
+			if err := tx.MarkTainted(r.c.Ticket.ID); err != nil {
+				return err
+			}
 		}
 		if rep.PausedAt != "" {
 			if err := tx.SetAssignmentPause(r.c.Assignment.ID, rep.PausedAt); err != nil {
@@ -219,16 +227,14 @@ func (r *run) finish(rep report) error {
 		if strings.TrimSpace(text) != "" {
 			text += footer
 		}
-		if r.mandate.Received.Source == core.SourceFollowUp && stage != core.StageQuestion && stage != core.StageBlocked {
-			// A follow-up that needed nothing from the person closes
-			// quietly: what it found goes to the digest, not the chat.
-			if n, err := tx.TicketAwaiting(r.c.Ticket.ID); err != nil || n == 0 {
-				if strings.TrimSpace(text) == "" || err != nil {
-					return err
-				}
-				return tx.CreateEffect(store.Effect{TicketID: r.c.Ticket.ID, ThreadID: r.c.Ticket.OriginThreadID, Source: string(core.SourceApp),
-					Kind: "digest", Reach: string(core.ReachOwner), Body: r.agent.Name + ": " + text, Status: store.EffectHeld, CreatedAt: now})
+		if r.quietFollowUp(tx, stage) {
+			// A check that needed nothing from the owner closes quietly:
+			// what it found goes to the digest, not the chat.
+			if strings.TrimSpace(text) == "" {
+				return nil
 			}
+			return tx.CreateEffect(store.Effect{TicketID: r.c.Ticket.ID, ThreadID: r.c.Ticket.OriginThreadID, Source: string(core.SourceApp),
+				Kind: "digest", Action: store.FollowUpDigest, Reach: string(core.ReachOwner), Body: r.agent.Name + ": " + text, Status: store.EffectHeld, CreatedAt: now})
 		}
 		if stage == core.StageQuestion && len(rep.Choices) > 0 {
 			if err := tx.SetTicketChoices(r.c.Ticket.ID, rep.Choices); err != nil {
