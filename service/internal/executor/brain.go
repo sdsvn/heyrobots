@@ -78,6 +78,7 @@ func (r *run) brainSection() string {
 	var pinned, related []store.BrainFact
 	var diary []store.BrainDiary
 	var waiting []store.BrainFollowUp
+	var wrong []string
 	_ = r.e.Store.Tx(func(tx *store.Tx) error {
 		agent, person := r.agent.ID, r.person()
 		pinned, _ = tx.PinnedFacts(agent, person, 40)
@@ -114,6 +115,7 @@ func (r *run) brainSection() string {
 			}
 		}
 		diary, _ = tx.SearchDiary(agent, person, query.String(), relatedDiary)
+		wrong = r.wentWrong(tx, query.String())
 		// What it is waiting on in this chat, or about the same things.
 		all, _ := tx.FollowUps(agent, person, []string{store.FollowUpOpen, store.FollowUpFired}, 100)
 		for _, f := range all {
@@ -126,7 +128,7 @@ func (r *run) brainSection() string {
 		}
 		return nil
 	})
-	if len(pinned)+len(related)+len(diary)+len(waiting) == 0 {
+	if len(pinned)+len(related)+len(diary)+len(waiting)+len(wrong) == 0 {
 		return ""
 	}
 	var b strings.Builder
@@ -163,8 +165,63 @@ func (r *run) brainSection() string {
 			b.WriteString("- " + r.followUpLine(f) + "\n")
 		}
 	}
+	if len(wrong) > 0 {
+		b.WriteString("What went wrong before on work like this:\n")
+		for _, l := range wrong {
+			b.WriteString("- " + l + "\n")
+		}
+	}
 	b.WriteString("</memory>\n\n")
 	return b.String()
+}
+
+// actionToolset is the toolset an outward action belongs to.
+var actionToolset = map[string]core.Toolset{"send_email": core.ToolsetMail, "create_event": core.ToolsetCalendar, "answer_invite": core.ToolsetCalendar}
+
+// wentWrong lists up to three of the agent's recent incidents for this
+// person that bear on this task: a declined draft and the owner's reason,
+// a toolset it lacks, a send that failed, or its own failure on untainted
+// work. A hand-back is the router's miss, and a stop without a reason says
+// nothing to learn, so neither shows.
+func (r *run) wentWrong(tx *store.Tx, query string) []string {
+	ins, _ := tx.Incidents(r.agent.ID, r.person(), r.e.Now().Add(-store.IncidentWindow), 50)
+	var out []string
+	for _, in := range ins {
+		if len(out) == 3 {
+			break
+		}
+		related := matchesWords(query, in.Detail+" "+in.Note)
+		if ts, ok := actionToolset[in.Key]; ok && slices.Contains(r.toolsets, ts) {
+			related = true
+		}
+		var line string
+		switch in.Cause {
+		case store.CauseDeclined:
+			if in.Note == "" || !related {
+				continue
+			}
+			line = r.day(in.At) + ": the owner declined your " + strings.ReplaceAll(in.Key, "_", " ") + ", saying: \"" + in.Note + "\""
+		case store.CauseSetup:
+			if r.agent.Allows(core.Toolset(in.Key)) || !(related || slices.Contains(r.mandate.Removed, core.Toolset(in.Key))) {
+				continue
+			}
+			line = r.day(in.At) + ": you were asked for work that needs the " + in.Key + " toolset, which you don't have"
+		case store.CauseSendFailed:
+			if !related {
+				continue
+			}
+			line = r.day(in.At) + ": " + in.Detail
+		case store.CauseFailed, store.CauseBlocked:
+			if in.Tainted || !related {
+				continue
+			}
+			line = r.day(in.At) + ": you " + in.Cause + " (your own report: " + shorten(in.Detail, 200) + ")"
+		default:
+			continue
+		}
+		out = append(out, line)
+	}
+	return out
 }
 
 func (r *run) factLine(f store.BrainFact) string {
@@ -542,6 +599,12 @@ func (r *run) endBrain(tx *store.Tx, rep report, now time.Time) (string, error) 
 			return "", err
 		}
 	}
+	if rep.State == "failed" || rep.State == "blocked" {
+		if err := tx.AddIncident(store.Incident{AgentID: r.agent.ID, Person: r.person(), Cause: rep.State, TicketID: r.c.Ticket.ID,
+			ThreadID: r.c.Ticket.OriginThreadID, Detail: shorten(rep.Summary, 400), Tainted: r.isTainted(), At: now}); err != nil {
+			return "", err
+		}
+	}
 	for _, id := range r.firedFollowUps() {
 		f, err := tx.FollowUp(id)
 		if err != nil || f.State != store.FollowUpFired {
@@ -573,6 +636,10 @@ func (r *run) stoppedBrain(tx *store.Tx, now time.Time) error {
 	}
 	if err := tx.WriteDiary(store.BrainDiary{AgentID: r.agent.ID, Person: r.person(), TicketID: r.c.Ticket.ID,
 		ThreadID: r.c.Ticket.OriginThreadID, Text: shorten(r.mandate.Scope, 300) + ". Stopped by the owner", CreatedAt: now}); err != nil {
+		return err
+	}
+	if err := tx.AddIncident(store.Incident{AgentID: r.agent.ID, Person: r.person(), Cause: store.CauseStopped, TicketID: r.c.Ticket.ID,
+		ThreadID: r.c.Ticket.OriginThreadID, Detail: "Stopped while working on: " + shorten(r.mandate.Scope, 200), At: now}); err != nil {
 		return err
 	}
 	for _, id := range r.firedFollowUps() {

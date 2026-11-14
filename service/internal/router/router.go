@@ -146,6 +146,9 @@ func render(c eval.Candidate) (string, error) {
 		ID      string `json:"id"`
 		Working int    `json:"working_on"`
 		Waiting int    `json:"waiting"`
+		// Setup gaps and recent hand-backs: facts, not scores.
+		MissingSetup []core.Toolset `json:"missing_setup,omitempty"`
+		HandedBack   int            `json:"handed_back_recently,omitempty"`
 	}
 	type hist struct {
 		Actor string    `json:"from"`
@@ -173,7 +176,7 @@ func render(c eval.Candidate) (string, error) {
 	}
 	for _, a := range c.Agents {
 		out.Agents = append(out.Agents, agentView{ID: a.ID, Name: a.Name, Purpose: a.Purpose, Toolsets: a.Toolsets, Any: a.AnyToolset})
-		out.Loads = append(out.Loads, load{ID: a.ID, Working: a.Working, Waiting: a.Waiting})
+		out.Loads = append(out.Loads, load{ID: a.ID, Working: a.Working, Waiting: a.Waiting, MissingSetup: a.MissingSetup, HandedBack: a.HandedBack})
 	}
 	for _, t := range c.Tickets {
 		out.Tickets = append(out.Tickets, tick{t.ID, t.Scope, t.Open, t.Stage, t.Stopped})

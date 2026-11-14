@@ -22,6 +22,9 @@ class AgentRequest {
     required this.enabled,
     this.delegates,
     this.rules,
+
+    /// Hold its follow-ups instead of starting tasks.
+    this.followUpsOff,
     this.additionalProperties = const {},
   });
 
@@ -59,6 +62,9 @@ class AgentRequest {
         ? (json["rules"] as List<Object?>)
               .map((item) => item as String)
               .toList()
+        : null,
+    followUpsOff: json.containsKey("follow_ups_off")
+        ? json["follow_ups_off"] as bool
         : null,
     additionalProperties: {
       for (final entry in json.entries)
@@ -98,6 +104,9 @@ class AgentRequest {
 
   final List<String>? rules;
 
+  /// Hold its follow-ups instead of starting tasks.
+  final bool? followUpsOff;
+
   static const _knownKeys = <String>{
     "name",
     "purpose",
@@ -115,6 +124,7 @@ class AgentRequest {
     "enabled",
     "delegates",
     "rules",
+    "follow_ups_off",
   };
 
   final Map<String, Object?> additionalProperties;
@@ -139,5 +149,6 @@ class AgentRequest {
     if (this.delegates != null)
       "delegates": this.delegates?.map((item) => item).toList(),
     if (this.rules != null) "rules": this.rules?.map((item) => item).toList(),
+    if (this.followUpsOff != null) "follow_ups_off": this.followUpsOff,
   };
 }

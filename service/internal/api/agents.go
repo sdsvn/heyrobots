@@ -58,6 +58,10 @@ func (s *Server) agentView(a store.Agent, l store.AgentLoad, pol policy.Policy) 
 		Badge: gen.AgentBadge(a.Badge), Builtin: a.Builtin, Enabled: a.Enabled, Delegates: []string{}, Rules: []string{},
 		Working: []gen.AgentTask{}, Waiting: l.Waiting,
 	}
+	if a.FollowUpsOff {
+		off := true
+		v.FollowUpsOff = &off
+	}
 	if v.Skills == nil {
 		v.Skills = []string{}
 	}
@@ -178,6 +182,7 @@ func (s *Server) saveAgent(w http.ResponseWriter, r *http.Request, a store.Agent
 		return
 	}
 	a.AnyToolset = req.AnyToolset != nil && *req.AnyToolset
+	a.FollowUpsOff = req.FollowUpsOff != nil && *req.FollowUpsOff
 	var ts []core.Toolset
 	for _, t := range req.Toolsets {
 		if !core.Toolset(t).IsToolset() {

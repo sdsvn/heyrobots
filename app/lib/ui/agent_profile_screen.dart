@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/session.dart';
 import '../state.dart';
 import 'agent_avatar.dart';
+import 'agent_brain.dart';
 import 'bit.dart';
 import 'chat_kit.dart';
 import 'common.dart';
@@ -33,10 +34,18 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
 
   AppState get s => widget.state;
 
-  Future<(Agent?, List<Job>)> _load() async {
+  Future<(Agent?, List<Job>, AgentBrain?)> _load() async {
     final r = await Future.wait([s.api.listAgents(), s.api.listJobs()]);
     final agent = (r[0] as AgentList).agents.where((a) => a.id == widget.agentId).firstOrNull;
-    return (agent, (r[1] as JobList).jobs.where((j) => j.agent == widget.agentId).toList());
+    AgentBrain? brain;
+    if (agent != null && agent.home == null) {
+      try {
+        brain = await s.api.getAgentBrain(agentId: agent.id);
+      } catch (_) {
+        // An older server has no brain to show.
+      }
+    }
+    return (agent, (r[1] as JobList).jobs.where((j) => j.agent == widget.agentId).toList(), brain);
   }
 
   Future<void> _togglePause(Agent a) async {
@@ -60,6 +69,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
           enabled: !a.enabled,
           delegates: a.delegates,
           rules: a.rules,
+          followUpsOff: a.followUpsOff,
         ),
       );
       if (mounted) {
@@ -78,19 +88,19 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
     final p = Palette.of(context);
     return Scaffold(
       backgroundColor: p.ground,
-      body: Loaded<(Agent?, List<Job>)>(
+      body: Loaded<(Agent?, List<Job>, AgentBrain?)>(
         key: ValueKey(_version),
         load: _load,
         builder: (context, v, reload) {
-          final (a, jobs) = v;
+          final (a, jobs, brain) = v;
           if (a == null) return const ErrorPanel(message: 'This agent is no longer on the team.');
-          return ListenableBuilder(listenable: s, builder: (context, _) => _body(context, p, a, jobs, reload));
+          return ListenableBuilder(listenable: s, builder: (context, _) => _body(context, p, a, jobs, brain, reload));
         },
       ),
     );
   }
 
-  Widget _body(BuildContext context, Palette p, Agent a, List<Job> jobs, VoidCallback reload) {
+  Widget _body(BuildContext context, Palette p, Agent a, List<Job> jobs, AgentBrain? brain, VoidCallback reload) {
     final ref = refOf(a);
     final (_, soft) = agentColors(a.color.toJson(), p);
     final ink = agentInk(a.color.toJson(), p);
@@ -99,7 +109,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
     final model = a.model ?? "Worker's model";
     final purpose = a.purpose.trim().replaceAll(RegExp(r'\.$'), '');
     final about = [if (purpose.isNotEmpty) '$purpose.', '$model · ${a.capacity == 1 ? '1 task' : '${a.capacity} tasks'} at a time'].join(' ');
-    final recent = _recent(a, jobs);
+    final recent = _recent(a, jobs, brain);
     return RefreshIndicator(
       onRefresh: () async => reload(),
       child: ListView(
@@ -255,6 +265,10 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                     else
                       _note(p, a.enabled ? 'Not working on anything right now.' : 'Paused: it takes no new work until you let it.'),
                     const SizedBox(height: 16),
+                    if (brain != null) ...[
+                      AgentBrainSections(state: s, agent: a, brain: brain, onChanged: () => setState(() => _version++)),
+                      const SizedBox(height: 16),
+                    ],
                     const SectionLabel('Instructions'),
                     const SizedBox(height: 8),
                     a.instructions.trim().isEmpty
@@ -367,9 +381,12 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
     ),
   );
 
-  /// What the agent did lately: its standing jobs' runs and what it asked you.
-  List<(DateTime, String)> _recent(Agent a, List<Job> jobs) {
+  /// What the agent did lately: its diary, its standing jobs' runs and what
+  /// it asked you.
+  List<(DateTime, String)> _recent(Agent a, List<Job> jobs, AgentBrain? brain) {
     final out = <(DateTime, String)>[
+      for (final d in brain?.diary ?? const <DiaryLine>[])
+        (d.at, [d.text.trim().replaceAll(RegExp(r'\.$'), ''), if (d.outcome != null) d.outcome!.trim()].join('. ')),
       for (final j in jobs)
         if (j.lastRunAt != null) (j.lastRunAt!, 'Ran ${jobTitle(j)}'),
       for (final item in s.attention)
@@ -383,7 +400,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
             },
           ),
     ]..sort((x, y) => y.$1.compareTo(x.$1));
-    return out.take(5).toList();
+    return out.take(8).toList();
   }
 
   Widget _doingNow(BuildContext context, Palette p, Agent a) {
@@ -449,9 +466,13 @@ class _HeaderButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[Icon(icon, size: 16, color: fg), const SizedBox(width: 6)],
-              Text(
-                label,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: fg),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: fg),
+                ),
               ),
             ],
           ),

@@ -555,6 +555,23 @@ var migrations = []migration{
 		}
 		return nil
 	}},
+	{20, "what went wrong, for the team brain", func(tx *gorm.DB) error {
+		type incident struct {
+			ID         int64  `gorm:"primaryKey"`
+			AgentID    string `gorm:"index:idx_incidents_agent_at"`
+			Person     string
+			Cause      string
+			Key        string
+			TicketID   string `gorm:"index"`
+			ThreadID   string
+			Detail     string
+			Note       string
+			Tainted    bool
+			At         time.Time `gorm:"index:idx_incidents_agent_at"`
+			ResolvedAt *time.Time
+		}
+		return tx.Table("incidents").AutoMigrate(&incident{})
+	}},
 }
 
 type schemaMigration struct {

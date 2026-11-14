@@ -559,6 +559,13 @@ func (r *run) taskSection() string {
 		ts = append(ts, string(t))
 	}
 	fmt.Fprintf(&b, "Toolsets you may use on it: %s\n", strings.Join(ts, ", "))
+	if len(m.Removed) > 0 {
+		var rm []string
+		for _, t := range m.Removed {
+			rm = append(rm, string(t))
+		}
+		fmt.Fprintf(&b, "The work also asked for %s, which you can't use: say so if the task needs it, and suggest asking IT to set it up or another agent to do that part.\n", strings.Join(rm, ", "))
+	}
 	for _, t := range m.Toolsets {
 		if p := r.purpose[string(t)]; p != "" {
 			fmt.Fprintf(&b, "Toolset %s, in the owner's words: %s\n", t, p)

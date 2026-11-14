@@ -55,6 +55,7 @@ func newMailWorld(t *testing.T) *mailWorld {
 	}
 	e.setPolicy(func(p *policy.Policy) {
 		p.Owner = append(p.Owner, core.Identity{Source: core.SourceMail, ID: "ann@gmail.com"})
+		p.Limits.Timezone = "UTC"
 		p.Toolsets = append(p.Toolsets, core.ToolsetMail)
 		p.Delegates[0].Toolsets = []core.Toolset{core.ToolsetMail}
 		p.Delegates[0].Agents = []string{"ag_mail"}
@@ -496,4 +497,88 @@ func (w *mailWorld) ticketThread() string {
 		return nil
 	})
 	return id
+}
+
+func TestADeclinedDraftTeachesTheAgentAndTheTeam(t *testing.T) {
+	w := newMailWorld(t)
+	w.model.steps = [][]*genai.Part{call("send_email", lenaEmail), reportCall("ready", "Drafted an email to Lena.", "Drafted.", "")}
+	w.say(owner, "chat-mail", "ask Lena for the contract")
+	w.evalAll()
+	w.work()
+	if err := w.store.Tx(func(tx *store.Tx) error {
+		es, _ := tx.AwaitingApproval()
+		_, err := outbox.Decide(tx, outbox.Decision{EffectID: es[0].ID, Approve: false, Note: "too formal, keep it to two lines", DeviceID: "dv_owner", At: w.clock})
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// The next mail task hears why, in the owner's words.
+	w.model.steps = [][]*genai.Part{
+		call("team", map[string]any{"agent": "Mailroom"}),
+		call("team", map[string]any{}),
+		reportCall("ready", "ok", "ok", ""),
+	}
+	w.model.n = 0
+	w.say(owner, "chat-mail2", "email the accountant about the invoice")
+	w.evalAll()
+	w.work()
+	if user := w.model.users[len(w.model.users)-1]; !strings.Contains(user, `saying: "too formal, keep it to two lines"`) {
+		t.Fatalf("the agent wasn't told:\n%s", user)
+	}
+	res := fmtResults(w.model.results)
+	if !strings.Contains(res, "too formal") || !strings.Contains(res, "declined") || !strings.Contains(res, "last_30_days") {
+		t.Fatalf("team said: %s", res)
+	}
+	// A trip question doesn't drag it in.
+	w.exec.Extra = nil
+	w.eval.Router = agentRouter{agent: "ag_mail", toolsets: nil}
+	w.model.steps = [][]*genai.Part{reportCall("ready", "ok", "ok", "")}
+	w.model.n = 0
+	w.say(owner, "chat-trip", "plan a weekend in Porto")
+	w.evalAll()
+	w.work()
+	if user := w.model.users[len(w.model.users)-1]; strings.Contains(user, "too formal") {
+		t.Fatalf("an unrelated task was told:\n%s", user)
+	}
+	// Monday's digest says how the team did.
+	w.clock = time.Date(2026, 11, 16, 23, 0, 0, 0, time.UTC)
+	d, err := w.ob.Digest()
+	if err != nil || d == nil {
+		t.Fatalf("digest %v, %v", d, err)
+	}
+	if !strings.Contains(d.Body, "How the team did") || !strings.Contains(d.Body, "1 declined by you") || !strings.Contains(d.Body, "too formal") {
+		t.Fatalf("digest:\n%s", d.Body)
+	}
+}
+
+func TestWorkNeedingAMissingToolsetIsASetupGapNotTheAgentsFault(t *testing.T) {
+	w := newMailWorld(t)
+	w.setPolicy(func(p *policy.Policy) { p.Toolsets = append(p.Toolsets, core.ToolsetCalendar) })
+	w.eval.Router = agentRouter{agent: "ag_mail", toolsets: []core.Toolset{core.ToolsetCalendar}}
+	w.say(owner, "c-cal", "put the Juniper call in my calendar")
+	w.say(owner, "c-cal2", "move my dentist appointment")
+	w.evalAll()
+	var ins []store.Incident
+	_ = w.store.Tx(func(tx *store.Tx) error { ins, _ = tx.Incidents("ag_mail", "", time.Time{}, 10); return nil })
+	if len(ins) != 2 || ins[0].Cause != store.CauseSetup || ins[0].Key != "calendar" {
+		t.Fatalf("incidents = %+v", ins)
+	}
+	w.clock = time.Date(2026, 11, 16, 23, 0, 0, 0, time.UTC)
+	d, _ := w.ob.Digest()
+	if d == nil || !strings.Contains(d.Body, "asked 2 times for work that needs calendar") {
+		t.Fatalf("digest = %+v", d)
+	}
+	// Once it has the toolset, the gap is gone.
+	a, _ := w.store.Agent("ag_mail")
+	a.Toolsets = `["mail","calendar"]`
+	_ = w.store.SaveAgent(a)
+	w.eval.Router = agentRouter{agent: "ag_mail", toolsets: []core.Toolset{core.ToolsetMail}}
+	w.model.steps = [][]*genai.Part{call("team", map[string]any{"agent": "Mailroom"}), reportCall("ready", "ok", "ok", "")}
+	w.model.n = 0
+	w.say(owner, "c-x", "what went wrong lately?")
+	w.evalAll()
+	w.work()
+	if res := fmtResults(w.model.results); strings.Contains(res, "calendar toolset") {
+		t.Fatalf("a fixed gap still shows: %s", res)
+	}
 }

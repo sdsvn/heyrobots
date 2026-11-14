@@ -174,3 +174,9 @@ func (s *Store) OpenTickets(limit int) ([]Ticket, error) {
 	err := s.db.Where("open").Order("updated_at DESC").Limit(limit).Find(&out).Error
 	return out, err
 }
+
+// Agents lists the team, as Store.Agents does, inside a transaction.
+func (tx *Tx) Agents() ([]Agent, error) {
+	var as []Agent
+	return as, tx.db.Order("builtin DESC, name").Find(&as).Error
+}

@@ -393,6 +393,11 @@ func (o *Outbox) fail(tx *store.Tx, e store.Effect, from, reason string, now tim
 	if err != nil || !ok {
 		return err
 	}
+	if e.Kind == "action" {
+		if err := incident(tx, e, store.CauseSendFailed, "Couldn't send "+describe(e)+": "+shorten(reason, 200), "", now); err != nil {
+			return err
+		}
+	}
 	return o.notice(tx, e, fmt.Sprintf("I couldn't send %s: %s.", describe(e), shorten(reason, 200)), now)
 }
 
@@ -495,8 +500,18 @@ func (o *Outbox) Digest() (*store.Digest, error) {
 			return err
 		}
 		waiting, err := waitingOn(tx, l.Location())
-		if err != nil || (len(held) == 0 && waiting == "") {
+		if err != nil {
 			return err
+		}
+		if local.Weekday() == time.Monday {
+			week, err := teamWeek(tx, now)
+			if err != nil {
+				return err
+			}
+			waiting += week
+		}
+		if len(held) == 0 && waiting == "" {
+			return nil
 		}
 		var b strings.Builder
 		var idsOut []uint

@@ -189,7 +189,10 @@ type Mandate struct {
 	Agent string `json:",omitempty"`
 	// Job names the standing job whose steps the task runs, for work a
 	// schedule or trigger started. Empty for free-form work.
-	Job        string `json:",omitempty"`
+	Job string `json:",omitempty"`
+	// Removed are toolsets the work asked for that the chat's agent can't
+	// use, so the agent can say so instead of guessing.
+	Removed    []Toolset `json:",omitempty"`
 	AcceptedAt time.Time
 }
 

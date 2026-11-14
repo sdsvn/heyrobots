@@ -111,7 +111,11 @@ func (r *run) controlTools() ([]tool.Tool, error) {
 		err := r.e.Store.Tx(func(tx *store.Tx) error {
 			var err error
 			n, err = tx.HandBack(r.c.Ticket.ID, valid, shorten(a.Reason, 300))
-			return err
+			if err != nil || n == 0 {
+				return err
+			}
+			return tx.AddIncident(store.Incident{AgentID: r.agent.ID, Person: r.person(), Cause: store.CauseRouting, Key: "handback",
+				TicketID: r.c.Ticket.ID, ThreadID: r.c.Ticket.OriginThreadID, Detail: shorten(a.Reason, 300), Tainted: r.isTainted(), At: r.e.Now().UTC()})
 		})
 		if err != nil {
 			return ControlResult{}, err

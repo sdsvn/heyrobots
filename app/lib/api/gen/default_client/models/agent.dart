@@ -45,6 +45,9 @@ class Agent {
 
     /// When its machine was last heard from
     this.unavailableSince,
+
+    /// Its follow-ups wait instead of starting tasks.
+    this.followUpsOff,
     this.additionalProperties = const {},
   });
 
@@ -84,6 +87,9 @@ class Agent {
     home: json.containsKey("home") ? json["home"] as String : null,
     unavailableSince: json.containsKey("unavailable_since")
         ? DateTime.parse(json["unavailable_since"] as String).toUtc()
+        : null,
+    followUpsOff: json.containsKey("follow_ups_off")
+        ? json["follow_ups_off"] as bool
         : null,
     additionalProperties: {
       for (final entry in json.entries)
@@ -143,6 +149,9 @@ class Agent {
   /// When its machine was last heard from
   final DateTime? unavailableSince;
 
+  /// Its follow-ups wait instead of starting tasks.
+  final bool? followUpsOff;
+
   static const _knownKeys = <String>{
     "id",
     "name",
@@ -166,6 +175,7 @@ class Agent {
     "presence",
     "home",
     "unavailable_since",
+    "follow_ups_off",
   };
 
   final Map<String, Object?> additionalProperties;
@@ -196,5 +206,6 @@ class Agent {
     if (this.home != null) "home": this.home,
     if (this.unavailableSince != null)
       "unavailable_since": this.unavailableSince?.toUtc().toIso8601String(),
+    if (this.followUpsOff != null) "follow_ups_off": this.followUpsOff,
   };
 }

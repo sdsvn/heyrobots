@@ -8,7 +8,7 @@ An agent is meant to be a long-running teammate, but today it barely remembers. 
 
 Take a mail agent whose job is your business and legal conversations. It should know its job and how you like it done. It should remember the threads it handled and the actions you asked for. It should keep a list of what it is waiting on, such as "Lena owes us a signed contract", and act when it's due, without being asked again and without filling your chats with chatter.
 
-This version was revised after two rounds of review between two models (Fable and Opus), which agreed on everything below. It keeps the four parts, and changes how follow-ups fire, when the reply clock starts, what the diary records, how memory is found, and how quiet it all is. The brain lives in new tables in the server's database, its timing in a new `internal/brain` package beside the schedule source.
+This version was revised after two rounds of review between two models (Fable and Opus), and a second debate on the team brain; they agreed on everything below. It keeps the four parts, and changes how follow-ups fire, when the reply clock starts, what the diary records, how memory is found, and how quiet it all is. The brain lives in new tables in the server's database, its timing in a new `internal/brain` package beside the schedule source.
 
 ## Design
 - Each agent keeps four things per person it works for, and never mixes people
@@ -54,8 +54,17 @@ This version was revised after two rounds of review between two models (Fable an
   - when a task sets a follow-up, its reply ends with one line such as "I'll check for Lena's reply on Wed 19 Nov", instead of a separate message
   - when one fires and something needs you, the agent says so in its chat, with answers you can tap ("Approve", "Snooze 2 days", "Drop"); when nothing does, it closes quietly
   - the daily digest gets a "Waiting on" section: what each agent is waiting on and what closed since yesterday
+- The team learns from what went wrong, and the General agent knows the team
+  - new table `incidents`, one row each time an agent's work went wrong, written by the server where it happened: a toolset the agent lacked (refused, or quietly removed in its chat), a hand-back, a draft you declined with your reason, a task you stopped, its own failed or stuck report, a send that failed
+  - each has a cause the server is sure of; a missing toolset is a setup gap and a hand-back is the router's miss, never the agent's fault, and there is no "did badly" cause
+  - an agent sees up to three of its own that bear on the task: your reason for declining a similar draft, a toolset it lacks, its own earlier failure on work that read no outside content
+  - the router sees only facts: which toolsets work for an agent needed that it still lacks, and how often it handed work back lately; never decline or failure counts, which would starve an agent
+  - the `team` tool shows each agent's toolsets, skills and last 30 days, and with an agent's name, what went wrong; the General agent checks it before taking work a specialist fits or has struggled with
+  - nothing becomes a lesson by itself: your reason for declining can become a how-to with one tap, and a gap closes when the agent gets the toolset
+  - a delegate's incidents show to you as what happened, without their words; a removed person's are deleted with the rest
+  - Monday's digest says how the team did: what each agent finished, what was declined or stopped, and one fix where a gap repeats ("ask IT to give it calendar")
 - You can see and change everything
-  - the agent's page gets Waiting on (follow-ups, with snooze and cancel), What I know (facts with source and date, delete), and Diary (recent lines)
+  - the agent's page gets Waiting on (follow-ups, with snooze and cancel, and a switch to hold them), What it knows (facts with where they came from, forget), Went wrong lately (fixed, or make your reason a how-to), and its diary in Recently
 - Today's notes move into the brain
   - each line of an agent's notes file becomes a fact you told it, on first start; the file stays as a backup
 

@@ -88,7 +88,7 @@ func afterSent(tx *store.Tx, e store.Effect, now time.Time) error {
 
 // afterDeclined notes a declined action, with the owner's reason, in its
 // task's diary line.
-func afterDeclined(tx *store.Tx, e store.Effect, note string) error {
+func afterDeclined(tx *store.Tx, e store.Effect, note string, now time.Time) error {
 	if e.TicketID == "" {
 		return nil
 	}
@@ -96,7 +96,25 @@ func afterDeclined(tx *store.Tx, e store.Effect, note string) error {
 	if n := strings.TrimSpace(note); n != "" {
 		text += ", saying: \"" + n + "\""
 	}
-	return tx.NoteDiaryOutcome(e.TicketID, text)
+	if err := tx.NoteDiaryOutcome(e.TicketID, text); err != nil {
+		return err
+	}
+	return incident(tx, e, store.CauseDeclined, "Declined "+describe(e), note, now)
+}
+
+// incident records what went wrong with an action, against the agent whose
+// task proposed it.
+func incident(tx *store.Tx, e store.Effect, cause, detail, note string, now time.Time) error {
+	if e.TicketID == "" || e.Origin != "" {
+		return nil
+	}
+	tk, err := tx.Ticket(e.TicketID)
+	if err != nil || tk.AgentID == "" {
+		return nil
+	}
+	m, _ := tk.DecodeMandate()
+	return tx.AddIncident(store.Incident{AgentID: tk.AgentID, Person: m.Person(), Cause: cause, Key: e.Action, TicketID: e.TicketID,
+		ThreadID: e.ThreadID, Detail: detail, Note: strings.TrimSpace(note), At: now})
 }
 
 func slicesOr(ts []core.Toolset) []core.Toolset {
@@ -132,4 +150,72 @@ func waitingOn(tx *store.Tx, loc *time.Location) (string, error) {
 		b.WriteString("- " + name + ", " + when + ": " + f.What + "\n")
 	}
 	return b.String() + "\n", nil
+}
+
+// teamWeek is the Monday digest's section on how each agent's work went in
+// the last week, with a suggested fix where something keeps going wrong.
+// Only counts, the server's own words and the owner's own notes appear.
+func teamWeek(tx *store.Tx, now time.Time) (string, error) {
+	since := now.AddDate(0, 0, -7)
+	counts, err := tx.TaskCounts(since)
+	if err != nil {
+		return "", err
+	}
+	incidents, err := tx.Incidents("", "", since, 1000)
+	if err != nil {
+		return "", err
+	}
+	agents, err := tx.Agents()
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	for _, a := range agents {
+		c := counts[a.ID]
+		by := map[string]int{}
+		setup := map[string]int{}
+		var notes []string
+		for _, in := range incidents {
+			if in.AgentID != a.ID {
+				continue
+			}
+			by[in.Cause]++
+			if in.Cause == store.CauseSetup && !a.Allows(core.Toolset(in.Key)) {
+				setup[in.Key]++
+			}
+			if in.Cause == store.CauseDeclined && in.Note != "" && in.Person == "owner" && len(notes) < 2 {
+				notes = append(notes, "\""+in.Note+"\"")
+			}
+		}
+		if c["ready"]+c["failed"]+c["blocked"]+len(by) == 0 {
+			continue
+		}
+		var parts []string
+		add := func(n int, what string) {
+			if n > 0 {
+				parts = append(parts, strconv.Itoa(n)+" "+what)
+			}
+		}
+		add(c["ready"], "done")
+		add(c["failed"], "failed")
+		add(c["blocked"], "blocked")
+		add(by[store.CauseDeclined], "declined by you")
+		add(by[store.CauseStopped], "stopped")
+		add(by[store.CauseRouting], "handed back")
+		add(by[store.CauseSendFailed], "couldn't be sent")
+		b.WriteString("- " + a.Name + ": " + strings.Join(parts, ", "))
+		if len(notes) > 0 {
+			b.WriteString(". You said: " + strings.Join(notes, ", "))
+		}
+		b.WriteString("\n")
+		for ts, n := range setup {
+			if n >= 2 {
+				b.WriteString("  - It was asked " + strconv.Itoa(n) + " times for work that needs " + ts + ", which it can't use. Ask IT to give it " + ts + ", or send that work to another agent.\n")
+			}
+		}
+	}
+	if b.Len() == 0 {
+		return "", nil
+	}
+	return "## How the team did this week\n\n" + b.String() + "\n", nil
 }

@@ -180,6 +180,30 @@ class FakeServer {
         return _json(202, {'trigger_id': 'tr1', 'thread_id': id, 'duplicate': false});
     }
     if (path == '/api/v1/agents' && r.method == 'GET') return _json(200, {'agents': agents});
+    final brain = RegExp(r'^/api/v1/agents/([^/]+)/brain$').firstMatch(path);
+    if (brain != null && r.method == 'GET') {
+      return _json(200, {
+        'waiting_on': [
+          {'id': 'fu_1', 'person': 'owner', 'kind': 'reply', 'what': 'Check whether lena@juniper.example replied to "Juniper contract"', 'why': 'You emailed them on Thu 12 Nov', 'due_at': '2026-11-17T16:00:00Z', 'state': 'open'},
+        ],
+        'facts': [
+          {'id': 3, 'person': 'owner', 'kind': 'fact', 'subject': 'Lena Ortiz', 'text': 'Lena signs contracts with DocuSign', 'source': 'outside', 'updated_at': '2026-11-12T10:00:00Z'},
+          {'id': 4, 'person': 'owner', 'kind': 'howto', 'text': 'Draft contract replies; never send them', 'source': 'person', 'updated_at': '2026-11-12T10:00:00Z'},
+        ],
+        'diary': [
+          {'id': 1, 'person': 'owner', 'text': 'Drafted an email to Lena asking for the signed contract.', 'outcome': 'Sent Thu 12 Nov 16:00.', 'at': '2026-11-12T16:00:00Z'},
+        ],
+        'went_wrong': [
+          {'id': 9, 'person': 'owner', 'cause': 'declined', 'what': 'You declined its send email', 'note': 'too formal', 'can_keep': true, 'at': '2026-11-12T10:00:00Z'},
+        ],
+      });
+    }
+    if (RegExp(r'^/api/v1/(follow-ups|incidents)/[^/]+$').hasMatch(path) && r.method == 'POST') {
+      return path.contains('follow-ups')
+          ? _json(200, {'id': 'fu_1', 'person': 'owner', 'kind': 'reply', 'what': 'x', 'due_at': '2026-11-19T16:00:00Z', 'state': 'cancelled'})
+          : http.Response('', 204);
+    }
+    if (RegExp(r'^/api/v1/agents/[^/]+/brain/facts/\d+$').hasMatch(path) && r.method == 'DELETE') return http.Response('', 204);
     if (path == '/api/v1/chat-model' && r.method == 'GET') {
       return _json(200, {'provider': 'openai', 'model': chatModel, 'scope': 'default', 'models': ['deepseek-chat', 'deepseek-reasoner']});
     }

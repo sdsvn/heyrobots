@@ -120,6 +120,37 @@ void main() {
     expect(find.byType(AgentProfileScreen), findsNothing);
   });
 
+  testWidgets("an agent's page shows what it waits on, knows and got wrong, and each can be corrected", (tester) async {
+    await show(tester, AgentProfileScreen(state: state, agentId: 'ag_coder'));
+    await settle(tester);
+    for (final t in ['WAITING ON', 'WHAT IT KNOWS', 'Lena signs contracts with DocuSign', 'from mail or web', 'how-to', 'WENT WRONG LATELY', 'you said "too formal"', 'Sent Thu 12 Nov']) {
+      await tester.scrollUntilVisible(find.textContaining(t).first, 200);
+      expect(find.textContaining(t), findsWidgets, reason: t);
+    }
+
+    await tester.ensureVisible(find.byKey(const Key('keep:9')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('keep:9')));
+    await settle(tester);
+    final keep = server.requests.where((r) => r.method == 'POST' && r.url.path == '/api/v1/incidents/9').single;
+    expect(jsonDecode(keep.body), {'action': 'keep'});
+
+    await tester.ensureVisible(find.byKey(const Key('forget:3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('forget:3')));
+    await settle(tester);
+    expect(server.requests.where((r) => r.method == 'DELETE' && r.url.path == '/api/v1/agents/ag_coder/brain/facts/3'), hasLength(1));
+
+    await tester.ensureVisible(find.byKey(const Key('follow-up-menu:fu_1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('follow-up-menu:fu_1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await settle(tester);
+    final cancel = server.requests.where((r) => r.method == 'POST' && r.url.path == '/api/v1/follow-ups/fu_1').single;
+    expect(jsonDecode(cancel.body), {'action': 'cancel'});
+  });
+
   testWidgets('sending in a new direct chat starts it with the agent', (tester) async {
     await show(tester, ChatScreen(state: state, agent: coder));
     expect(find.text('Say hi to Coder'), findsOneWidget);

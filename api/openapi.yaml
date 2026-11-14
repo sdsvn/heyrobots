@@ -428,6 +428,86 @@ paths:
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
+  /api/v1/agents/{agentId}/brain:
+    parameters:
+      - name: agentId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getAgentBrain
+      description: What an agent keeps between tasks, for each person it works for - what it is waiting on, what it knows, its diary, and what went wrong lately. Owner devices only.
+      responses:
+        "200":
+          description: The agent's brain.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentBrain" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/agents/{agentId}/brain/facts/{factId}:
+    parameters:
+      - name: agentId
+        in: path
+        required: true
+        schema: { type: string }
+      - name: factId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      operationId: deleteAgentFact
+      description: Make the agent forget one fact. Owner devices only.
+      responses:
+        "204": { description: Forgotten. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/follow-ups/{followUpId}:
+    parameters:
+      - name: followUpId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      operationId: updateFollowUp
+      description: Cancel a follow-up, or move it to another time. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowUpUpdate" }
+      responses:
+        "200":
+          description: The follow-up.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FollowUp" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/incidents/{incidentId}:
+    parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    post:
+      operationId: updateIncident
+      description: "Mark something that went wrong as fixed, or keep your reason for declining as a how-to the agent follows from now on. Owner devices only."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IncidentUpdate" }
+      responses:
+        "204": { description: Done. }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /api/v1/skills:
     get:
       operationId: listSkills
@@ -1321,6 +1401,7 @@ components:
         presence: { $ref: "#/components/schemas/Presence" }
         home: { type: string, description: The machine that runs it, when that isn't this one. Such an agent is read-only here. }
         unavailable_since: { type: string, format: date-time, description: When its machine was last heard from, while unavailable. }
+        follow_ups_off: { type: boolean, description: Its follow-ups wait instead of starting tasks. }
     ChatModel:
       type: object
       required: [provider, model, scope, models]
@@ -1368,6 +1449,79 @@ components:
       properties:
         address: { type: string, minLength: 1, maxLength: 300 }
         code: { type: string, minLength: 1, maxLength: 20 }
+    AgentBrain:
+      type: object
+      required: [waiting_on, facts, diary, went_wrong]
+      properties:
+        waiting_on:
+          type: array
+          items: { $ref: "#/components/schemas/FollowUp" }
+        facts:
+          type: array
+          items: { $ref: "#/components/schemas/BrainFact" }
+        diary:
+          type: array
+          items: { $ref: "#/components/schemas/DiaryLine" }
+        went_wrong:
+          type: array
+          items: { $ref: "#/components/schemas/AgentIncident" }
+    BrainFact:
+      type: object
+      required: [id, person, kind, text, source, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        person: { type: string, description: "owner, or the delegate whose tasks it was learned on." }
+        kind: { type: string, description: "fact or howto." }
+        subject: { type: string }
+        text: { type: string }
+        source: { type: string, description: "person: they said it; seen: the agent worked it out; outside: read in mail or a page, may be wrong." }
+        updated_at: { type: string, format: date-time }
+    DiaryLine:
+      type: object
+      required: [id, person, text, at]
+      properties:
+        id: { type: integer, format: int64 }
+        person: { type: string }
+        text: { type: string }
+        outcome: { type: string, description: What became of what it proposed, such as sent or declined. }
+        thread_id: { type: string }
+        at: { type: string, format: date-time }
+    FollowUp:
+      type: object
+      required: [id, person, kind, what, due_at, state]
+      properties:
+        id: { type: string }
+        person: { type: string }
+        kind: { type: string, description: "task, or reply: the server's check for an answer to a sent email." }
+        what: { type: string }
+        why: { type: string }
+        check: { type: string }
+        due_at: { type: string, format: date-time }
+        state: { type: string, description: "open, fired (its task is running), done or cancelled." }
+        thread_id: { type: string }
+    FollowUpUpdate:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, description: "cancel or snooze." }
+        until: { type: string, format: date-time, description: For snooze, when it is due instead. }
+    AgentIncident:
+      type: object
+      required: [id, person, cause, what, at]
+      properties:
+        id: { type: integer, format: int64 }
+        person: { type: string }
+        cause: { type: string, description: "setup, routing, declined, stopped, failed, blocked or send_failed." }
+        what: { type: string, description: What went wrong, in the server's words. }
+        detail: { type: string, description: "More about it; for failed and blocked, the agent's own report. Left out for a delegate's work." }
+        note: { type: string, description: Your own words about it, such as why you declined. }
+        can_keep: { type: boolean, description: Your note can become a how-to the agent follows. }
+        at: { type: string, format: date-time }
+    IncidentUpdate:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, description: "fixed, or keep to make your note a how-to." }
     AgentRequest:
       type: object
       required: [name, purpose, toolsets, skills, capacity, color, badge, enabled]
@@ -1388,6 +1542,7 @@ components:
         enabled: { type: boolean }
         delegates: { type: array, items: { type: string } }
         rules: { type: array, items: { type: string } }
+        follow_ups_off: { type: boolean, description: Hold its follow-ups instead of starting tasks. }
     SkillList:
       type: object
       required: [skills]

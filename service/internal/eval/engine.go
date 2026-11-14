@@ -307,14 +307,33 @@ func (e *Engine) team() ([]AgentSummary, error) {
 	if err != nil {
 		return nil, err
 	}
+	now := time.Now()
+	if e.Now != nil {
+		now = e.Now()
+	}
+	var incidents []store.Incident
+	_ = e.Store.Tx(func(tx *store.Tx) error {
+		incidents, _ = tx.Incidents("", "", now.Add(-store.IncidentWindow), 500)
+		return nil
+	})
 	var out []AgentSummary
 	for _, a := range agents {
 		if !a.Enabled || (a.Home != "" && (e.Available == nil || !e.Available(a))) {
 			continue
 		}
 		l := loads[a.ID]
-		out = append(out, AgentSummary{ID: a.ID, Name: a.Name, Purpose: a.Purpose, Toolsets: a.ToolsetList(),
-			AnyToolset: a.AnyToolset, Working: len(l.Running), Waiting: l.Waiting})
+		s := AgentSummary{ID: a.ID, Name: a.Name, Purpose: a.Purpose, Toolsets: a.ToolsetList(),
+			AnyToolset: a.AnyToolset, Working: len(l.Running), Waiting: l.Waiting}
+		for _, in := range incidents {
+			switch {
+			case in.AgentID != a.ID:
+			case in.Cause == store.CauseSetup && !a.Allows(core.Toolset(in.Key)) && !slices.Contains(s.MissingSetup, core.Toolset(in.Key)):
+				s.MissingSetup = append(s.MissingSetup, core.Toolset(in.Key))
+			case in.Cause == store.CauseRouting && now.Sub(in.At) < 14*24*time.Hour:
+				s.HandedBack++
+			}
+		}
+		out = append(out, s)
 	}
 	return out, nil
 }
@@ -706,10 +725,19 @@ func (a *applier) accept(valid []string, primary *judged, r Route, note string) 
 	if len(primary.chat) > 0 {
 		// In a chat the agent is fixed: it works with what it can use, and
 		// says so itself if that isn't enough, rather than being refused.
+		for _, ts := range m.Toolsets {
+			if !ag.Allows(ts) {
+				m.Removed = append(m.Removed, ts)
+			}
+		}
 		m.Toolsets = slices.DeleteFunc(m.Toolsets, func(ts core.Toolset) bool { return !ag.Allows(ts) })
 	}
 	for _, ts := range m.Toolsets {
 		if !ag.Allows(ts) {
+			if err := a.tx.AddIncident(store.Incident{AgentID: ag.ID, Person: m.Person(), Cause: store.CauseSetup, Key: string(ts),
+				ThreadID: a.th.ID, Detail: "Asked for work that needs the " + string(ts) + " toolset: " + trimRunes(m.Scope, 200), At: a.now}); err != nil {
+				return err
+			}
 			return a.refuse(valid, primary, "", fmt.Sprintf("%s can't use the %s toolset", ag.Name, ts))
 		}
 	}
@@ -735,6 +763,12 @@ func (a *applier) accept(valid []string, primary *judged, r Route, note string) 
 	}
 	for _, id := range valid {
 		if err := a.tx.AddTicketInput(ticketID, id, a.now); err != nil {
+			return err
+		}
+	}
+	for _, ts := range m.Removed {
+		if err := a.tx.AddIncident(store.Incident{AgentID: ag.ID, Person: m.Person(), Cause: store.CauseSetup, Key: string(ts),
+			TicketID: ticketID, ThreadID: a.th.ID, Detail: "Asked in its chat for work that needs the " + string(ts) + " toolset: " + trimRunes(m.Scope, 200), At: a.now}); err != nil {
 			return err
 		}
 	}

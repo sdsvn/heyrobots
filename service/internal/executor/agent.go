@@ -19,6 +19,9 @@ func (r *run) agentSection() string {
 	if a.Purpose != "" {
 		fmt.Fprintf(&b, "Your job on the team: %s\n", a.Purpose)
 	}
+	if a.ID == core.GeneralAgent {
+		b.WriteString("You lead the team's general work. Before you take on work a specialist fits, or work an agent has struggled with, call team to see who can do what and what went wrong lately, and say who would be better placed when that helps the owner.\n")
+	}
 	if strings.TrimSpace(a.Instructions) != "" {
 		b.WriteString("\nThe owner's instructions for you:\n")
 		b.WriteString(strings.TrimSpace(a.Instructions))

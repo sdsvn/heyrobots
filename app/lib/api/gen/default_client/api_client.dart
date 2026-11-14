@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../http_request_options.dart';
 import 'models/add_skill_request.dart' as models show AddSkillRequest;
 import 'models/agent.dart' as models show Agent;
+import 'models/agent_brain.dart' as models show AgentBrain;
 import 'models/agent_list.dart' as models show AgentList;
 import 'models/agent_request.dart' as models show AgentRequest;
 import 'models/app_access.dart' as models show AppAccess;
@@ -28,12 +29,15 @@ import 'models/device.dart' as models show Device;
 import 'models/device_list.dart' as models show DeviceList;
 import 'models/digest_list.dart' as models show DigestList;
 import 'models/file_link.dart' as models show FileLink;
+import 'models/follow_up.dart' as models show FollowUp;
+import 'models/follow_up_update.dart' as models show FollowUpUpdate;
 import 'models/google_client.dart' as models show GoogleClient;
 import 'models/google_connect_finish.dart' as models show GoogleConnectFinish;
 import 'models/group.dart' as models show Group;
 import 'models/group_list.dart' as models show GroupList;
 import 'models/group_request.dart' as models show GroupRequest;
 import 'models/health.dart' as models show Health;
+import 'models/incident_update.dart' as models show IncidentUpdate;
 import 'models/job.dart' as models show Job;
 import 'models/job_list.dart' as models show JobList;
 import 'models/job_request.dart' as models show JobRequest;
@@ -1430,6 +1434,227 @@ class ApiClient {
       <String, Object?>{
         ...?options?.headers,
         'Accept': "application/json",
+      }.map((key, value) => MapEntry(key, value.toString())),
+    );
+    if (options?.followRedirects case final value?)
+      request.followRedirects = value;
+    if (options?.maxRedirects case final value?) request.maxRedirects = value;
+    prepareRequest?.call(request, extra);
+    final response = await _transport.send(request);
+    final _status = response.statusCode;
+    if (!(_status == 204)) {
+      await response.stream.listen(null).cancel();
+      throw http.ClientException('HTTP $_status', _url);
+    }
+    await response.stream.drain<void>();
+  }
+
+  /// What an agent keeps between tasks, for each person it works for - what it is waiting on, what it knows, its diary, and what went wrong lately. Owner devices only.
+  Future<models.AgentBrain> getAgentBrain({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://127.0.0.1:7340"},
+      ],
+      "openapi.security": [
+        {"deviceToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "deviceToken": {"type": "http", "scheme": "bearer"},
+      },
+    },
+    Future<void>? abortTrigger,
+    HttpRequestOptions? options,
+    required String agentId,
+  }) async {
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(agentId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    var _url = Uri.parse(
+      _base + ("/api/v1/agents/" + Uri.encodeComponent(agentId) + "/brain"),
+    );
+    final request = http.AbortableRequest(
+      "GET",
+      _url,
+      abortTrigger: abortTrigger,
+    );
+    request.headers.addAll(
+      <String, Object?>{
+        ...?options?.headers,
+        'Accept': "application/json",
+      }.map((key, value) => MapEntry(key, value.toString())),
+    );
+    if (options?.followRedirects case final value?)
+      request.followRedirects = value;
+    if (options?.maxRedirects case final value?) request.maxRedirects = value;
+    prepareRequest?.call(request, extra);
+    final response = await _transport.send(request);
+    final _status = response.statusCode;
+    if (!(_status == 200)) {
+      await response.stream.listen(null).cancel();
+      throw http.ClientException('HTTP $_status', _url);
+    }
+    return await convert.utf8.decoder.bind(response.stream).join().then((text) {
+      final Object? value = convert.jsonDecode(text);
+      return models.AgentBrain.fromJson(value as Map<String, Object?>);
+    });
+  }
+
+  /// Make the agent forget one fact. Owner devices only.
+  Future<void> deleteAgentFact({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://127.0.0.1:7340"},
+      ],
+      "openapi.security": [
+        {"deviceToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "deviceToken": {"type": "http", "scheme": "bearer"},
+      },
+    },
+    Future<void>? abortTrigger,
+    HttpRequestOptions? options,
+    required String agentId,
+    required int factId,
+  }) async {
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(agentId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    if (const {
+      '',
+      '.',
+      '..',
+    }.contains(Uri.encodeComponent(factId.toString()))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    var _url = Uri.parse(
+      _base +
+          ("/api/v1/agents/" +
+              Uri.encodeComponent(agentId) +
+              "/brain/facts/" +
+              Uri.encodeComponent(factId.toString())),
+    );
+    final request = http.AbortableRequest(
+      "DELETE",
+      _url,
+      abortTrigger: abortTrigger,
+    );
+    request.headers.addAll(
+      <String, Object?>{
+        ...?options?.headers,
+        'Accept': "application/json",
+      }.map((key, value) => MapEntry(key, value.toString())),
+    );
+    if (options?.followRedirects case final value?)
+      request.followRedirects = value;
+    if (options?.maxRedirects case final value?) request.maxRedirects = value;
+    prepareRequest?.call(request, extra);
+    final response = await _transport.send(request);
+    final _status = response.statusCode;
+    if (!(_status == 204)) {
+      await response.stream.listen(null).cancel();
+      throw http.ClientException('HTTP $_status', _url);
+    }
+    await response.stream.drain<void>();
+  }
+
+  /// Cancel a follow-up, or move it to another time. Owner devices only.
+  Future<models.FollowUp> updateFollowUp({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://127.0.0.1:7340"},
+      ],
+      "openapi.security": [
+        {"deviceToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "deviceToken": {"type": "http", "scheme": "bearer"},
+      },
+    },
+    Future<void>? abortTrigger,
+    HttpRequestOptions? options,
+    required String followUpId,
+    required models.FollowUpUpdate body,
+  }) async {
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(followUpId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    var _url = Uri.parse(
+      _base + ("/api/v1/follow-ups/" + Uri.encodeComponent(followUpId)),
+    );
+    final request = http.AbortableRequest(
+      "POST",
+      _url,
+      abortTrigger: abortTrigger,
+    );
+    request.bodyBytes = convert.utf8.encode(convert.jsonEncode(body));
+    request.headers.addAll(
+      <String, Object?>{
+        ...?options?.headers,
+        'Accept': "application/json",
+        'Content-Type': "application/json",
+      }.map((key, value) => MapEntry(key, value.toString())),
+    );
+    if (options?.followRedirects case final value?)
+      request.followRedirects = value;
+    if (options?.maxRedirects case final value?) request.maxRedirects = value;
+    prepareRequest?.call(request, extra);
+    final response = await _transport.send(request);
+    final _status = response.statusCode;
+    if (!(_status == 200)) {
+      await response.stream.listen(null).cancel();
+      throw http.ClientException('HTTP $_status', _url);
+    }
+    return await convert.utf8.decoder.bind(response.stream).join().then((text) {
+      final Object? value = convert.jsonDecode(text);
+      return models.FollowUp.fromJson(value as Map<String, Object?>);
+    });
+  }
+
+  /// Mark something that went wrong as fixed, or keep your reason for declining as a how-to the agent follows from now on. Owner devices only.
+  Future<void> updateIncident({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://127.0.0.1:7340"},
+      ],
+      "openapi.security": [
+        {"deviceToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "deviceToken": {"type": "http", "scheme": "bearer"},
+      },
+    },
+    Future<void>? abortTrigger,
+    HttpRequestOptions? options,
+    required int incidentId,
+    required models.IncidentUpdate body,
+  }) async {
+    if (const {
+      '',
+      '.',
+      '..',
+    }.contains(Uri.encodeComponent(incidentId.toString()))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    var _url = Uri.parse(
+      _base +
+          ("/api/v1/incidents/" + Uri.encodeComponent(incidentId.toString())),
+    );
+    final request = http.AbortableRequest(
+      "POST",
+      _url,
+      abortTrigger: abortTrigger,
+    );
+    request.bodyBytes = convert.utf8.encode(convert.jsonEncode(body));
+    request.headers.addAll(
+      <String, Object?>{
+        ...?options?.headers,
+        'Accept': "application/json",
+        'Content-Type': "application/json",
       }.map((key, value) => MapEntry(key, value.toString())),
     );
     if (options?.followRedirects case final value?)

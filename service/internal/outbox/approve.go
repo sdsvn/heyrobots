@@ -90,7 +90,7 @@ func Decide(tx *store.Tx, d Decision) (store.Effect, error) {
 		return e, err
 	}
 	if !d.Approve {
-		if err := afterDeclined(tx, e, d.Note); err != nil {
+		if err := afterDeclined(tx, e, d.Note, now); err != nil {
 			return e, err
 		}
 	}

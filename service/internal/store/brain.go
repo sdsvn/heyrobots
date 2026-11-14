@@ -320,7 +320,7 @@ func (tx *Tx) DueFollowUps(now time.Time, limit int) ([]BrainFollowUp, error) {
 
 // ForgetPerson removes everything every agent kept for a person.
 func (tx *Tx) ForgetPerson(person string) error {
-	for _, m := range []any{&BrainFact{}, &BrainDiary{}, &BrainFollowUp{}} {
+	for _, m := range []any{&BrainFact{}, &BrainDiary{}, &BrainFollowUp{}, &Incident{}} {
 		if err := tx.db.Where("person = ?", person).Delete(m).Error; err != nil {
 			return err
 		}

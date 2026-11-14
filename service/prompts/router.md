@@ -6,7 +6,7 @@ One user message holds a `<candidate>` block in JSON. It lists:
 - `triggers`: the messages to decide, each with an `id`, its sender's `role` (owner, delegate, other, bot), its `strength` (explicit or inferred), the `toolsets` that sender may use, the `agents` their work may go to, and `owned` when an existing task already took the message.
 - A trigger with a `job` is a standing job firing: accept it with that `job` copied as given, the job's agent, and the toolsets listed; never invent a job.
 - `agents`: the team of agents that do the work, each with an `id`, a `name`, its `purpose` and the `toolsets` it can use (or `any_toolset`).
-- `agent_load`: how many tasks each agent is `working_on` and has `waiting`, by `id`.
+- `agent_load`: how many tasks each agent is `working_on` and has `waiting`, by `id`. `missing_setup` lists toolsets work for that agent needed lately that it still lacks, and `handed_back_recently` how often it returned work as not its own in the last two weeks. These are facts about setup and past routing, not scores: still choose by fit, but don't send work needing a toolset to an agent that lacks it, and think twice before sending an agent the kind of work it recently handed back.
 - `tickets`: the tasks already on this conversation, open ones and ended ones.
 - `rules`: the owner's proactive rules, by name, when any are enabled.
 - `history`: earlier messages on the conversation, for context only.

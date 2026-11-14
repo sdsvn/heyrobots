@@ -69,6 +69,11 @@ type AgentSummary struct {
 	AnyToolset bool
 	Working    int
 	Waiting    int
+	// MissingSetup are toolsets work for it needed lately that it still
+	// lacks; HandedBack is how often it returned work as not its own in
+	// the last two weeks. Facts about setup and routing, not scores.
+	MissingSetup []core.Toolset `json:",omitempty"`
+	HandedBack   int            `json:",omitempty"`
 }
 
 // TicketSummary describes a Ticket on the Thread.

@@ -681,6 +681,9 @@ type Agent struct {
 	Delegates []string `json:"delegates"`
 	Enabled   bool     `json:"enabled"`
 
+	// FollowUpsOff Its follow-ups wait instead of starting tasks.
+	FollowUpsOff *bool `json:"follow_ups_off,omitempty"`
+
 	// Home The machine that runs it
 	Home         *string `json:"home,omitempty"`
 	Id           string  `json:"id"`
@@ -714,6 +717,36 @@ type AgentBadge string
 // AgentColor defines model for Agent.Color.
 type AgentColor string
 
+// AgentBrain defines model for AgentBrain.
+type AgentBrain struct {
+	Diary     []DiaryLine     `json:"diary"`
+	Facts     []BrainFact     `json:"facts"`
+	WaitingOn []FollowUp      `json:"waiting_on"`
+	WentWrong []AgentIncident `json:"went_wrong"`
+}
+
+// AgentIncident defines model for AgentIncident.
+type AgentIncident struct {
+	At time.Time `json:"at"`
+
+	// CanKeep Your note can become a how-to the agent follows.
+	CanKeep *bool `json:"can_keep,omitempty"`
+
+	// Cause setup, routing, declined, stopped, failed, blocked or send_failed.
+	Cause string `json:"cause"`
+
+	// Detail More about it; for failed and blocked, the agent's own report. Left out for a delegate's work.
+	Detail *string `json:"detail,omitempty"`
+	Id     int64   `json:"id"`
+
+	// Note Your own words about it
+	Note   *string `json:"note,omitempty"`
+	Person string  `json:"person"`
+
+	// What What went wrong
+	What string `json:"what"`
+}
+
 // AgentList defines model for AgentList.
 type AgentList struct {
 	Agents []Agent `json:"agents"`
@@ -732,13 +765,16 @@ type AgentRef struct {
 
 // AgentRequest defines model for AgentRequest.
 type AgentRequest struct {
-	AnyToolset   *bool                 `json:"any_toolset,omitempty"`
-	Badge        AgentRequestBadge     `json:"badge"`
-	BaseUrl      *string               `json:"base_url,omitempty"`
-	Capacity     int                   `json:"capacity"`
-	Color        AgentRequestColor     `json:"color"`
-	Delegates    *[]string             `json:"delegates,omitempty"`
-	Enabled      bool                  `json:"enabled"`
+	AnyToolset *bool             `json:"any_toolset,omitempty"`
+	Badge      AgentRequestBadge `json:"badge"`
+	BaseUrl    *string           `json:"base_url,omitempty"`
+	Capacity   int               `json:"capacity"`
+	Color      AgentRequestColor `json:"color"`
+	Delegates  *[]string         `json:"delegates,omitempty"`
+	Enabled    bool              `json:"enabled"`
+
+	// FollowUpsOff Hold its follow-ups instead of starting tasks.
+	FollowUpsOff *bool                 `json:"follow_ups_off,omitempty"`
 	Instructions *string               `json:"instructions,omitempty"`
 	Key          *string               `json:"key,omitempty"`
 	Model        *string               `json:"model,omitempty"`
@@ -959,6 +995,23 @@ type Brain struct {
 // BrainProvider defines model for Brain.Provider.
 type BrainProvider string
 
+// BrainFact defines model for BrainFact.
+type BrainFact struct {
+	Id int64 `json:"id"`
+
+	// Kind fact or howto.
+	Kind string `json:"kind"`
+
+	// Person owner, or the delegate whose tasks it was learned on.
+	Person string `json:"person"`
+
+	// Source person: they said it; seen: the agent worked it out; outside: read in mail or a page, may be wrong.
+	Source    string    `json:"source"`
+	Subject   *string   `json:"subject,omitempty"`
+	Text      string    `json:"text"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // BrainList defines model for BrainList.
 type BrainList struct {
 	// Chosen Both roles have a model that passed its test.
@@ -1080,6 +1133,18 @@ type DeviceList struct {
 	Devices []Device `json:"devices"`
 }
 
+// DiaryLine defines model for DiaryLine.
+type DiaryLine struct {
+	At time.Time `json:"at"`
+	Id int64     `json:"id"`
+
+	// Outcome What became of what it proposed
+	Outcome  *string `json:"outcome,omitempty"`
+	Person   string  `json:"person"`
+	Text     string  `json:"text"`
+	ThreadId *string `json:"thread_id,omitempty"`
+}
+
 // Digest defines model for Digest.
 type Digest struct {
 	Body      string    `json:"body"`
@@ -1104,6 +1169,32 @@ type FileLink struct {
 
 	// Url A path on the server, such as /files/abc; open it to download. It works without signing in, for 10 minutes.
 	Url string `json:"url"`
+}
+
+// FollowUp defines model for FollowUp.
+type FollowUp struct {
+	Check *string   `json:"check,omitempty"`
+	DueAt time.Time `json:"due_at"`
+	Id    string    `json:"id"`
+
+	// Kind task, or reply: the server's check for an answer to a sent email.
+	Kind   string `json:"kind"`
+	Person string `json:"person"`
+
+	// State open, fired (its task is running), done or cancelled.
+	State    string  `json:"state"`
+	ThreadId *string `json:"thread_id,omitempty"`
+	What     string  `json:"what"`
+	Why      *string `json:"why,omitempty"`
+}
+
+// FollowUpUpdate defines model for FollowUpUpdate.
+type FollowUpUpdate struct {
+	// Action cancel or snooze.
+	Action string `json:"action"`
+
+	// Until For snooze
+	Until *time.Time `json:"until,omitempty"`
 }
 
 // GoogleClient defines model for GoogleClient.
@@ -1145,6 +1236,12 @@ type Health struct {
 
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
+
+// IncidentUpdate defines model for IncidentUpdate.
+type IncidentUpdate struct {
+	// Action fixed, or keep to make your note a how-to.
+	Action string `json:"action"`
+}
 
 // Job defines model for Job.
 type Job struct {
@@ -1571,11 +1668,17 @@ type SetAppToolJSONRequestBody = AppToolUpdate
 // SetChatModelJSONRequestBody defines body for SetChatModel for application/json ContentType.
 type SetChatModelJSONRequestBody = ChatModelUpdate
 
+// UpdateFollowUpJSONRequestBody defines body for UpdateFollowUp for application/json ContentType.
+type UpdateFollowUpJSONRequestBody = FollowUpUpdate
+
 // CreateGroupJSONRequestBody defines body for CreateGroup for application/json ContentType.
 type CreateGroupJSONRequestBody = GroupRequest
 
 // UpdateGroupJSONRequestBody defines body for UpdateGroup for application/json ContentType.
 type UpdateGroupJSONRequestBody = GroupRequest
+
+// UpdateIncidentJSONRequestBody defines body for UpdateIncident for application/json ContentType.
+type UpdateIncidentJSONRequestBody = IncidentUpdate
 
 // SaveJobJSONRequestBody defines body for SaveJob for application/json ContentType.
 type SaveJobJSONRequestBody = JobRequest
@@ -1621,6 +1724,12 @@ type ServerInterface interface {
 
 	// (PUT /api/v1/agents/{agentId})
 	UpdateAgent(w http.ResponseWriter, r *http.Request, agentId string)
+
+	// (GET /api/v1/agents/{agentId}/brain)
+	GetAgentBrain(w http.ResponseWriter, r *http.Request, agentId string)
+
+	// (DELETE /api/v1/agents/{agentId}/brain/facts/{factId})
+	DeleteAgentFact(w http.ResponseWriter, r *http.Request, agentId string, factId int64)
 
 	// (GET /api/v1/approvals)
 	ListApprovals(w http.ResponseWriter, r *http.Request)
@@ -1679,6 +1788,9 @@ type ServerInterface interface {
 	// (POST /api/v1/files/{fileId}/link)
 	CreateFileLink(w http.ResponseWriter, r *http.Request, fileId string)
 
+	// (POST /api/v1/follow-ups/{followUpId})
+	UpdateFollowUp(w http.ResponseWriter, r *http.Request, followUpId string)
+
 	// (GET /api/v1/groups)
 	ListGroups(w http.ResponseWriter, r *http.Request)
 
@@ -1693,6 +1805,9 @@ type ServerInterface interface {
 
 	// (GET /api/v1/health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+
+	// (POST /api/v1/incidents/{incidentId})
+	UpdateIncident(w http.ResponseWriter, r *http.Request, incidentId int64)
 
 	// (GET /api/v1/jobs)
 	ListJobs(w http.ResponseWriter, r *http.Request)
@@ -1864,6 +1979,67 @@ func (siw *ServerInterfaceWrapper) UpdateAgent(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAgent(w, r, agentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAgentBrain operation middleware
+func (siw *ServerInterfaceWrapper) GetAgentBrain(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "agentId" -------------
+	var agentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "agentId", r.PathValue("agentId"), &agentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAgentBrain(w, r, agentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAgentFact operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAgentFact(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "agentId" -------------
+	var agentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "agentId", r.PathValue("agentId"), &agentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "factId" -------------
+	var factId int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "factId", r.PathValue("factId"), &factId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "factId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAgentFact(w, r, agentId, factId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2322,6 +2498,32 @@ func (siw *ServerInterfaceWrapper) CreateFileLink(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// UpdateFollowUp operation middleware
+func (siw *ServerInterfaceWrapper) UpdateFollowUp(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "followUpId" -------------
+	var followUpId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "followUpId", r.PathValue("followUpId"), &followUpId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "followUpId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateFollowUp(w, r, followUpId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListGroups operation middleware
 func (siw *ServerInterfaceWrapper) ListGroups(w http.ResponseWriter, r *http.Request) {
 
@@ -2407,6 +2609,32 @@ func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateIncident operation middleware
+func (siw *ServerInterfaceWrapper) UpdateIncident(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "incidentId" -------------
+	var incidentId int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "incidentId", r.PathValue("incidentId"), &incidentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "incidentId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateIncident(w, r, incidentId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3040,6 +3268,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agents", wrapper.CreateAgent)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/agents/{agentId}", wrapper.DeleteAgent)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/agents/{agentId}", wrapper.UpdateAgent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agents/{agentId}/brain", wrapper.GetAgentBrain)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/agents/{agentId}/brain/facts/{factId}", wrapper.DeleteAgentFact)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/follow-ups/{followUpId}", wrapper.UpdateFollowUp)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/incidents/{incidentId}", wrapper.UpdateIncident)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/skills", wrapper.ListSkills)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/skills/{name}", wrapper.DeleteSkill)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/skills/{name}", wrapper.SaveSkill)
