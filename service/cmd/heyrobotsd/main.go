@@ -217,9 +217,11 @@ func run() error {
 	if !cfg.Public {
 		cfg.Listen = withLoopback(cfg.Listen)
 	}
+	tailName := ""
 	if ips := tailnetIPs(); len(ips) > 0 && !cfg.Public {
 		cfg.Listen = withTailnet(cfg.Listen, ips)
-		log.Info("listening on the tailnet too", "addrs", ips)
+		tailName = tailnetName(ips)
+		log.Info("listening on the tailnet too", "addrs", ips, "name", tailName)
 	}
 	scheme := "http"
 	if cfg.TLSCert != "" {
@@ -286,7 +288,7 @@ func run() error {
 		Broker:    api.NewBroker(),
 		Log:       log,
 		ServerURL: cfg.ServerURL,
-		Addresses: reachable(cfg.ServerURL, cfg.Listen, scheme),
+		Addresses: reachable(cfg.ServerURL, cfg.Listen, scheme, tailName),
 		ShowPairingCode: func(code string, expires time.Time, servers []string) {
 			fmt.Fprint(os.Stderr, pairingBlock(code, expires, servers, scheme+"://"+localAddr(cfg.Listen[0])))
 			log.Info("pairing code issued; it is printed above")

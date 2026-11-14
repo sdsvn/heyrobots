@@ -10,16 +10,17 @@ import (
 )
 
 func TestPairingAddressesPutTheTailnetFirst(t *testing.T) {
-	listen := withTailnet([]string{"127.0.0.1:7340", "192.168.1.110:7340"}, []netip.Addr{netip.MustParseAddr("100.101.102.103")})
-	got := reachable("", listen, "http")
-	want := []string{"http://100.101.102.103:7340", "http://192.168.1.110:7340"}
+	listen := withTailnet([]string{"127.0.0.1:7340", "192.168.1.110:7340"}, []netip.Addr{netip.MustParseAddr("100.101.102.103"), netip.MustParseAddr("fd7a:115c:a1e0::1")})
+	got := reachable("", listen, "http", "laptop.tail1234.ts.net")
+	// The MagicDNS name first, then the tailnet IPv4 address; no IPv6.
+	want := []string{"http://laptop.tail1234.ts.net:7340", "http://100.101.102.103:7340", "http://192.168.1.110:7340"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("reachable = %v, want %v", got, want)
 	}
-	if got := reachable("https://me.example", []string{"127.0.0.1:7340"}, "http"); !slices.Equal(got, []string{"https://me.example"}) {
+	if got := reachable("https://me.example", []string{"127.0.0.1:7340"}, "http", ""); !slices.Equal(got, []string{"https://me.example"}) {
 		t.Fatalf("with a server URL = %v", got)
 	}
-	if got := reachable("", []string{"127.0.0.1:7340"}, "http"); len(got) != 0 {
+	if got := reachable("", []string{"127.0.0.1:7340"}, "http", ""); len(got) != 0 {
 		t.Fatalf("loopback only = %v, want none", got)
 	}
 }

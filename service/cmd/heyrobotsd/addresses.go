@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"net"
 	"net/netip"
 	"slices"
+	"strings"
+	"time"
 )
 
 // tailnet holds Tailscale's addresses: 100.64.0.0/10 and fd7a:115c:a1e0::/48.
@@ -30,6 +33,31 @@ func tailnetIPs() []netip.Addr {
 	return out
 }
 
+// tailnetName is this machine's MagicDNS name, such as
+// laptop.tail1234.ts.net, from Tailscale's own DNS; empty when MagicDNS is
+// off or doesn't answer in time.
+func tailnetName(ips []netip.Addr) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	magic := &net.Resolver{PreferGo: true, Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, network, "100.100.100.100:53")
+	}}
+	for _, ip := range ips {
+		if !ip.Is4() {
+			continue
+		}
+		for _, r := range []*net.Resolver{magic, net.DefaultResolver} {
+			names, err := r.LookupAddr(ctx, ip.String())
+			for _, n := range names {
+				if n = strings.TrimSuffix(n, "."); err == nil && strings.HasSuffix(n, ".ts.net") {
+					return n
+				}
+			}
+		}
+	}
+	return ""
+}
+
 // withTailnet adds a listen address on each tailnet IP, on the port of the
 // first listen address, unless one is there already.
 func withTailnet(listen []string, ips []netip.Addr) []string {
@@ -51,9 +79,11 @@ func withTailnet(listen []string, ips []netip.Addr) []string {
 }
 
 // reachable lists the addresses another device can pair with, best first:
-// the configured public one, then tailnet addresses, then other network
-// addresses the server listens on. This machine's own loopback is left out.
-func reachable(serverURL string, listen []string, scheme string) []string {
+// the configured public one, then the machine's MagicDNS name, then its
+// tailnet IPv4 address, then other network addresses the server listens on.
+// This machine's own loopback is left out, and so are tailnet IPv6
+// addresses, which the name and the IPv4 address already cover.
+func reachable(serverURL string, listen []string, scheme, tailName string) []string {
 	var out []string
 	add := func(u string) {
 		if u != "" && !slices.Contains(out, u) {
@@ -73,6 +103,13 @@ func reachable(serverURL string, listen []string, scheme string) []string {
 		}
 		u := scheme + "://" + a
 		if err == nil && slices.ContainsFunc(tailnet, func(t netip.Prefix) bool { return t.Contains(ip) }) {
+			if !ip.Is4() {
+				continue
+			}
+			if tailName != "" {
+				_, port, _ := net.SplitHostPort(a)
+				add(scheme + "://" + net.JoinHostPort(tailName, port))
+			}
 			add(u)
 		} else {
 			lan = append(lan, u)
