@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"heyrobots/service/internal/cluster"
 	"net/url"
 	"os"
 	"slices"
@@ -95,6 +96,16 @@ func statusCommand() error {
 	}
 	if dataInUse(cfg.DataDir) {
 		fmt.Println("running, with", cfg.DataDir)
+		var ms []cluster.Machine
+		if control("GET", "/machines", nil, &ms) == nil && len(ms) > 1 {
+			online := 0
+			for _, m := range ms {
+				if m.Online {
+					online++
+				}
+			}
+			fmt.Printf("in a team of %d machines, %d online (\"heyrobotsd machines\" lists them)\n", len(ms), online)
+		}
 		return nil
 	}
 	fmt.Println("not running, with", cfg.DataDir)

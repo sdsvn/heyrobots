@@ -19,6 +19,10 @@ Usage:
   heyrobotsd pair --link   print just the heyrobots:// link that signs the app in
   heyrobotsd pair --web    print just the web address that signs a browser in
   heyrobotsd status        say whether a server is running with this data folder (exit 3 if not)
+  heyrobotsd machines      list the machines in your team, online or when last seen
+  heyrobotsd machines code             show a code another machine uses to join this one
+  heyrobotsd machines join ADDR CODE   join the team of the machine at ADDR
+  heyrobotsd machines remove NAME|ID   take a machine out of the team
   heyrobotsd config        show the settings in effect, and where each comes from
   heyrobotsd version       print the version
   heyrobotsd help          show this

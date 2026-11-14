@@ -1043,6 +1043,7 @@ components:
         code: { type: string }
         device_name: { type: string, maxLength: 80 }
         platform: { type: string, maxLength: 40 }
+        install_id: { type: string, maxLength: 80, description: "The app's own id for this install, kept across sign-outs. Pairing again with it retires the older device." }
     PairResponse:
       type: object
       required: [device, token]

@@ -260,7 +260,11 @@ func (s *Server) PairDevice(w http.ResponseWriter, r *http.Request) {
 	if req.Platform != nil {
 		platform = *req.Platform
 	}
-	d, token, err := s.opts.Devices.Pair(req.Code, req.DeviceName, platform)
+	installID := ""
+	if req.InstallId != nil {
+		installID = *req.InstallId
+	}
+	d, token, err := s.opts.Devices.Pair(req.Code, req.DeviceName, platform, installID)
 	switch {
 	case errors.Is(err, devices.ErrBadRequest):
 		writeError(w, http.StatusBadRequest, err.Error())

@@ -95,6 +95,12 @@ func (n *Node) handlePair(w http.ResponseWriter, r *http.Request) {
 	}
 	now := n.Now().UTC()
 	req.Member.LastSeen = &now
+	// A machine removed earlier joins again with a fresh code.
+	if err := n.restore(req.Member.ID); err != nil {
+		n.Log.Error("cluster: pair", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	if err := n.merge(req.Member, true); err != nil {
 		n.Log.Error("cluster: pair", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -113,6 +119,11 @@ func (n *Node) handlePair(w http.ResponseWriter, r *http.Request) {
 func (n *Node) handleExchange(w http.ResponseWriter, r *http.Request) {
 	m, ok := n.memberByKey(keyOf(*r.TLS))
 	if !ok {
+		if n.wasRemoved(keyOf(*r.TLS)) {
+			// Tell it, so it leaves the team on its side too.
+			http.Error(w, "this machine was removed from the team", http.StatusGone)
+			return
+		}
 		http.Error(w, "not a member", http.StatusForbidden)
 		return
 	}
@@ -201,6 +212,9 @@ func (n *Node) post(ctx context.Context, c *http.Client, addr, path string, body
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusGone {
+		return errRemoved
+	}
 	if resp.StatusCode != http.StatusOK {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
 		return fmt.Errorf("%s: %s", resp.Status, bytes.TrimSpace(msg))
@@ -224,6 +238,15 @@ func (n *Node) Join(ctx context.Context, addr, code string) (store.Member, error
 	}
 	if out.From.Address == "" {
 		out.From.Address = addr
+	}
+	// Joining with a code brings back the machines this one left or
+	// removed, if the team still has them.
+	for _, r := range append([]info{out.From}, out.Roster...) {
+		if r.RemovedAt == nil {
+			if err := n.restore(r.ID); err != nil {
+				return store.Member{}, err
+			}
+		}
 	}
 	if err := n.receive(out); err != nil {
 		return store.Member{}, err
@@ -260,6 +283,9 @@ func (n *Node) exchange(ctx context.Context, m store.Member) error {
 	}
 	var in message
 	if err := n.post(ctx, n.client(m.PublicKey, nil), m.Address, "/cluster/exchange", out, &in); err != nil {
+		if errors.Is(err, errRemoved) {
+			return n.leave(m)
+		}
 		return err
 	}
 	if in.From.ID != m.ID {

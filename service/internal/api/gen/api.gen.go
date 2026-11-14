@@ -1402,9 +1402,12 @@ type ModelRoleUpdateProvider string
 
 // PairRequest defines model for PairRequest.
 type PairRequest struct {
-	Code       string  `json:"code"`
-	DeviceName string  `json:"device_name"`
-	Platform   *string `json:"platform,omitempty"`
+	Code       string `json:"code"`
+	DeviceName string `json:"device_name"`
+
+	// InstallId The app's own id for this install, kept across sign-outs. Pairing again with it retires the older device.
+	InstallId *string `json:"install_id,omitempty"`
+	Platform  *string `json:"platform,omitempty"`
 }
 
 // PairResponse defines model for PairResponse.

@@ -18,6 +18,9 @@ type Device struct {
 	CreatedAt    time.Time
 	LastSeenAt   *time.Time
 	RevokedAt    *time.Time
+	// InstallID is the app's own id for this install, which stays the same
+	// when it pairs again; empty for devices that don't send one.
+	InstallID string
 }
 
 // PairingCode is a one-time code that pairs one device. Only a hash of the
@@ -60,6 +63,12 @@ func (s *Store) Pair(codeHash []byte, now time.Time, d Device) (Device, error) {
 			return err
 		}
 		d.Role, d.DelegateName, d.CreatedAt = c.Role, c.DelegateName, now
+		// The same install pairing again replaces its older self.
+		if d.InstallID != "" {
+			if err := tx.Model(&Device{}).Where("install_id = ? AND revoked_at IS NULL", d.InstallID).Update("revoked_at", now).Error; err != nil {
+				return err
+			}
+		}
 		return tx.Create(&d).Error
 	})
 	return d, err

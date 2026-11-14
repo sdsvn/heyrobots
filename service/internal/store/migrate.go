@@ -579,6 +579,42 @@ var migrations = []migration{
 		// A reminder the person asked for speaks in the chat when due.
 		return tx.Exec("ALTER TABLE brain_follow_ups ADD COLUMN tell numeric NOT NULL DEFAULT false").Error
 	}},
+	{22, "a device that pairs again replaces itself", func(tx *gorm.DB) error {
+		if err := tx.Exec("ALTER TABLE devices ADD COLUMN install_id text NOT NULL DEFAULT ''").Error; err != nil {
+			return err
+		}
+		// Devices paired before this have no install id. Retire one that a
+		// newer device of the same name, kind and role replaced: the newer
+		// one paired after it was last seen, and it has been quiet a day.
+		type device struct {
+			ID, Name, Platform, Role, DelegateName string
+			CreatedAt                              time.Time
+			LastSeenAt                             *time.Time
+		}
+		var ds []device
+		if err := tx.Table("devices").Where("revoked_at IS NULL").Find(&ds).Error; err != nil {
+			return err
+		}
+		now := time.Now().UTC()
+		for _, d := range ds {
+			last := d.CreatedAt
+			if d.LastSeenAt != nil {
+				last = *d.LastSeenAt
+			}
+			if now.Sub(last) < 24*time.Hour {
+				continue
+			}
+			for _, n := range ds {
+				if n.ID != d.ID && n.Name == d.Name && n.Platform == d.Platform && n.Role == d.Role && n.DelegateName == d.DelegateName && n.CreatedAt.After(last) {
+					if err := tx.Table("devices").Where("id = ?", d.ID).Update("revoked_at", now).Error; err != nil {
+						return err
+					}
+					break
+				}
+			}
+		}
+		return nil
+	}},
 }
 
 type schemaMigration struct {

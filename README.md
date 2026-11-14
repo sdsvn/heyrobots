@@ -158,6 +158,8 @@ For faster replies, use a quick model for your agent: Sonnet at low thinking ans
 | New pairing code | `heyrobotsd pair` | `heyrobotsd pair` |
 | Version | `heyrobotsd version` | `heyrobotsd version` |
 | Settings in effect | `heyrobotsd config` | `heyrobotsd config` |
+| Machines in your team | `heyrobotsd machines` | `heyrobotsd machines` |
+| Add a machine | `heyrobotsd machines code` here, `heyrobotsd machines join ADDR CODE` there | same |
 | Update | Settings → Updates in the app | Settings → Updates in the app |
 | All commands | `heyrobotsd help` | `heyrobotsd help` |
 

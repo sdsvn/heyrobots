@@ -79,10 +79,11 @@ class AppState extends ChangeNotifier {
     late Uri server;
     Object? unreachable;
     var paired = false;
+    final install = await credentials.installId();
     for (final s in p.servers) {
       try {
         res = await openApi(s, inner: httpClient?.call())
-            .pairDevice(body: PairRequest(code: p.code.trim(), deviceName: deviceName.trim(), platform: platformName()))
+            .pairDevice(body: PairRequest(code: p.code.trim(), deviceName: deviceName.trim(), platform: platformName(), installId: install))
             .timeout(const Duration(seconds: 8));
         server = s;
         paired = true;

@@ -76,6 +76,8 @@ func main() {
 			return
 		case "config":
 			run = configCommand
+		case "machines":
+			run = func() error { return machinesCommand(os.Args[2:]) }
 		default:
 			// Anything else would start a server by mistake.
 			fmt.Fprintf(os.Stderr, "heyrobotsd: unknown command %q\n\n", os.Args[1])
@@ -482,6 +484,7 @@ func run() error {
 		}
 	}
 	go node.Run(ctx)
+	serveControl(ctx, cfg.DataDir, node, log)
 	if cfg.ClusterListen != "" {
 		go func() {
 			log.Info("machine link listening", "addr", cfg.ClusterListen, "member", node.ID(), "name", node.Name())

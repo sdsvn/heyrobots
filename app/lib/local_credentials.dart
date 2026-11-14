@@ -54,4 +54,24 @@ class FileCredentialStore implements CredentialStore {
   Future<void> clear() async {
     if (await file.exists()) await file.delete();
   }
+
+  @override
+  Future<String> installId() async {
+    // Beside the pairing, but not cleared with it.
+    final f = File('${file.parent.path}/install_id');
+    try {
+      final id = (await f.readAsString()).trim();
+      if (id.isNotEmpty) return id;
+    } on Object {
+      // Not made yet.
+    }
+    final made = newInstallId();
+    try {
+      await f.parent.create(recursive: true);
+      await f.writeAsString(made, flush: true);
+    } on Object {
+      // Unsaved, it is new at each pairing, as before.
+    }
+    return made;
+  }
 }

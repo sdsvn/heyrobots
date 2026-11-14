@@ -8,7 +8,7 @@ import 'platform.dart';
 CredentialStore? localCredentialStore() => _LocalStorageStore();
 
 class _LocalStorageStore implements CredentialStore {
-  static const _server = 'heyrobots.server', _token = 'heyrobots.device_token', _device = 'heyrobots.device_id';
+  static const _server = 'heyrobots.server', _token = 'heyrobots.device_token', _device = 'heyrobots.device_id', _install = 'heyrobots.install_id';
 
   web.Storage get _s => web.window.localStorage;
 
@@ -31,5 +31,14 @@ class _LocalStorageStore implements CredentialStore {
     for (final k in [_server, _token, _device]) {
       _s.removeItem(k);
     }
+  }
+
+  @override
+  Future<String> installId() async {
+    final id = _s.getItem(_install);
+    if (id != null && id.isNotEmpty) return id;
+    final made = newInstallId();
+    _s.setItem(_install, made);
+    return made;
   }
 }

@@ -83,9 +83,11 @@ func (s *Service) NewCode(role, delegateName, createdBy string) (Code, error) {
 
 // Pair uses a pairing code to create a device and returns the device and
 // its token. The token is never stored and can't be shown again.
-func (s *Service) Pair(code, name, platform string) (store.Device, string, error) {
-	name, platform = strings.TrimSpace(name), strings.TrimSpace(platform)
-	if name == "" || len(name) > 80 || len(platform) > 40 {
+// installID is the app's id for its install, which stays the same when
+// it pairs again; it may be empty.
+func (s *Service) Pair(code, name, platform, installID string) (store.Device, string, error) {
+	name, platform, installID = strings.TrimSpace(name), strings.TrimSpace(platform), strings.TrimSpace(installID)
+	if name == "" || len(name) > 80 || len(platform) > 40 || len(installID) > 80 {
 		return store.Device{}, "", fmt.Errorf("%w: device name must be 1 to 80 characters and platform up to 40", ErrBadRequest)
 	}
 	if s.limiter.Blocked() {
@@ -100,7 +102,7 @@ func (s *Service) Pair(code, name, platform string) (store.Device, string, error
 		return store.Device{}, "", err
 	}
 	d, err := s.store.Pair(hashCode(code), s.now().UTC(), store.Device{
-		ID: id, Name: name, Platform: platform, TokenHash: HashToken(token),
+		ID: id, Name: name, Platform: platform, TokenHash: HashToken(token), InstallID: installID,
 	})
 	if errors.Is(err, store.ErrCodeInvalid) {
 		s.limiter.Fail()

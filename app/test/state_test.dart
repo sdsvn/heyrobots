@@ -92,6 +92,18 @@ void main() {
     expect(again.attention, hasLength(1));
   });
 
+  test('pairing again after signing out sends the same install id', () async {
+    final s = newState();
+    await s.start();
+    await s.pair(payload, 'My phone');
+    await s.forget();
+    await s.pair(payload, 'My phone');
+    final ids = [for (final r in server.requests.where((r) => r.url.path == '/api/v1/pair')) (jsonDecode(r.body) as Map)['install_id']];
+    expect(ids, hasLength(2));
+    expect(ids.first, isA<String>());
+    expect(ids.first, ids.last);
+  });
+
   test("a wrong code shows the server's message", () async {
     final s = newState();
     await s.start();

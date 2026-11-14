@@ -34,7 +34,7 @@ func TestPairAndAuthenticate(t *testing.T) {
 	}
 	// Typing is forgiving: lower case, no dash, an O for a zero.
 	typed := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(code.Code, "-", ""), "0", "o"))
-	d, token, err := svc.Pair(typed, "Sarath's iPhone", "ios")
+	d, token, err := svc.Pair(typed, "Sarath's iPhone", "ios", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestCodeExpires(t *testing.T) {
 	svc, c := newService(t)
 	code, _ := svc.NewCode(RoleOwner, "", "setup")
 	c.advance(PairingTTL + time.Second)
-	if _, _, err := svc.Pair(code.Code, "phone", ""); !errors.Is(err, ErrInvalidCode) {
+	if _, _, err := svc.Pair(code.Code, "phone", "", ""); !errors.Is(err, ErrInvalidCode) {
 		t.Fatalf("err = %v, want ErrInvalidCode", err)
 	}
 }
@@ -68,7 +68,7 @@ func TestDelegateCodeCarriesRoleAndName(t *testing.T) {
 		t.Fatalf("delegate invite without a name err = %v", err)
 	}
 	code, _ := svc.NewCode(RoleDelegate, "partner", "dev_1")
-	d, _, err := svc.Pair(code.Code, "partner's phone", "android")
+	d, _, err := svc.Pair(code.Code, "partner's phone", "android", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,14 +84,14 @@ func TestPairingIsRateLimited(t *testing.T) {
 	svc, c := newService(t)
 	good, _ := svc.NewCode(RoleOwner, "", "setup")
 	for range 10 {
-		svc.Pair("AAAAA-AAAAA", "x", "")
+		svc.Pair("AAAAA-AAAAA", "x", "", "")
 	}
-	if _, _, err := svc.Pair(good.Code, "phone", ""); !errors.Is(err, ErrRateLimited) {
+	if _, _, err := svc.Pair(good.Code, "phone", "", ""); !errors.Is(err, ErrRateLimited) {
 		t.Fatalf("err = %v, want ErrRateLimited even for a good code", err)
 	}
 	c.advance(10*time.Minute + time.Second)
 	fresh, _ := svc.NewCode(RoleOwner, "", "setup")
-	if _, _, err := svc.Pair(fresh.Code, "phone", ""); err != nil {
+	if _, _, err := svc.Pair(fresh.Code, "phone", "", ""); err != nil {
 		t.Fatalf("after the window: %v", err)
 	}
 }
@@ -130,6 +130,32 @@ func TestCodeAlphabetIsReadable(t *testing.T) {
 		code, _ := randomCode()
 		if strings.ContainsAny(code, "ILOU") || len(code) != 11 || code[5] != '-' {
 			t.Fatalf("bad code %q", code)
+		}
+	}
+}
+
+// The same install pairing again replaces its older self; another install
+// with the same name stays.
+func TestPairingAgainReplacesTheSameInstall(t *testing.T) {
+	svc, _ := newService(t)
+	pair := func(name, install string) string {
+		t.Helper()
+		code, _ := svc.NewCode(RoleOwner, "", "setup")
+		_, token, err := svc.Pair(code.Code, name, "android", install)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return token
+	}
+	first := pair("Android phone", "inst-1")
+	other := pair("Android phone", "inst-2")
+	again := pair("Android phone", "inst-1")
+	if _, err := svc.Authenticate(first); !errors.Is(err, ErrInvalidToken) {
+		t.Errorf("the replaced pairing still works: %v", err)
+	}
+	for _, tok := range []string{other, again} {
+		if _, err := svc.Authenticate(tok); err != nil {
+			t.Errorf("a live pairing was retired: %v", err)
 		}
 	}
 }

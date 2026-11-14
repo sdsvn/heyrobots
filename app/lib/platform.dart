@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -17,6 +19,16 @@ abstract class CredentialStore {
   Future<Credentials?> load();
   Future<void> save(Credentials c);
   Future<void> clear();
+
+  /// This install's own id, made once and kept across sign-outs, so the
+  /// server can tell a device pairing again from a new one.
+  Future<String> installId();
+}
+
+/// A new random install id.
+String newInstallId() {
+  final r = Random.secure();
+  return List.generate(16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
 }
 
 /// Keeps the token in the Keychain on Apple devices and the Keystore on
@@ -31,6 +43,7 @@ class SecureCredentialStore implements CredentialStore {
   static const _server = 'server';
   static const _token = 'device_token';
   static const _device = 'device_id';
+  static const _install = 'install_id';
 
   @override
   Future<Credentials?> load() async {
@@ -54,6 +67,15 @@ class SecureCredentialStore implements CredentialStore {
     await _storage.delete(key: _device);
     await _storage.delete(key: _server);
   }
+
+  @override
+  Future<String> installId() async {
+    final id = await _storage.read(key: _install);
+    if (id != null && id.isNotEmpty) return id;
+    final made = newInstallId();
+    await _storage.write(key: _install, value: made);
+    return made;
+  }
 }
 
 /// Keeps the token in memory only, for tests and previews.
@@ -70,6 +92,11 @@ class MemoryCredentialStore implements CredentialStore {
 
   @override
   Future<void> clear() async => _saved = null;
+
+  final _install = newInstallId();
+
+  @override
+  Future<String> installId() async => _install;
 }
 
 enum VerifyResult { verified, failed, unavailable }

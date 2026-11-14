@@ -5,6 +5,9 @@ class PairRequest {
     required this.code,
     required this.deviceName,
     this.platform,
+
+    /// The app's own id for this install, kept across sign-outs. Pairing again with it retires the older device.
+    this.installId,
     this.additionalProperties = const {},
   });
 
@@ -12,6 +15,9 @@ class PairRequest {
     code: json["code"] as String,
     deviceName: json["device_name"] as String,
     platform: json.containsKey("platform") ? json["platform"] as String : null,
+    installId: json.containsKey("install_id")
+        ? json["install_id"] as String
+        : null,
     additionalProperties: {
       for (final entry in json.entries)
         if (!_knownKeys.contains(entry.key)) entry.key: entry.value,
@@ -24,7 +30,15 @@ class PairRequest {
 
   final String? platform;
 
-  static const _knownKeys = <String>{"code", "device_name", "platform"};
+  /// The app's own id for this install, kept across sign-outs. Pairing again with it retires the older device.
+  final String? installId;
+
+  static const _knownKeys = <String>{
+    "code",
+    "device_name",
+    "platform",
+    "install_id",
+  };
 
   final Map<String, Object?> additionalProperties;
 
@@ -34,5 +48,6 @@ class PairRequest {
     "code": this.code,
     "device_name": this.deviceName,
     if (this.platform != null) "platform": this.platform,
+    if (this.installId != null) "install_id": this.installId,
   };
 }

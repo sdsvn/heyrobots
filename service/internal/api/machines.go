@@ -23,41 +23,22 @@ func (s *Server) ListMachines(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, out)
 		return
 	}
-	ms, err := s.opts.Store.Members()
+	ms, err := c.Machines()
 	if err != nil {
 		s.internal(w, "list machines", err)
 		return
 	}
-	agents, err := s.opts.Store.Agents()
-	if err != nil {
-		s.internal(w, "list agents", err)
-		return
-	}
-	count := map[string]int{}
-	for _, a := range agents {
-		home := a.Home
-		if home == "" {
-			home = c.ID()
-		}
-		count[home]++
-	}
 	for _, m := range ms {
-		if m.RemovedAt != nil {
-			continue
-		}
-		v := gen.Machine{Id: m.ID, Name: m.Name, Self: m.ID == c.ID(), Online: c.Online(m), Agents: count[m.ID]}
+		v := gen.Machine{Id: m.ID, Name: m.Name, Self: m.Self, Online: m.Online, Agents: m.Agents}
 		if m.Address != "" {
 			addr := m.Address
 			v.Address = &addr
 		}
-		if seen := c.LastSeen(m); !seen.IsZero() && !v.Self {
+		if !m.LastSeen.IsZero() {
+			seen := m.LastSeen
 			v.LastSeen = &seen
 		}
-		if v.Self {
-			out.Machines = append([]gen.Machine{v}, out.Machines...)
-		} else {
-			out.Machines = append(out.Machines, v)
-		}
+		out.Machines = append(out.Machines, v)
 	}
 	writeJSON(w, http.StatusOK, out)
 }
