@@ -71,6 +71,16 @@ void main() {
     expect(find.text('Launch v2'), findsNothing);
   });
 
+  testWidgets('a file an agent shared shows as a download', (tester) async {
+    await show(tester, ChatScreen(state: state, threadId: 'th_coder', agent: coder));
+    expect(find.text('report.pdf'), findsOneWidget);
+    expect(find.text('PDF · 24 KB'), findsOneWidget);
+    expect(find.text('The test report'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('download:ef_9')));
+    await settle(tester);
+    expect(server.requests.where((r) => r.method == 'POST' && r.url.path == '/api/v1/files/ef_9/link'), hasLength(1));
+  });
+
   testWidgets('on a wide screen the open chat sits beside the list', (tester) async {
     await show(tester, ChatsTab(state: state));
     tester.view.physicalSize = const Size(2800, 1800);

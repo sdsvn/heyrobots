@@ -470,3 +470,65 @@ Future<bool> deleteChat(BuildContext context, AppState s, String threadId, Strin
   await s.refresh();
   return true;
 }
+
+/// A file an agent shared: its name, size and a Download button.
+class FileTile extends StatelessWidget {
+  const FileTile({super.key, required this.file, required this.onDownload});
+
+  final SharedFile file;
+  final VoidCallback onDownload;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    final type = file.type ?? '';
+    final ext = file.name.contains('.') ? file.name.split('.').last.toUpperCase() : 'FILE';
+    final icon = switch (type) {
+      'application/pdf' => Icons.picture_as_pdf_rounded,
+      final t when t.startsWith('image/') => Icons.image_rounded,
+      final t when t.contains('sheet') || t.contains('csv') => Icons.table_chart_rounded,
+      _ => Icons.insert_drive_file_rounded,
+    };
+    return Container(
+      key: Key('file:${file.id}'),
+      padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
+      decoration: BoxDecoration(color: p.ground, borderRadius: BorderRadius.circular(16), border: Border.all(color: p.line)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: p.accentSoft, borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: p.accent, size: 22),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(file.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: p.ink)),
+                Text('$ext · ${fileSize(file.size)}', style: TextStyle(fontSize: 12, color: p.muted)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          TextButton.icon(
+            key: Key('download:${file.id}'),
+            onPressed: onDownload,
+            icon: Icon(Icons.download_rounded, size: 18, color: p.accent),
+            label: Text('Download', style: TextStyle(fontWeight: FontWeight.w900, color: p.accent)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 812 B, 14 KB, 2.3 MB.
+String fileSize(int bytes) => bytes < 1024
+    ? '$bytes B'
+    : bytes < 1024 * 1024
+    ? '${(bytes / 1024).round()} KB'
+    : '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';

@@ -48,6 +48,8 @@ type Options struct {
 	Jobs *jobs.Library
 	// MCP reads the owner's MCP servers' tools.
 	MCP *gateway.MCP
+	// Files is where shared files are kept.
+	Files string
 	// Registry finds MCP servers in the official MCP registry.
 	Registry *registry.Client
 	Broker   *Broker
@@ -101,6 +103,7 @@ type Server struct {
 	opts    Options
 	setup   *setupState
 	signIns mcpSignIns
+	links   fileLinks
 }
 
 var _ gen.ServerInterface = (*Server)(nil)
@@ -156,6 +159,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /setup", s.setupSubmit)
 	mux.HandleFunc("GET /oauth/google/callback", s.GoogleCallback)
 	mux.HandleFunc("GET /oauth/mcp/callback", s.MCPCallback)
+	mux.HandleFunc("GET /files/{key}", s.DownloadFile)
 	gen.HandlerWithOptions(s, gen.StdHTTPServerOptions{
 		BaseRouter:  mux,
 		Middlewares: []gen.MiddlewareFunc{s.authenticate},

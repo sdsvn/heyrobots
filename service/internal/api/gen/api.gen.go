@@ -1098,6 +1098,14 @@ type Error struct {
 	Error string `json:"error"`
 }
 
+// FileLink defines model for FileLink.
+type FileLink struct {
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// Url A path on the server, such as /files/abc; open it to download. It works without signing in, for 10 minutes.
+	Url string `json:"url"`
+}
+
 // GoogleClient defines model for GoogleClient.
 type GoogleClient struct {
 	ClientId     string `json:"client_id"`
@@ -1388,6 +1396,18 @@ type SendMessageResponse struct {
 	TriggerId string `json:"trigger_id"`
 }
 
+// SharedFile A file an agent shared in the chat, to download.
+type SharedFile struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+
+	// Size In bytes.
+	Size int `json:"size"`
+
+	// Type Its media type, such as application/pdf.
+	Type *string `json:"type,omitempty"`
+}
+
 // Skill defines model for Skill.
 type Skill struct {
 	Description string `json:"description"`
@@ -1429,12 +1449,15 @@ type ThreadDetail struct {
 
 // ThreadItem defines model for ThreadItem.
 type ThreadItem struct {
-	Action     *string        `json:"action,omitempty"`
-	Agent      *AgentRef      `json:"agent,omitempty"`
-	Approval   *string        `json:"approval,omitempty"`
-	At         time.Time      `json:"at"`
-	Card       *ChatCard      `json:"card,omitempty"`
-	Decision   *string        `json:"decision,omitempty"`
+	Action   *string   `json:"action,omitempty"`
+	Agent    *AgentRef `json:"agent,omitempty"`
+	Approval *string   `json:"approval,omitempty"`
+	At       time.Time `json:"at"`
+	Card     *ChatCard `json:"card,omitempty"`
+	Decision *string   `json:"decision,omitempty"`
+
+	// File A file an agent shared in the chat, to download.
+	File       *SharedFile    `json:"file,omitempty"`
 	From       *string        `json:"from,omitempty"`
 	Id         string         `json:"id"`
 	Kind       ThreadItemKind `json:"kind"`
@@ -1652,6 +1675,9 @@ type ServerInterface interface {
 
 	// (GET /api/v1/events)
 	StreamEvents(w http.ResponseWriter, r *http.Request)
+
+	// (POST /api/v1/files/{fileId}/link)
+	CreateFileLink(w http.ResponseWriter, r *http.Request, fileId string)
 
 	// (GET /api/v1/groups)
 	ListGroups(w http.ResponseWriter, r *http.Request)
@@ -2261,6 +2287,32 @@ func (siw *ServerInterfaceWrapper) StreamEvents(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.StreamEvents(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateFileLink operation middleware
+func (siw *ServerInterfaceWrapper) CreateFileLink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "fileId" -------------
+	var fileId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "fileId", r.PathValue("fileId"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateFileLink(w, r, fileId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2970,6 +3022,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/events", wrapper.StreamEvents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/messages", wrapper.SendMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/threads", wrapper.ListThreads)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/files/{fileId}/link", wrapper.CreateFileLink)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/threads/{threadId}", wrapper.DeleteThread)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/threads/{threadId}", wrapper.GetThread)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/policy", wrapper.GetPolicy)

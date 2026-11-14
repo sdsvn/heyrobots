@@ -328,6 +328,10 @@ class FakeServer {
       s.addAll((jsonDecode(r.body) as Map<String, Object?>)..remove('purpose'));
       return _json(200, s);
     }
+    final link = RegExp(r'^/api/v1/files/([^/]+)/link$').firstMatch(path);
+    if (link != null && r.method == 'POST') {
+      return _json(200, {'url': '/files/key-${link[1]}', 'expires_at': '2026-11-11T09:41:00Z'});
+    }
     final thread = RegExp(r'^/api/v1/threads/([^/]+)$').firstMatch(path);
     if (thread != null && r.method == 'DELETE') {
       threads.removeWhere((t) => t['id'] == thread[1]);
@@ -425,6 +429,10 @@ class FakeServer {
       'items': [
         {'kind': 'message', 'id': 'm1', 'at': '2026-11-11T09:30:00Z', 'from': 'app:owner', 'text': 'Run the tests every night'},
         {'kind': 'reply', 'id': 'r1', 'at': '2026-11-11T09:31:00Z', 'ticket_id': 'tk_c', 'text': 'Done. They run at 02:00.', 'status': 'sent'},
+        {
+          'kind': 'reply', 'id': 'ef_9', 'at': '2026-11-11T09:31:00Z', 'ticket_id': 'tk_c', 'text': 'The test report', 'status': 'sent',
+          'file': {'id': 'ef_9', 'name': 'report.pdf', 'size': 24576, 'type': 'application/pdf'},
+        },
         {
           'kind': 'card', 'id': 'c1', 'at': '2026-11-11T09:31:00Z', 'ticket_id': 'tk_c',
           'card': {'kind': 'job', 'title': 'Nightly test run', 'subtitle': 'Every day 02:00 · first one tonight', 'link': 'plans'},

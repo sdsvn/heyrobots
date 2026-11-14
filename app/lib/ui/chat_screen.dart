@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api/session.dart';
 import '../state.dart';
@@ -507,6 +508,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 maxWidth: maxBubble,
                 cardState: (c) => _cardState(c),
                 onCard: _openCard,
+                onFile: _download,
               ),
             ),
           );
@@ -741,6 +743,18 @@ class _ChatScreenState extends State<ChatScreen> {
     if (await deleteChat(context, s, _threadId!, name) && mounted && !widget.embedded) Navigator.of(context).maybePop();
   }
 
+  /// Downloads a shared file: the server gives a short-lived link, and the
+  /// browser or the system downloads it from there.
+  Future<void> _download(SharedFile f) async {
+    try {
+      final link = await s.api.createFileLink(fileId: f.id);
+      final url = s.server!.resolve(link.url);
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication) && mounted) showMessage(context, 'Open $url to download ${f.name}.');
+    } catch (e) {
+      if (mounted) showMessage(context, describeError(e));
+    }
+  }
+
   Widget _composer(Palette p, String name, double side) {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(999),
@@ -962,9 +976,11 @@ class _TheirBubble extends StatelessWidget {
     required this.maxWidth,
     required this.cardState,
     required this.onCard,
+    required this.onFile,
   });
 
   final _Entry entry;
+  final Future<void> Function(SharedFile) onFile;
   final bool group, showName, lastOfRun;
   final double maxWidth;
   final ({String? action, bool confirmed}) Function(ChatCard) cardState;
@@ -979,6 +995,9 @@ class _TheirBubble extends StatelessWidget {
     for (final part in entry.parts) {
       if (part.kind == ThreadItemKind.card) {
         texts.add(_CardTile(card: part.card!, state: cardState(part.card!), onTap: () => onCard(part.card!)));
+      } else if (part.file case final f?) {
+        if ((part.text ?? '').isNotEmpty && part.text != f.name) texts.add(SelectableText(part.text!, style: TextStyle(fontSize: 15, height: 1.4, color: p.ink)));
+        texts.add(FileTile(file: f, onDownload: () => onFile(f)));
       } else if ((part.text ?? '').isNotEmpty) {
         final failed = part.status == 'failed' || part.status == 'uncertain';
         texts.add(SelectableText(part.text!, style: TextStyle(fontSize: 15, height: 1.4, color: p.ink)));

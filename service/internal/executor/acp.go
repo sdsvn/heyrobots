@@ -95,10 +95,23 @@ func (r *run) runACP(ctx context.Context, tools []tool.Tool) (report, error) {
 	default:
 		s := client.text()
 		if s == "" {
-			s = "I stopped before finishing and didn't say why."
+			s = stopWhy(stop)
 		}
 		return report{State: "blocked", Summary: shorten(s, 2000)}, nil
 	}
+}
+
+// stopWhy says, in plain words, why a turn ended without a report.
+func stopWhy(stop sdk.StopReason) string {
+	switch stop {
+	case sdk.StopReasonMaxTokens:
+		return "My answer got too long and was cut off before I finished. Ask me to carry on, or to do it in smaller parts."
+	case sdk.StopReasonMaxTurnRequests:
+		return "I used up my steps for this turn before finishing. Reply and I'll carry on from where I stopped."
+	case sdk.StopReasonCancelled:
+		return "My turn was cancelled before I finished. Reply and I'll carry on."
+	}
+	return "I stopped before finishing without saying why. Reply and I'll carry on."
 }
 
 func (r *run) reported() *report {

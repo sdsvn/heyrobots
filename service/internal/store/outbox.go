@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -212,4 +213,28 @@ func AddressReply(e Effect, requester core.Identity, owner bool) Effect {
 		e.Status, e.Approval = EffectAwaitingApproval, ApprovalAwaiting
 	}
 	return e
+}
+
+// KindFile is an Effect that shares a file in a chat.
+const KindFile = "file"
+
+// SharedFile is what a file Effect's Payload holds: the file as the person
+// sees it, and where the server keeps its copy, relative to the files folder.
+type SharedFile struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+	Type string `json:"type"`
+	Path string `json:"path"`
+}
+
+// File returns the file a file Effect shares.
+func (e Effect) File() (SharedFile, bool) {
+	if e.Kind != KindFile {
+		return SharedFile{}, false
+	}
+	var f SharedFile
+	if json.Unmarshal([]byte(e.Payload), &f) != nil || f.Path == "" {
+		return SharedFile{}, false
+	}
+	return f, true
 }

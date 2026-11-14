@@ -139,6 +139,23 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ThreadList" }
         "401": { $ref: "#/components/responses/Error" }
+  /api/v1/files/{fileId}/link:
+    post:
+      operationId: createFileLink
+      description: A short-lived link to download a file an agent shared, for a device that can see its chat. The link needs no sign-in, so a browser can download it.
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The link.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FileLink" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /api/v1/threads/{threadId}:
     get:
       operationId: getThread
@@ -1011,6 +1028,22 @@ components:
         recipients: { type: string }
         approval: { type: string }
         last_error: { type: string }
+        file: { $ref: "#/components/schemas/SharedFile" }
+    SharedFile:
+      type: object
+      description: A file an agent shared in the chat, to download.
+      required: [id, name, size]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        size: { type: integer, description: In bytes. }
+        type: { type: string, description: "Its media type, such as application/pdf." }
+    FileLink:
+      type: object
+      required: [url, expires_at]
+      properties:
+        url: { type: string, description: "A path on the server, such as /files/abc; open it to download. It works without signing in, for 10 minutes." }
+        expires_at: { type: string, format: date-time }
     TicketView:
       type: object
       required: [id, scope, open, stage, stopped]

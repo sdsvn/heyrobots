@@ -97,6 +97,8 @@ type Engine struct {
 	AgentModel func(ctx context.Context, a store.Agent) (model.LLM, error)
 	// Jobs is the owner's standing jobs.
 	Jobs *jobs.Library
+	// Files is where files agents share in chats are kept.
+	Files string
 	// Registry finds MCP servers for the setup toolset.
 	Registry *registry.Client
 	// BudgetStop is checked before every model call. When it returns a
@@ -373,7 +375,11 @@ func (r *run) work(ctx context.Context) (report, error) {
 	if err != nil {
 		return report{State: "failed", Summary: "The worker couldn't start."}, err
 	}
-	tools = append(tools, team)
+	share, err := r.shareTool()
+	if err != nil {
+		return report{State: "failed", Summary: "The worker couldn't start."}, err
+	}
+	tools = append(tools, team, share)
 	if slices.Contains(r.toolsets, core.ToolsetSetup) {
 		setup, err := r.setupTools()
 		if err != nil {

@@ -2,6 +2,7 @@
 
 import 'agent_ref.dart';
 import 'chat_card.dart';
+import 'shared_file.dart';
 import 'thread_item_kind.dart';
 
 class ThreadItem {
@@ -21,6 +22,9 @@ class ThreadItem {
     this.recipients,
     this.approval,
     this.lastError,
+
+    /// A file an agent shared in the chat, to download.
+    this.file,
     this.additionalProperties = const {},
   });
 
@@ -49,6 +53,9 @@ class ThreadItem {
     approval: json.containsKey("approval") ? json["approval"] as String : null,
     lastError: json.containsKey("last_error")
         ? json["last_error"] as String
+        : null,
+    file: json.containsKey("file")
+        ? SharedFile.fromJson(json["file"] as Map<String, Object?>)
         : null,
     additionalProperties: {
       for (final entry in json.entries)
@@ -86,6 +93,9 @@ class ThreadItem {
 
   final String? lastError;
 
+  /// A file an agent shared in the chat, to download.
+  final SharedFile? file;
+
   static const _knownKeys = <String>{
     "kind",
     "id",
@@ -102,6 +112,7 @@ class ThreadItem {
     "recipients",
     "approval",
     "last_error",
+    "file",
   };
 
   final Map<String, Object?> additionalProperties;
@@ -124,5 +135,6 @@ class ThreadItem {
     if (this.recipients != null) "recipients": this.recipients,
     if (this.approval != null) "approval": this.approval,
     if (this.lastError != null) "last_error": this.lastError,
+    if (this.file != null) "file": this.file?.toJson(),
   };
 }

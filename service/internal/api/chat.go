@@ -308,6 +308,7 @@ func (s *Server) GetThread(w http.ResponseWriter, r *http.Request, threadID stri
 			item.LastError = &le
 		}
 		cardItem(e, &item)
+		item.File = fileView(e)
 		out.Items = append(out.Items, item)
 	}
 	order := map[gen.ThreadItemKind]int{gen.Message: 0, gen.Decision: 1, gen.Reply: 2, gen.Action: 2, gen.Card: 2}

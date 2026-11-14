@@ -27,6 +27,7 @@ import 'models/connect_result.dart' as models show ConnectResult;
 import 'models/device.dart' as models show Device;
 import 'models/device_list.dart' as models show DeviceList;
 import 'models/digest_list.dart' as models show DigestList;
+import 'models/file_link.dart' as models show FileLink;
 import 'models/google_client.dart' as models show GoogleClient;
 import 'models/google_connect_finish.dart' as models show GoogleConnectFinish;
 import 'models/group.dart' as models show Group;
@@ -566,6 +567,57 @@ class ApiClient {
     return await convert.utf8.decoder.bind(response.stream).join().then((text) {
       final Object? value = convert.jsonDecode(text);
       return models.ThreadList.fromJson(value as Map<String, Object?>);
+    });
+  }
+
+  /// A short-lived link to download a file an agent shared, for a device that can see its chat. The link needs no sign-in, so a browser can download it.
+  Future<models.FileLink> createFileLink({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://127.0.0.1:7340"},
+      ],
+      "openapi.security": [
+        {"deviceToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "deviceToken": {"type": "http", "scheme": "bearer"},
+      },
+    },
+    Future<void>? abortTrigger,
+    HttpRequestOptions? options,
+    required String fileId,
+  }) async {
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(fileId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    var _url = Uri.parse(
+      _base + ("/api/v1/files/" + Uri.encodeComponent(fileId) + "/link"),
+    );
+    final request = http.AbortableRequest(
+      "POST",
+      _url,
+      abortTrigger: abortTrigger,
+    );
+    request.headers.addAll(
+      <String, Object?>{
+        ...?options?.headers,
+        'Accept': "application/json",
+      }.map((key, value) => MapEntry(key, value.toString())),
+    );
+    if (options?.followRedirects case final value?)
+      request.followRedirects = value;
+    if (options?.maxRedirects case final value?) request.maxRedirects = value;
+    prepareRequest?.call(request, extra);
+    final response = await _transport.send(request);
+    final _status = response.statusCode;
+    if (!(_status == 200)) {
+      await response.stream.listen(null).cancel();
+      throw http.ClientException('HTTP $_status', _url);
+    }
+    return await convert.utf8.decoder.bind(response.stream).join().then((text) {
+      final Object? value = convert.jsonDecode(text);
+      return models.FileLink.fromJson(value as Map<String, Object?>);
     });
   }
 
