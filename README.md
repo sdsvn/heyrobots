@@ -1,51 +1,39 @@
+<p align="center">
+  <img src="docs/images/social-preview.png" alt="heyrobots: your own team of AI agents, running on your own machines" width="720">
+</p>
+
 # heyrobots
 
-A personal team of AI agents that runs on your own machines. You chat with your agents from your phone or a browser. They work with your mail, calendar, files and apps, and anything that reaches other people waits for your OK.
+**Your own team of AI agents, running on your own machines.** Chat with your agents from your phone, a browser or the Mac app. They work with your mail, calendar, files and apps. Anything that reaches other people waits for your OK.
 
-heyrobots has two parts:
+- **A team, not one bot.** Each agent has its own job, tools, skills and model. Message one directly, or put several in a group chat where they answer, split the work and pass pieces to each other.
+- **Runs on what you already pay for.** Use Claude Code or [omp](https://omp.sh) on your own subscription, an API key (Anthropic, OpenAI, DeepSeek, Gemini), or a model on your machine (Ollama, LM Studio).
+- **Any app.** Connect from a starter set (Gmail, Calendar, Linear, Notion, GitHub, Jira, Stripe, Figma, Zapier and more), search the official MCP registry, or paste any MCP server. Add skills from [skills.sh](https://skills.sh). An IT agent can set this up for you.
+- **Safe by default.** Outward actions (sending, posting, changing things) wait for your approval. Content from outside, such as mail or web pages, is read in quarantine and treated as untrusted, and agents can't change their own rules.
+- **Always on, across your machines.** The server runs as a background service on a Mac, a Linux box or a cloud machine. Several machines can join into one team, and your phone is just a window onto it.
+- **Your data stays yours.** Chats, memory and keys live in a folder on your machine. Keys go in an encrypted vault.
 
-- **The server, `heyrobotsd`.** One program that holds your team, your chats and your keys. It runs on a Mac, a Linux box or a cloud machine, and it serves the web app too. Several servers can join into one team.
-- **The app.** The same app runs in a browser, on macOS, on Linux and on Android. It talks to one server at a time.
+## Quick start
 
-## Downloads
-
-Every release on the repository's **Releases** page has these files. `vX.Y.Z` is the version.
-
-| File | What it is |
-|---|---|
-| `heyrobotsd-vX.Y.Z-darwin-arm64.tar.gz` | Server for Apple silicon Macs |
-| `heyrobotsd-vX.Y.Z-darwin-amd64.tar.gz` | Server for Intel Macs |
-| `heyrobotsd-vX.Y.Z-linux-amd64.tar.gz` | Server for Linux on x86-64 |
-| `heyrobotsd-vX.Y.Z-linux-arm64.tar.gz` | Server for Linux on ARM, such as a Raspberry Pi 4 or 5 |
-| `heyrobots-app-vX.Y.Z-macos.zip` | App for macOS |
-| `heyrobots-app-vX.Y.Z-linux-x64.tar.gz` | App for Linux on x86-64 |
-| `heyrobots-app-vX.Y.Z-android.apk` | App for Android |
-| `SHA256SUMS.txt` | Checksums for every file above |
-
-Check a download before you use it:
-
-```bash
-shasum -a 256 -c SHA256SUMS.txt --ignore-missing
-```
-
-## Install
-
-One line installs everything on your Mac or Linux machine:
+On a Mac or Linux machine:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sdsvn/heyrobots/main/install.sh | bash
 ```
 
-It does four things:
+That one line:
 
 1. **Installs the server,** `heyrobotsd`, in `~/.local/bin`, after checking it against the release's checksums.
 2. **Runs it in the background,** starting at login: a launchd service on a Mac, a systemd user service on Linux.
-3. **Installs the app** in `/Applications` on a Mac. Installed this way, macOS opens it without the "can't be opened" message.
-4. **Opens the app, already signed in.** There's no pairing step on the same machine. On Linux, the web app opens in your browser, signed in.
+3. **Installs the Mac app** in `/Applications`. Installed this way, macOS opens it without asking.
+4. **Opens the app, already signed in.** On Linux, the web app opens in your browser, signed in.
 
-Run it again to upgrade; it replaces everything in place and keeps your data. If you already run a server by hand, stop it first, since the installer won't start a second one on the same data.
+Then pick a brain (Settings → Brain): your own agent, an API key, or a local model. Run the same line again to upgrade; it keeps your data.
 
-While the repository is private, an anonymous download can't reach it. Sign in with the GitHub CLI and run the script through it:
+<details>
+<summary>The repository is private: installing with the GitHub CLI or a token</summary>
+
+An anonymous download can't reach a private repository. Sign in with the GitHub CLI and run the script through it:
 
 ```bash
 gh api repos/sdsvn/heyrobots/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
@@ -57,31 +45,90 @@ Or use a token that can read the repository:
 curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" https://raw.githubusercontent.com/sdsvn/heyrobots/main/install.sh | GITHUB_TOKEN="$GITHUB_TOKEN" bash
 ```
 
-| Setting | What it does |
-|---|---|
-| `HEYROBOTS_VERSION` | Install a given release, such as `v0.2.0`, instead of the latest |
-| `HEYROBOTS_INSTALL_DIR` | Put `heyrobotsd` somewhere else, such as `/usr/local/bin` |
-| `HEYROBOTS_APP_DIR` | Put the Mac app somewhere else |
-| `HEYROBOTS_NO_SERVICE=1` | Install the server only, and run it yourself |
-| `HEYROBOTS_NO_APP=1` | Don't install or open the app |
+</details>
 
-Any other `HEYROBOTS_*` setting you give the installer is passed on to the service, along with your `PATH`, so it finds `claude`, `omp`, `npx` and Docker. For example, this installs a service that uses omp and also listens on your Wi-Fi:
+## How it fits together
 
-```bash
-curl -fsSL … | HEYROBOTS_ACP_COMMAND="omp acp --model claude-sonnet-5-5 --thinking low --no-extensions" HEYROBOTS_LISTEN="127.0.0.1:7340,192.168.1.110:7340" bash
+```
+ phone · browser · Mac app ──HTTPS──▶ heyrobotsd ◀──mutual TLS──▶ heyrobotsd on your other machines
+                                        │
+              ┌─────────────────────────┼──────────────────────────┐
+              ▼                         ▼                          ▼
+     your agents (ACP:          your apps (MCP:             model providers
+     Claude Code, omp)          Linear, Notion, …)          (your keys)
 ```
 
-**Day to day:**
+- **The server, `heyrobotsd`,** holds your team, your chats, your keys and the web app. A lead decides which agent takes a message; each agent works in its own task folder with only the tools you allow.
+- **The app** is the same Flutter app in a browser, on macOS, on Linux and on Android. It talks to one server at a time.
+- **Several servers** share chats and hand work to each other's agents, with no voting: each fact has one writer. See [How heyrobots talks](design/architecture/heyrobots-communication.html).
 
-| On a Mac | On Linux |
+## Using it
+
+| You want to… | Do this |
 |---|---|
-| Log: `~/Library/Logs/heyrobots.log` | Log: `journalctl --user -u heyrobots` |
-| Restart: `launchctl kickstart -k gui/$(id -u)/dev.heyrobots.heyrobotsd` | Restart: `systemctl --user restart heyrobots` |
-| Is it running: `heyrobotsd status` | Is it running: `heyrobotsd status` |
+| Talk to one agent | Open its chat from **Chats** or **Agents** |
+| Get several agents on something | Start a group (the pencil on **Chats**). Write `both of you` or `everyone` to hear from each, or `@Name` for one |
+| Add an app | **Settings → Add-ons**: tap one, or search the MCP registry, or paste a link. Or tell the IT agent what you use |
+| Teach an agent a way of working | **Settings → Skills**: search skills.sh, add one, give it to an agent |
+| Make something happen regularly | Say it in a chat: "every weekday at 8, brief me". The agent proposes a standing job; you confirm it |
+| Approve or decline an action | The card in the chat, or **Plans → Needs you** |
+| Change an agent | Its page on **Agents**, or just ask it ("from now on, …") |
+| Delete a chat | Long-press or right-click it, or use its ⋯ menu |
 
-`heyrobotsd pair` prints a new one-time pairing code, and links that sign in the app or a browser on this machine, whenever you need one.
+Each agent works on up to 3 things at once by default (1–5), and one slot always stays free for your messages, so background jobs never make you wait.
 
-**To uninstall** on a Mac:
+## Reaching it from your phone
+
+By default the server listens only on its own machine (`127.0.0.1:7340`).
+
+- **With Tailscale,** the server also listens on its tailnet address by itself. Only your own devices can reach it, and it works away from home. This is the easiest way.
+- **On your home network,** add the machine's address:
+  ```bash
+  HEYROBOTS_LISTEN="127.0.0.1:7340,192.168.1.110:7340" heyrobotsd
+  ```
+  Your Mac prints its address with `ipconfig getifaddr en0`; Linux with `hostname -I`.
+- **Pairing:** every start prints a QR code, the addresses and a one-time code. Scan the QR code with the app; it tries each address and keeps the first that answers. A paired device makes more codes under **Settings → Add a phone**, and `heyrobotsd pair` prints one any time.
+
+Signing in to an app such as Notion or Google comes back to the server's own machine, so add apps from a browser or the app on that machine. The phone shows them but doesn't start sign-ins. `0.0.0.0` is refused outside public mode.
+
+## Faster replies with your own agent
+
+Each reply is one or more turns of your agent's model, so the model sets the speed. Sonnet at low thinking answers in about 3–5 seconds; Opus takes about twice as long.
+
+```bash
+# omp
+HEYROBOTS_ACP_COMMAND="omp acp --model claude-sonnet-5-5 --thinking low --no-extensions" heyrobotsd
+# Claude Code
+HEYROBOTS_AGENT_MODEL=claude-sonnet-5-5 heyrobotsd
+```
+
+The installer passes any `HEYROBOTS_*` setting on to the service:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sdsvn/heyrobots/main/install.sh | HEYROBOTS_ACP_COMMAND="omp acp --model claude-sonnet-5-5 --thinking low --no-extensions" bash
+```
+
+## Several machines, one team
+
+1. On the machine others will dial, give it a link address and a name:
+   ```bash
+   HEYROBOTS_CLUSTER_LISTEN=192.168.1.110:7350 HEYROBOTS_MACHINE_NAME="Home Mac" heyrobotsd
+   ```
+2. In its app: **Settings → Your machines → Add a machine**. It shows an address and a code.
+3. On the other machine: **Settings → Your machines → Join a machine**, and enter them.
+
+A laptop without a reachable address can still join; it only dials out. Every agent shows up in every app, and the only difference is whether its machine is up.
+
+## Day to day
+
+| | On a Mac | On Linux |
+|---|---|---|
+| Log | `~/Library/Logs/heyrobots.log` | `journalctl --user -u heyrobots` |
+| Restart | `launchctl kickstart -k gui/$(id -u)/dev.heyrobots.heyrobotsd` | `systemctl --user restart heyrobots` |
+| Is it running | `heyrobotsd status` | `heyrobotsd status` |
+| New pairing code | `heyrobotsd pair` | `heyrobotsd pair` |
+
+**Uninstall** on a Mac:
 
 ```bash
 launchctl bootout gui/$(id -u)/dev.heyrobots.heyrobotsd; rm -f ~/Library/LaunchAgents/dev.heyrobots.heyrobotsd.plist ~/.local/bin/heyrobotsd; rm -rf /Applications/heyrobots.app
@@ -93,40 +140,73 @@ On Linux:
 systemctl --user disable --now heyrobots; rm -f ~/.config/systemd/user/heyrobots.service ~/.local/bin/heyrobotsd
 ```
 
-Your data stays in its folder (see `HEYROBOTS_DATA_DIR` under Settings). Delete that folder too to remove everything.
+Your data stays in its folder (`HEYROBOTS_DATA_DIR`); delete it too to remove everything.
 
-## Install by hand
+## Settings
 
-### On a Mac
+The installer's own settings:
+
+| Setting | What it does |
+|---|---|
+| `HEYROBOTS_VERSION` | Install a given release, such as `v0.4.0`, instead of the latest |
+| `HEYROBOTS_INSTALL_DIR` | Put `heyrobotsd` somewhere else, such as `/usr/local/bin` |
+| `HEYROBOTS_APP_DIR` | Put the Mac app somewhere else |
+| `HEYROBOTS_NO_SERVICE=1` | Install the server only, and run it yourself |
+| `HEYROBOTS_NO_APP=1` | Don't install or open the app |
+
+The server's:
+
+| Variable | What it does | Default |
+|---|---|---|
+| `HEYROBOTS_LISTEN` | Addresses to listen on, separated by commas | `127.0.0.1:7340`, plus the tailnet address |
+| `HEYROBOTS_DATA_DIR` | Where the database, keys and workspaces live | `~/Library/Application Support/heyrobots` on a Mac, `~/.config/heyrobots` on Linux |
+| `HEYROBOTS_VAULT_KEY` | Where the vault key is kept: `keychain` or `file` | `keychain` on a Mac, `file` elsewhere |
+| `HEYROBOTS_SERVER_URL` | A public address, put first in pairing codes | — |
+| `HEYROBOTS_TLS_CERT`, `HEYROBOTS_TLS_KEY` | Serve HTTPS with this certificate and key | plain HTTP |
+| `HEYROBOTS_ACP_COMMAND` | The agent to run as "Your agent", such as `omp acp` | Claude Code through `claude-agent-acp` |
+| `HEYROBOTS_AGENT_MODEL` | Claude Code's model | Claude Code's own default |
+| `HEYROBOTS_CLAUDE_CONFIG_DIR` | A separate Claude Code sign-in folder for heyrobots | your own `~/.claude` |
+| `HEYROBOTS_CLUSTER_LISTEN` | Where this machine's link to your other machines listens | none; it only dials out |
+| `HEYROBOTS_CLUSTER_ADDRESS` | The link address other machines dial, if different | — |
+| `HEYROBOTS_MACHINE_NAME` | This machine's name in the app | the host name |
+| `HEYROBOTS_PUBLIC` | `true` for public mode, which needs the `HEYROBOTS_GUARD_*` settings | off |
+| `HEYROBOTS_MODEL_PRICES` | Prices for unknown models, as `model=in/out,…` in dollars per million tokens | built-in prices |
+| `HEYROBOTS_DEBUG` | Any value logs every detail, including the agent's own output | off |
+
+## Downloads
+
+Every release on the **Releases** page has these files (`vX.Y.Z` is the version):
+
+| File | What it is |
+|---|---|
+| `heyrobotsd-vX.Y.Z-darwin-arm64.tar.gz` / `-darwin-amd64` | Server for Apple silicon / Intel Macs |
+| `heyrobotsd-vX.Y.Z-linux-amd64.tar.gz` / `-linux-arm64` | Server for Linux on x86-64 / ARM (such as a Raspberry Pi 4 or 5) |
+| `heyrobots-app-vX.Y.Z-macos.zip` | App for macOS |
+| `heyrobots-app-vX.Y.Z-linux-x64.tar.gz` | App for Linux on x86-64 |
+| `heyrobots-app-vX.Y.Z-android.apk` | App for Android |
+| `SHA256SUMS.txt` | Checksums for every file above |
+
+Check a download before you use it: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`.
+
+<details>
+<summary>Installing by hand</summary>
+
+**Server on a Mac:**
 
 ```bash
-tar -xzf heyrobotsd-*-darwin-arm64.tar.gz
-cd heyrobotsd-*-darwin-arm64
-xattr -c heyrobotsd
+tar -xzf heyrobotsd-*-darwin-arm64.tar.gz && cd heyrobotsd-*-darwin-arm64
+xattr -c heyrobotsd   # clears the "downloaded from the internet" mark macOS puts on unsigned programs
 ./heyrobotsd
 ```
 
-The `xattr` line clears the "downloaded from the internet" mark, which macOS puts on unsigned programs and then refuses to start. It does nothing if the mark isn't there. On a Mac, the server keeps its vault key in your login Keychain.
-
-### On Linux
+**Server on Linux:**
 
 ```bash
-tar -xzf heyrobotsd-*-linux-amd64.tar.gz
-cd heyrobotsd-*-linux-amd64
+tar -xzf heyrobotsd-*-linux-amd64.tar.gz && cd heyrobotsd-*-linux-amd64
 ./heyrobotsd
 ```
 
-On Linux the vault key is kept in a file in the data folder, readable only by your user.
-
-### Keep it running on Linux
-
-To keep it running after you log out, run it as a systemd user service. The install script already puts the binary in `~/.local/bin`; by hand, copy it there:
-
-```bash
-mkdir -p ~/.local/bin && cp heyrobotsd ~/.local/bin/
-```
-
-Save this as `~/.config/systemd/user/heyrobots.service`:
+To keep it running after you log out, copy it to `~/.local/bin` and save this as `~/.config/systemd/user/heyrobots.service`:
 
 ```ini
 [Unit]
@@ -141,125 +221,25 @@ Restart=on-failure
 WantedBy=default.target
 ```
 
-Then start it:
-
 ```bash
 systemctl --user enable --now heyrobots
 loginctl enable-linger "$USER"
 ```
 
-### First start
+**First start.** The terminal prints a QR code, the addresses to open and a one-time code. Open `http://127.0.0.1:7340` on the same machine and enter the code, then pick a brain.
 
-The server prints a setup code in the terminal:
+**The apps:**
 
-```
-  heyrobots setup code: G8SSB-7X3E7
-  Open http://127.0.0.1:7340/setup on this machine and enter it.
-```
+- **Browser:** open the server's address. The server serves the app; nothing to install.
+- **macOS:** unzip `heyrobots-app-*-macos.zip`, move `heyrobots.app` to Applications, then clear the download mark once: `xattr -cr /Applications/heyrobots.app && open /Applications/heyrobots.app`. (Or after the first failed open: **System Settings → Privacy & Security → Open Anyway**.) The app isn't signed by Apple yet, which is why this step is needed.
+- **Linux:** extract `heyrobots-app-*-linux-x64.tar.gz` and run `./heyrobots`. It needs GTK 3 and libsecret (`sudo apt install libgtk-3-0 libsecret-1-0` on Debian or Ubuntu). There's no fingerprint check on Linux, so actions that need one are approved from your phone.
+- **Android:** copy the `.apk` to the phone and open it; Android asks once to allow installs from that source.
 
-1. Open that address in a browser on the same machine and enter the code.
-2. The page shows a pairing code and a QR code. Pair this browser with it, or scan the QR code with the app.
-3. Pick a brain: who does the work, and who makes the quick routing calls.
-   - **Your agent** uses an AI coding agent you already have on this machine and pay for: Claude Code, or [omp](https://omp.sh) with `HEYROBOTS_ACP_COMMAND`. You need no API key.
-   - **An API key** uses Anthropic, OpenAI, DeepSeek or Gemini directly.
-   - **A model on this machine** uses Ollama or LM Studio.
-
-## Running the server
-
-### Reaching it from your phone
-
-By default the server listens only on its own machine (`127.0.0.1:7340`). To use it from a phone, also listen on an address the phone can reach:
-
-```bash
-HEYROBOTS_LISTEN="127.0.0.1:7340,192.168.1.110:7340" ./heyrobotsd
-```
-
-Use your machine's own network address in place of `192.168.1.110`. Your Mac prints it with `ipconfig getifaddr en0`, and Linux with `hostname -I`.
-
-- **With Tailscale.** The server also listens on its tailnet address by itself. Only your own devices can reach that address, and it works away from home too.
-- **Pairing codes.** Every code lists every address that works, the tailnet one first, and the app uses the first that answers.
-- **`0.0.0.0` is refused.** It would listen on every network the machine is on. That is only allowed in public mode, behind an access proxy that checks every request.
-
-### Faster replies with your own agent
-
-Each reply is one or more turns of your agent's model, so the model decides the speed. A Sonnet model at low thinking answers in about 3–5 seconds. Opus takes about twice as long.
-
-With omp:
-
-```bash
-HEYROBOTS_ACP_COMMAND="omp acp --model claude-sonnet-5-5 --thinking low --no-extensions" ./heyrobotsd
-```
-
-With Claude Code:
-
-```bash
-HEYROBOTS_AGENT_MODEL=claude-sonnet-5-5 ./heyrobotsd
-```
-
-### Several machines, one team
-
-Each machine runs its own server and its own agents. Joined together, every agent shows up in every app, and the only difference is whether its machine is up.
-
-1. On the machine others will dial, start the server with a machine link:
-   ```bash
-   HEYROBOTS_CLUSTER_LISTEN=192.168.1.110:7350 HEYROBOTS_MACHINE_NAME="Home Mac" ./heyrobotsd
-   ```
-2. In its app, open **Settings**, then **Your machines**, then **Add a machine**. It shows an address and a code.
-3. On the other machine, open **Settings**, then **Your machines**, then **Join a machine**, and enter them.
-
-A machine without a reachable address, such as a laptop, can still join. It only dials out. How the machines agree, and why they never vote, is explained in [design/architecture/heyrobots-communication.html](design/architecture/heyrobots-communication.html).
-
-### Settings
-
-| Variable | What it does | Default |
-|---|---|---|
-| `HEYROBOTS_LISTEN` | Addresses to listen on, separated by commas | `127.0.0.1:7340`, plus the tailnet address when there is one |
-| `HEYROBOTS_DATA_DIR` | Where the database, keys and workspaces live | `~/Library/Application Support/heyrobots` on a Mac, `~/.config/heyrobots` on Linux |
-| `HEYROBOTS_VAULT_KEY` | Where the vault key is kept: `keychain` or `file` | `keychain` on a Mac, `file` elsewhere |
-| `HEYROBOTS_SERVER_URL` | The public address put first in pairing codes | — |
-| `HEYROBOTS_TLS_CERT`, `HEYROBOTS_TLS_KEY` | Serve HTTPS with this certificate and key | plain HTTP |
-| `HEYROBOTS_ACP_COMMAND` | The ACP agent to run as "Your agent", such as `omp acp` | Claude Code through `claude-agent-acp` |
-| `HEYROBOTS_AGENT_MODEL` | Claude Code's model | Claude Code's own default |
-| `HEYROBOTS_CLAUDE_CONFIG_DIR` | A separate Claude Code sign-in folder for heyrobots | your own `~/.claude` |
-| `HEYROBOTS_CLUSTER_LISTEN` | Where this machine's link to your other machines listens | none; it only dials out |
-| `HEYROBOTS_CLUSTER_ADDRESS` | The link address other machines dial, if it differs from the one above | — |
-| `HEYROBOTS_MACHINE_NAME` | This machine's name in the app | the host name |
-| `HEYROBOTS_PUBLIC` | `true` for public mode, which needs the `HEYROBOTS_GUARD_*` settings | off |
-| `HEYROBOTS_MODEL_PRICES` | Prices for models the server doesn't know, as `model=in/out,…` in dollars per million tokens | built-in prices |
-| `HEYROBOTS_DEBUG` | Any value logs every detail, including the agent's own output | off |
-
-## Install the app by hand
-
-On a Mac, the one-line install already installs and signs in the app. Elsewhere:
-
-- **In a browser.** Open the server's address, such as `http://127.0.0.1:7340`. The server serves the app itself, so there's nothing to install.
-- **On macOS.** Unzip `heyrobots-app-*-macos.zip` and move `heyrobots.app` to Applications. See [Opening the macOS app](#opening-the-macos-app) for the one extra step the first time.
-- **On Linux.** Extract `heyrobots-app-*-linux-x64.tar.gz` and run `./heyrobots` inside the folder. It needs GTK 3, libsecret and a keyring service to keep its pairing, which most desktops have; on Debian or Ubuntu, `sudo apt install libgtk-3-0 libsecret-1-0 gnome-keyring`. There's no fingerprint check on Linux, so actions that need one are approved from your phone.
-- **On Android.** Copy `heyrobots-app-*-android.apk` to the phone and open it. Android asks once to allow installs from that source.
-
-Then pair the app. Every time the server starts, its terminal shows a QR code, the addresses to open and a one-time pairing code. Scan the QR code with the app, or open one of the addresses and enter the code. A device that's already paired can make another code under **Settings**, then **Add a phone**. You can also type the address and the code by hand.
-
-Connecting an add-on, such as Gmail or Notion, opens a sign-in that returns to the server's own machine. So add apps from a browser or the desktop app on that machine. The phone app shows what's connected but doesn't start sign-ins.
+The desktop apps keep their pairing in a file only you can read; phones use the Keychain or Keystore.
 
 Setting up Gmail and Google Calendar is in [docs/setup/google.md](docs/setup/google.md).
 
-### Opening the macOS app
-
-The first time you open it, macOS may say **"The application “heyrobots” can’t be opened."** The app isn't broken. It's built for both Apple silicon and Intel, and its signature is valid, but it's only signed locally (ad-hoc), not by Apple. Your browser also marks every download as quarantined, and macOS refuses a quarantined app that Apple hasn't signed.
-
-Clear the mark once, then open it:
-
-```bash
-xattr -cr /Applications/heyrobots.app && open /Applications/heyrobots.app
-```
-
-Use `~/Downloads/heyrobots.app` instead if you haven't moved it.
-
-Or, without the terminal: after the failed open, go to **System Settings**, then **Privacy & Security**. Scroll down to the line about "heyrobots" being blocked, click **Open Anyway**, and confirm.
-
-Once it opens, pair it, then quit and reopen it to check it's still paired. An app that Apple hasn't signed sometimes can't keep its pairing in the Keychain. If it asks to pair again every time, open an issue.
-
-Every new download needs this step once, until the app is signed and notarized (see [CI and releases](#ci-and-releases)).
+</details>
 
 ## Build from source
 
@@ -277,45 +257,28 @@ The apps:
 ```bash
 cd app
 flutter build macos --release   # needs Xcode
-flutter build linux --release   # needs clang, cmake, ninja, GTK 3 and libsecret development packages
+flutter build linux --release   # needs clang, cmake, ninja and GTK 3 development packages
 flutter build apk --release     # needs the Android SDK and Java 17 or newer
 ```
 
-If Java isn't on your PATH for the Android build, point `JAVA_HOME` at a JDK, for example Homebrew's:
-
-```bash
-export JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home
-```
+If Java isn't on your PATH, point `JAVA_HOME` at a JDK, for example Homebrew's: `export JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home`.
 
 After changing `api/openapi.yaml`, regenerate both sides:
 
 ```bash
 cd service/internal/api/gen && go generate ./...
-cd app && flutter pub run swagger_parser
+cd app && dart run swagger_parser
 ```
 
 ## CI and releases
 
-Two GitHub Actions workflows live in `.github/workflows`:
+- **`ci.yml`** runs on every push to `main` and every pull request: it vets and tests the server, and analyzes and tests the app.
+- **`release.yml`** runs when you push a version tag (`git tag v0.4.1 && git push origin v0.4.1`). It builds every file in the Downloads table and attaches them, with checksums, to a GitHub release. Run it by hand from the Actions tab to get the builds without a release.
 
-- **`ci.yml`** runs on every push to `main` and every pull request. It vets and tests the server, and analyzes and tests the app.
-- **`release.yml`** runs when you push a version tag. It builds every file in the Downloads table and attaches them, with checksums, to a GitHub release.
+Not set up yet:
 
-To make a release:
-
-```bash
-git tag v0.4.0
-git push origin v0.4.0
-```
-
-To get the builds without making a release, run **Release** by hand from the Actions tab. The files appear as artifacts on that run.
-
-The servers are built for every platform on one Linux runner, since they're pure Go. The macOS app is built on a macOS runner, and the Linux and Android apps on Linux runners.
-
-Signing isn't set up yet:
-
-- **macOS.** The server and the app are only signed locally (ad-hoc), not by Apple, and aren't notarized. So macOS refuses them until the quarantine mark is cleared, as described in [Opening the macOS app](#opening-the-macos-app). Signing and notarizing need an Apple Developer account, about $99 a year, with its Developer ID certificate and an app-specific password in the workflow's secrets.
-- **Android.** The APK is signed with a debug key that each CI run makes afresh. It installs directly, but a newer release won't install over an older one: uninstall the old app first, which also unpairs it. The Play Store won't accept it either. Both need a fixed keystore in the workflow's secrets and a `signingConfig` that uses it in `app/android/app/build.gradle.kts`.
+- **macOS signing.** The server and the app are signed only locally (ad hoc), not by Apple, and aren't notarized. That needs an Apple Developer account and its Developer ID certificate in the workflow's secrets.
+- **Android signing.** Each CI run signs the APK with a fresh debug key, so a newer release won't install over an older one: uninstall first (which also unpairs it). A fixed keystore in the workflow's secrets fixes that and lets it go on the Play Store.
 
 ## Where things are
 
@@ -325,4 +288,4 @@ Signing isn't set up yet:
 | `app/` | The app, in Flutter |
 | `api/openapi.yaml` | The API between them |
 | `design/` | Design documents and architecture pages |
-| `docs/setup/` | Setup guides for connected apps |
+| `docs/` | Setup guides and images |

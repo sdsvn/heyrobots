@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <!-- Social preview: 1280×640. Everything that matters stays inside the
+       80px safe border GitHub recommends, so no crop cuts it. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F6F4FF"/>
+      <stop offset="1" stop-color="#ECE8FF"/>
+    </linearGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6E5FF2"/>
+      <stop offset="1" stop-color="#5040D6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <!-- Soft sparkles in the margin, outside the safe area. -->
+  <g fill="#C9C2FF">
+    <circle cx="44" cy="52" r="6"/><circle cx="1232" cy="96" r="8"/><circle cx="1196" cy="590" r="5"/><circle cx="70" cy="574" r="7"/>
+  </g>
+
+  <!-- Bit, on its app-icon tile, with its shadow. -->
+  <ellipse cx="276" cy="528" rx="150" ry="16" fill="#2A2540" opacity=".10"/>
+  <rect x="116" y="150" width="320" height="320" rx="80" fill="url(#tile)"/>
+  <g transform="translate(139 199) scale(3.42)">
+    <line x1="40" y1="18" x2="40" y2="9.5" stroke="#2A2540" stroke-width="3.2" stroke-linecap="round"/>
+    <circle cx="40" cy="8" r="5.2" fill="#FFB38A" stroke="#2A2540" stroke-width="2.24"/>
+    <rect x="14" y="18" width="52" height="44" rx="18" fill="#FFFFFF" stroke="#2A2540" stroke-width="3.2"/>
+    <ellipse cx="31" cy="38" rx="4.75" ry="6.25" fill="#2A2540"/>
+    <ellipse cx="49" cy="38" rx="4.75" ry="6.25" fill="#2A2540"/>
+    <circle cx="33" cy="35.5" r="1.7" fill="#FFFFFF"/><circle cx="51" cy="35.5" r="1.7" fill="#FFFFFF"/>
+    <circle cx="23" cy="49" r="4.2" fill="#FFC9D4"/><circle cx="57" cy="49" r="4.2" fill="#FFC9D4"/>
+    <path d="M34.5 48.5 Q40 54.5 45.5 48.5" fill="none" stroke="#2A2540" stroke-width="3.04" stroke-linecap="round"/>
+  </g>
+
+  <!-- Name and pitch. -->
+  <text x="500" y="250" font-family="Nunito" font-weight="900" font-size="104" fill="#24213A" letter-spacing="-2">heyrobots</text>
+  <text x="504" y="316" font-family="Nunito" font-weight="700" font-size="36" fill="#4A4568">Your own team of AI agents,</text>
+  <text x="504" y="362" font-family="Nunito" font-weight="700" font-size="36" fill="#4A4568">running on your own machines.</text>
+
+  <!-- What it does, as the app's chips. -->
+  <g font-family="Nunito" font-weight="800" font-size="22">
+    <rect x="504" y="402" width="196" height="46" rx="23" fill="#FFFFFF" stroke="#D9D3FF" stroke-width="2"/>
+    <text x="602" y="432" text-anchor="middle" fill="#5848E0">Chats &amp; groups</text>
+    <rect x="714" y="402" width="216" height="46" rx="23" fill="#FFFFFF" stroke="#D9D3FF" stroke-width="2"/>
+    <text x="822" y="432" text-anchor="middle" fill="#5848E0">Any MCP app</text>
+    <rect x="944" y="402" width="236" height="46" rx="23" fill="#FFFFFF" stroke="#D9D3FF" stroke-width="2"/>
+    <text x="1062" y="432" text-anchor="middle" fill="#5848E0">Phone, Mac &amp; web</text>
+    <rect x="504" y="462" width="302" height="46" rx="23" fill="#FFEADD" stroke="#F5C9AE" stroke-width="2"/>
+    <text x="655" y="492" text-anchor="middle" fill="#B4501E">Asks before it acts</text>
+    <rect x="820" y="462" width="300" height="46" rx="23" fill="#DDF5EC" stroke="#A9E2CF" stroke-width="2"/>
+    <text x="970" y="492" text-anchor="middle" fill="#1E7A62">Your keys, your data</text>
+  </g>
+</svg>
