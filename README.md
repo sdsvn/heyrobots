@@ -2,6 +2,26 @@
   <img src="docs/images/social-preview.png" alt="heyrobots: your own team of AI agents, running on your own machines" width="720">
 </p>
 
+<p align="center">
+  <a href="https://github.com/sdsvn/heyrobots/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/sdsvn/heyrobots/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/sdsvn/heyrobots/actions/workflows/release.yml"><img alt="Release build" src="https://github.com/sdsvn/heyrobots/actions/workflows/release.yml/badge.svg"></a>
+  <a href="https://github.com/sdsvn/heyrobots/releases/latest"><img alt="Latest release" src="https://img.shields.io/badge/release-v0.4.0-5848E0"></a>
+  <br>
+  <a href="service/go.mod"><img alt="Go 1.26" src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&amp;logoColor=white"></a>
+  <a href="app/pubspec.yaml"><img alt="Flutter 3.47" src="https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&amp;logoColor=white"></a>
+  <a href="api/openapi.yaml"><img alt="OpenAPI 3" src="https://img.shields.io/badge/API-OpenAPI_3-6BA539?logo=openapiinitiative&amp;logoColor=white"></a>
+  <a href="https://google.github.io/adk-docs/"><img alt="Google ADK" src="https://img.shields.io/badge/agents-Google_ADK-4285F4?logo=google&amp;logoColor=white"></a>
+  <br>
+  <img alt="Server: macOS, Linux" src="https://img.shields.io/badge/server-macOS_%7C_Linux-24213A?logo=apple&amp;logoColor=white">
+  <img alt="App: macOS, Linux, Android, web" src="https://img.shields.io/badge/app-macOS_%7C_Linux_%7C_Android_%7C_web-24213A?logo=android&amp;logoColor=white">
+  <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-yes-1E7A62">
+  <br>
+  <a href="https://modelcontextprotocol.io"><img alt="MCP: any server" src="https://img.shields.io/badge/MCP-any_server-5848E0"></a>
+  <a href="https://agentclientprotocol.com"><img alt="ACP: Claude Code, omp" src="https://img.shields.io/badge/ACP-Claude_Code_%7C_omp-D97757?logo=anthropic&amp;logoColor=white"></a>
+  <a href="https://skills.sh"><img alt="Skills from skills.sh" src="https://img.shields.io/badge/skills-skills.sh-B4501E"></a>
+  <a href="https://tailscale.com"><img alt="Works with Tailscale" src="https://img.shields.io/badge/works_with-Tailscale-242424?logo=tailscale&amp;logoColor=white"></a>
+</p>
+
 # heyrobots
 
 **Your own team of AI agents, running on your own machines.** Chat with your agents from your phone, a browser or the Mac app. They work with your mail, calendar, files and apps. Anything that reaches other people waits for your OK.
