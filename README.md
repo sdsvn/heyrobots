@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/sdsvn/heyrobots/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/sdsvn/heyrobots/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <a href="https://github.com/sdsvn/heyrobots/actions/workflows/release.yml"><img alt="Release build" src="https://github.com/sdsvn/heyrobots/actions/workflows/release.yml/badge.svg"></a>
-  <a href="https://github.com/sdsvn/heyrobots/releases/latest"><img alt="Latest release" src="https://img.shields.io/badge/release-v0.4.0-5848E0"></a>
+  <a href="https://github.com/sdsvn/heyrobots/releases/latest"><img alt="Latest release" src="https://img.shields.io/badge/release-v0.4.1-5848E0"></a>
   <br>
   <a href="service/go.mod"><img alt="Go 1.26" src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&amp;logoColor=white"></a>
   <a href="app/pubspec.yaml"><img alt="Flutter 3.47" src="https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&amp;logoColor=white"></a>
