@@ -156,6 +156,10 @@ For faster replies, use a quick model for your agent: Sonnet at low thinking ans
 | Restart | `launchctl kickstart -k gui/$(id -u)/dev.heyrobots.heyrobotsd` | `systemctl --user restart heyrobots` |
 | Is it running | `heyrobotsd status` | `heyrobotsd status` |
 | New pairing code | `heyrobotsd pair` | `heyrobotsd pair` |
+| Version | `heyrobotsd version` | `heyrobotsd version` |
+| Settings in effect | `heyrobotsd config` | `heyrobotsd config` |
+| Update | Settings → Updates in the app | Settings → Updates in the app |
+| All commands | `heyrobotsd help` | `heyrobotsd help` |
 
 Uninstall on a Mac:
 

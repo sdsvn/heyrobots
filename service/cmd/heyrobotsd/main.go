@@ -68,9 +68,19 @@ func main() {
 			run = func() error { return pairCommand(os.Args[2:]) }
 		case "status":
 			run = statusCommand
-		case "version":
+		case "version", "--version", "-v":
 			fmt.Println(version)
 			return
+		case "help", "--help", "-h":
+			helpCommand()
+			return
+		case "config":
+			run = configCommand
+		default:
+			// Anything else would start a server by mistake.
+			fmt.Fprintf(os.Stderr, "heyrobotsd: unknown command %q\n\n", os.Args[1])
+			helpCommand()
+			os.Exit(2)
 		}
 	}
 	err := run()
