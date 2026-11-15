@@ -11,6 +11,7 @@ import 'machines_screen.dart';
 import 'setup_screen.dart';
 import 'skills_screen.dart';
 import 'theme.dart';
+import 'clear_history_screen.dart';
 import 'update_screen.dart';
 
 /// Settings: how much the assistant does on its own, and six rows. Anything
@@ -216,6 +217,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                       ],
+                      if (owner)
+                        _Row(
+                          key: const Key('row:clear'),
+                          glyph: Glyph.sparkle,
+                          tint: 'rose',
+                          title: 'Start fresh',
+                          line: 'Clear chats and tasks; keep the team',
+                          onTap: () => _open(ClearHistoryScreen(state: s)),
+                        ),
                       _Row(
                         key: const Key('row:update'),
                         glyph: Glyph.bolt,

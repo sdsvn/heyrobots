@@ -196,6 +196,21 @@ void main() {
     expect(find.textContaining('Idle'), findsOneWidget);
   });
 
+  testWidgets('a specialist is marked in the team, and its profile shows what it is held to', (tester) async {
+    server.addSpecialist();
+    await show(tester, TeamTab(state: state));
+    expect(find.descendant(of: find.byKey(const Key('team:Researcher')), matching: find.byKey(const Key('specialist-pill'))), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('team:General')), matching: find.byKey(const Key('specialist-pill'))), findsNothing);
+
+    await show(tester, AgentProfileScreen(state: state, agentId: 'ag_researcher'));
+    expect(find.byKey(const Key('specialist')), findsOneWidget);
+    expect(find.text("9 of 12 passed first time · 2 didn't pass"), findsOneWidget);
+    expect(find.byKey(const Key('specialist:check:sources-say-it')), findsOneWidget);
+    expect(find.text('"Compare three CRMs for a five-person team"'), findsOneWidget);
+    expect(find.text('Web search'), findsOneWidget);
+    expect(find.textContaining('Not for: writing or sending mail'), findsOneWidget);
+  });
+
   testWidgets('plans show what is running and the scheduled jobs', (tester) async {
     await show(tester, PlansTab(state: state));
     expect(find.text('NOW'), findsOneWidget);

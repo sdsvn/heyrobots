@@ -46,6 +46,33 @@ class FakeServer {
     },
   ];
 
+  /// What the last clear of the history asked for.
+  bool? clearedForgetBrain;
+
+  /// A Researcher specialist, with its card, checks and record.
+  void addSpecialist() {
+    agents.add({
+      'id': 'ag_researcher', 'name': 'Researcher', 'purpose': 'Finds things out from the web and says where each fact came from.', 'instructions': '',
+      'toolsets': ['research', 'writing'], 'any_toolset': false, 'skills': <String>[], 'capacity': 2, 'color': 'mint', 'badge': 'search',
+      'builtin': false, 'enabled': true, 'delegates': <String>[], 'rules': <String>[], 'working': <Object?>[], 'waiting': 0,
+      'specialist': {
+        'id': 'researcher',
+        'skills': [
+          {'description': 'Compares options against what you care about, with sources', 'examples': ['Compare three CRMs for a five-person team']},
+        ],
+        'not_for': ['writing or sending mail', 'writing code'],
+        'tools': ['web_search', 'web_fetch'], 'app_tools': false, 'runtime': 'loop',
+        'output': 'A research answer lists its claims, each with the page it came from.',
+        'checks': [
+          {'id': 'sourced', 'about': 'Every claim has a page and a passage from it', 'kind': 'shape'},
+          {'id': 'sources-say-it', 'about': 'Each cited page opens and contains the passage quoted from it', 'kind': 'tool'},
+          {'id': 'answers-it', 'about': 'It answers what was asked', 'kind': 'rubric'},
+        ],
+        'record': {'checked': 12, 'first_try': 9, 'failed': 2, 'tokens': 120000, 'line': "9 of 12 passed first time · 2 didn't pass"},
+      },
+    });
+  }
+
   /// MCP servers, by name.
   final mcpServers = <String, Map<String, Object?>>{};
 
@@ -251,6 +278,11 @@ class FakeServer {
     }
     if (path == '/api/v1/usage' && r.method == 'GET') {
       return _json(200, {'spent_usd': 4.2, 'budget_usd': 30, 'since': '2026-11-01T00:00:00Z', 'tickets': <Object?>[]});
+    }
+    if (path == '/api/v1/history/clear' && r.method == 'POST') {
+      clearedForgetBrain = (jsonDecode(r.body) as Map)['forget_brain'] as bool;
+      threads.clear();
+      return _json(200, {'tasks': 7, 'chats': 3, 'actions': 1, 'forgot_brain': clearedForgetBrain, 'backup': '/data/backups/x.db'});
     }
     if (path == '/api/v1/update' && r.method == 'GET') {
       return _json(200, update);

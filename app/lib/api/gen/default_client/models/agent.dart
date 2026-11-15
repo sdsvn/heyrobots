@@ -4,6 +4,7 @@ import 'agent_badge.dart';
 import 'agent_color.dart';
 import 'agent_task.dart';
 import 'presence.dart';
+import 'specialist.dart';
 
 class Agent {
   const Agent({
@@ -48,6 +49,9 @@ class Agent {
 
     /// Its follow-ups wait instead of starting tasks.
     this.followUpsOff,
+
+    /// What makes an agent a specialist, as the server enforces it. A generalist has none.
+    this.specialist,
     this.additionalProperties = const {},
   });
 
@@ -90,6 +94,9 @@ class Agent {
         : null,
     followUpsOff: json.containsKey("follow_ups_off")
         ? json["follow_ups_off"] as bool
+        : null,
+    specialist: json.containsKey("specialist")
+        ? Specialist.fromJson(json["specialist"] as Map<String, Object?>)
         : null,
     additionalProperties: {
       for (final entry in json.entries)
@@ -152,6 +159,9 @@ class Agent {
   /// Its follow-ups wait instead of starting tasks.
   final bool? followUpsOff;
 
+  /// What makes an agent a specialist, as the server enforces it. A generalist has none.
+  final Specialist? specialist;
+
   static const _knownKeys = <String>{
     "id",
     "name",
@@ -176,6 +186,7 @@ class Agent {
     "home",
     "unavailable_since",
     "follow_ups_off",
+    "specialist",
   };
 
   final Map<String, Object?> additionalProperties;
@@ -207,5 +218,6 @@ class Agent {
     if (this.unavailableSince != null)
       "unavailable_since": this.unavailableSince?.toUtc().toIso8601String(),
     if (this.followUpsOff != null) "follow_ups_off": this.followUpsOff,
+    if (this.specialist != null) "specialist": this.specialist?.toJson(),
   };
 }

@@ -9,6 +9,7 @@ import 'bit.dart';
 import 'chat_kit.dart';
 import 'common.dart';
 import 'icons.dart';
+import 'specialist_view.dart';
 import 'theme.dart';
 
 /// The team: each agent with its reach, what it's doing and what's next.
@@ -193,7 +194,7 @@ class _AgentCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(a.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                    AgentName(a),
                     if (a.purpose.isNotEmpty) Text(a.purpose, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: p.muted)),
                   ],
                 ),
@@ -279,7 +280,7 @@ class _IdleCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(a.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
+                AgentName(a, size: 14, compact: true),
                 Text(what, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
               ],
             ),

@@ -23,6 +23,8 @@ import 'models/attention_list.dart' as models show AttentionList;
 import 'models/brain_list.dart' as models show BrainList;
 import 'models/chat_model.dart' as models show ChatModel;
 import 'models/chat_model_update.dart' as models show ChatModelUpdate;
+import 'models/clear_history_request.dart' as models show ClearHistoryRequest;
+import 'models/cleared_history.dart' as models show ClearedHistory;
 import 'models/connect_request.dart' as models show ConnectRequest;
 import 'models/connect_result.dart' as models show ConnectResult;
 import 'models/device.dart' as models show Device;
@@ -1448,6 +1450,56 @@ class ApiClient {
       throw http.ClientException('HTTP $_status', _url);
     }
     await response.stream.drain<void>();
+  }
+
+  /// Clear the history and start fresh
+  ///
+  /// Stops running work, keeps a backup of the database, then removes every chat and task, their files, and actions waiting to be sent, which are never sent. Agents, apps, skills, rules, jobs, settings and the spending ledger stay. What agents learned stays unless forget_brain is set. Owner devices only.
+  Future<models.ClearedHistory> clearHistory({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://127.0.0.1:7340"},
+      ],
+      "openapi.security": [
+        {"deviceToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "deviceToken": {"type": "http", "scheme": "bearer"},
+      },
+    },
+    Future<void>? abortTrigger,
+    HttpRequestOptions? options,
+    required models.ClearHistoryRequest body,
+  }) async {
+    final _base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    var _url = Uri.parse(_base + ("/api/v1/history/clear"));
+    final request = http.AbortableRequest(
+      "POST",
+      _url,
+      abortTrigger: abortTrigger,
+    );
+    request.bodyBytes = convert.utf8.encode(convert.jsonEncode(body));
+    request.headers.addAll(
+      <String, Object?>{
+        ...?options?.headers,
+        'Accept': "application/json",
+        'Content-Type': "application/json",
+      }.map((key, value) => MapEntry(key, value.toString())),
+    );
+    if (options?.followRedirects case final value?)
+      request.followRedirects = value;
+    if (options?.maxRedirects case final value?) request.maxRedirects = value;
+    prepareRequest?.call(request, extra);
+    final response = await _transport.send(request);
+    final _status = response.statusCode;
+    if (!(_status == 200)) {
+      await response.stream.listen(null).cancel();
+      throw http.ClientException('HTTP $_status', _url);
+    }
+    return await convert.utf8.decoder.bind(response.stream).join().then((text) {
+      final Object? value = convert.jsonDecode(text);
+      return models.ClearedHistory.fromJson(value as Map<String, Object?>);
+    });
   }
 
   /// This server's version, the latest release, and how an update from the app is going. Asks GitHub only when check is set or the last answer is a day old.

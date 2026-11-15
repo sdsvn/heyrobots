@@ -8,6 +8,7 @@ import 'package:heyrobots/platform.dart';
 import 'package:heyrobots/state.dart';
 import 'package:heyrobots/ui/app_screen.dart';
 import 'package:heyrobots/ui/chats_tab.dart';
+import 'package:heyrobots/ui/clear_history_screen.dart';
 import 'package:heyrobots/ui/connect_apps_screen.dart';
 import 'package:heyrobots/ui/settings_screen.dart';
 import 'package:heyrobots/ui/skills_screen.dart';
@@ -215,5 +216,24 @@ void main() {
     await tester.runAsync(state.checkUpdate);
     await tester.pumpAndSettle();
     expect(find.bySemanticsLabel('Settings · 0.6.0 is out'), findsOneWidget);
+  });
+
+  testWidgets('start fresh clears the history after a confirm, and can forget what agents learned', (tester) async {
+    await show(tester, ClearHistoryScreen(state: state));
+    expect(find.textContaining('cancelled, never sent later'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('clear:forget')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('clear:forget')));
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('clear:start')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('clear:start')));
+    await settle(tester);
+    expect(server.clearedForgetBrain, isNull, reason: 'nothing is cleared before the confirm');
+    await tester.tap(find.byKey(const Key('clear:confirm')));
+    await settle(tester);
+    expect(server.clearedForgetBrain, isTrue);
+    expect(find.byKey(const Key('clear:done')), findsOneWidget);
+    expect(find.textContaining('Removed 3 chats and 7 tasks, and cancelled 1 waiting action'), findsOneWidget);
   });
 }

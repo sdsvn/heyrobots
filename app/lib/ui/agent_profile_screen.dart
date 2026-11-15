@@ -8,6 +8,7 @@ import 'bit.dart';
 import 'chat_kit.dart';
 import 'common.dart';
 import 'icons.dart';
+import 'specialist_view.dart';
 import 'theme.dart';
 
 /// One agent: what it's doing, its standing jobs and what it can reach.
@@ -193,10 +194,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  a.name,
-                                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: p.ink),
-                                ),
+                                AgentName(a, size: 22),
                                 Text(a.enabled ? about : 'Paused · $about', style: TextStyle(fontSize: 13, color: ink)),
                               ],
                             ),
@@ -265,6 +263,10 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                     else
                       _note(p, a.enabled ? 'Not working on anything right now.' : 'Paused: it takes no new work until you let it.'),
                     const SizedBox(height: 16),
+                    if (a.specialist != null) ...[
+                      SpecialistSection(specialist: a.specialist!, onExample: (ex) => openAgentChat(context, s, ref, draft: ex)),
+                      const SizedBox(height: 16),
+                    ],
                     if (brain != null) ...[
                       AgentBrainSections(state: s, agent: a, brain: brain, onChanged: () => setState(() => _version++)),
                       const SizedBox(height: 16),
