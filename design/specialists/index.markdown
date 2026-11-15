@@ -1,0 +1,161 @@
+---
+co-review: design
+---
+# Define specialist agents in code: their tools, their checks and their proof
+
+## Context
+Every agent today is the same worker in a different outfit. An agent is a row: a name, a purpose line, instructions, toolsets, skills, a model and a capacity. Every task runs the same loop with every tool the task allows, and the loop ends when the model calls `report`. Nothing checks the work, nothing proves one agent does a kind of work better than another, and the router chooses on a one-line purpose.
+
+The research behind this design is in `docs/research/specialist-agents.md` and `docs/research/adk-workflow-for-specialists.md`, and was argued through with Fable. Frameworks and papers agree that specialists really differ in four ways: the tools they can reach, the shape their result must have, the checks it passes before anyone sees it, and a description good enough to route on. A persona prompt is the weakest difference. Splitting one piece of work into fixed phases (gather, then write, then check) is called a poor boundary, costs 3 to 10 times the tokens, and loses decisions between the phases. So a specialist here is not a different prompt and not a pipeline: it is the same loop given different tools, a different runtime, a contract and checks, which is code, plus evidence that it beats General.
+
+## Design
+- A specialist is defined in Go (new package `internal/specialists`, a registry of specs, like the toolsets and the built-in skills)
+  - a spec holds its card, its tools, its runtime and model, its output contract, its checks, and its eval cases
+  - shipped specialists are Go code compiled into the server, so their tools and checks are real functions, not text
+  - an owner-made specialist is an `AGENT.md` in the data folder, in the frontmatter style of jobs and skills, and is read into the same spec
+    - the file is the specialist language: a declared structure (card, tool allow-list, output schema, checks, graph) with CEL for every expression and WASM for code (both below)
+    - only the instructions are prompt; everything else is enforced by the server, so a file that is "just a prompt" is a generalist and isn't called a specialist
+  - the agents table keeps what the owner owns (enabled, capacity, colour, badge, the brain) and gains a column naming the spec
+    - a row with no spec is a generalist and runs exactly as today
+- You make a specialist by describing it in a chat; nobody has to write the file by hand
+  - IT gains a "make a specialist" ability: you say what you want ("keep track of my bills"), and it asks what it needs to know
+    - which mail or events should wake it, what a good result looks like, what must never happen
+  - it drafts the whole specialist: the card, the tools it may use, the checks as CEL, a graph only if the work has a real shape
+  - when a check or tool needs code, it hands the writing to the Coder, which writes the module and builds it to WASM in Claude Code
+    - building needs a compiler on the computer (TinyGo or Rust); IT offers to install it the first time, with your OK
+  - before you approve, it runs the draft on real examples from your own data (your last five bills) and shows what it would have done
+    - beside that: the capabilities it asks for, its worst-case cost per task, and which checks passed
+  - saving goes through the same approval as a new job or rule today; the examples it ran become the specialist's first eval cases
+  - you change one the same way ("also file the receipts"); each saved change is a new version, and running tasks keep theirs
+  - "make this a specialist" on a chat that went well starts the same flow, using that chat as the first example
+  - people who prefer files can write the file themselves, or install one from GitHub pinned to a version, and see the same review before it's saved
+- Conditions are written in CEL, not invented syntax (new dependency `cel-go`, Google's Common Expression Language)
+  - "when a check applies", pre-send rules and simple checks on a result are one-line expressions over the result, the tool's arguments and the task
+    - for example: a send's recipients are all in the thread or in your contacts; every claim in a result has a source
+  - CEL can't loop forever, reach the network or touch files, and is checked when the file is loaded, so a bad condition fails at load time, not during a task
+  - shipped Go specs use the same expressions where they can, so a check reads the same in Go and in a file
+- Specialists can bring their own code as WASM tools and checks (new dependency: the Extism plugin system, built on the pure-Go `wazero` runtime)
+  - wazero, not wasmer: the server is built for four platforms from one Linux machine with cgo off, which wazero keeps working and wasmer's Go bindings (cgo, a native library) would break
+  - a tool is a WASM module beside the specialist's file, taking JSON and returning JSON; it can be written in Rust, Go, JavaScript, Python or anything else Extism supports
+  - it runs in a sandbox with a memory limit and a time limit per call; everything it can reach comes through a bridge heyrobots provides
+  - the bridge is a versioned set of host functions (`heyrobots/v1`), each one a capability the module declares in the specialist's file and you grant when installing
+    - the task: its brief, its messages, the result being checked, and progress notes that show in the chat
+    - files: the task's own folder, mounted as its file system, and nothing else
+    - tools: call any tool the task allows, through the same Mandate, guard, outbox and taint as a model's call, so it never reaches more than the agent could
+    - the web: only through heyrobots' fetch and search tools, so what comes back is quarantined and marked untrusted, never a raw socket
+    - memory: recall and remember in the agent's brain, and a small key-value store of its own that lasts between tasks
+    - events: it can be woken by the events the jobs design names (a schedule, a new mail, an MCP trigger) and read the event that woke it
+    - time, random numbers and logs that land in the task's trace
+  - secrets never cross the bridge; a module uses an account only through the tool that holds it
+  - an undeclared host call fails with the capability's name, so a missing grant is obvious, not silent
+  - a check can be a WASM module too, so an owner-made Coder can parse test output or a Researcher can score sources without a release
+  - what can go wrong: a module from the internet is untrusted code; the sandbox is the defence, installing one shows what it is and needs your OK, and it is pinned by its hash
+- A specialist may say how it works as a graph with loops, as an option (the jobs format in `internal/jobs`, extended)
+  - by default a specialist runs the one loop with the report gate; a graph is for work with a real shape, not for phases of one piece of work
+    - a node is a whole piece of work with its own context (a branch, a critic, a judge), never "gather" then "write"
+  - one format for jobs and graphs: a job is started by a schedule or trigger, a graph is how a specialist handles a task routed to it
+    - jobs gain conditions and loops from this too
+  - nodes are a model step (its own tools and model), a tool step, a WASM step, a question for you, or the default loop
+    - another specialist as a node waits: it would skip queues and capacity, which the jobs design ruled out
+  - edges carry CEL conditions over the previous node's structured output, so routing is code, not the model's say-so
+  - the first version allows three shapes, all built from those parts
+    - routing by condition
+    - a bounded loop; a critic inside a loop must be a tool or WASM node, since a model critic is what the report gate is for
+    - fan-out and merge with branches declared in the file; the merge gets each branch's output as written
+  - a debate (two sides for some rounds, then a judge) can be drawn from these parts, but ships as no shape or specialist until an eval shows it helps
+- A graph's cost is known before it runs, and shown after
+  - every loop has a maximum count, and CEL may only leave it early, so the worst-case number of model calls is computed when the file loads
+    - it is shown when you install the specialist and on its profile; a graph above a ceiling, or likely to pass the 30-minute run limit, is refused
+  - every node counts against the task's call limit and budget; the file declares a token budget for the graph
+  - fan-out has a maximum width, and its branches count against the agent's capacity
+  - a "run without the graph" switch lets you compare; the profile line shows tokens per task for the graph beside the single loop
+  - a shipped graph must beat the same specialist's single loop on its eval, not just General
+  - the report gate still runs at the end, with its own cap of two
+- A graph survives a restart by remembering finished nodes, not by resuming
+  - after a crash the run starts again from the top, and each node first looks for its saved output, keyed by its name, its turn in a loop and its input
+    - a node that already finished returns its saved output without a model call, so fan-out and loops recover too
+  - the graph itself is saved on the task when it starts, so changing the file never changes a running task
+  - pauses for your answer resume at their node, as jobs do today
+  - what can go wrong: a tool node whose effect doesn't go through the outbox (running a command) may run twice after a crash
+- Its card tells the router what it is for, in the shape of an A2A agent card
+  - each skill on the card has a description, tags and two to five example requests; the card also says what the specialist is not for
+  - the router's view of the team carries the card, beside the load and missing setup it already sees
+  - every example on a card, and every recorded hand-back, becomes a routing test, so a card that misroutes fails a test, not a person
+  - a specialist hands a task back with `hand_back` when it is outside its card, as any agent can today
+- Its tools are its own
+  - the spec lists the tools it may call by name, not only by toolset
+    - at run time that list is cut to what the task's Mandate grants, so a specialist narrows a task, never widens it
+  - a specialist can bring tools only it has, written in Go: the Researcher's "check this source says this", the Coder's "run the tests"
+  - its runtime is the built-in loop or Claude Code over ACP, through the existing branch; its model is its own
+- Its result has a contract
+  - the spec says what a ready result contains, in prose and optionally as a schema (the Researcher's report has its claims, each with a source)
+  - a result that doesn't match the schema is refused in code before any check runs
+- Its work is checked before you see it, at the `report` tool
+  - when the agent reports ready, the checks run in order: the schema, then the tool checks, then at most one rubric call
+    - a rubric call is a fresh model call with no tools and no history, given only the brief, the result and the checklist
+    - it counts against the task's call limit and budget like any other call
+    - each check says when it applies (a chat reply or a "thanks" skips them), so cheap turns stay cheap
+  - a failed check refuses the report with the reasons; the agent keeps working in the same loop with all it knew, and tries again
+    - at most two refusals; if the same reasons come back twice, it stops early
+    - then it reports what it has, saying plainly what didn't pass
+  - the checklist a rubric uses is a file in the specialist's references, so the rule it works by and the rule it is judged by are the same text
+  - what can go wrong: a rubric can pass bad work; when you ask for the same thing again after a pass, that is recorded as a false pass from day one
+- Outward actions are checked before they are queued
+  - checks can apply to an outward tool (send mail, create an event); they run in the tool guard before the action becomes an Effect
+    - only tool checks run there, never a model call, so a send doesn't wait on a judge
+  - a failure returns the reasons to the loop and nothing is queued; failures count against the same cap of two, and then the agent asks you
+  - the first of these ship for every agent, General included: a recipient must be in the thread or your contacts, an event's slot must be free, and its time zone must be stated
+- A specialist ships only while it beats General
+  - each spec carries about twenty real requests with a rubric
+    - a harness (built like the live brain tests, run by hand) runs each on the specialist and on General with the same model, and reports pass rate and tokens
+  - a shipped specialist must win on its cases at a token cost the report states
+    - the harness runs again when the default model changes, since a stronger model can erase the win
+  - owner-made specialists are not gated, but the app calls an agent a specialist only once it has at least one check
+- Each finished task records how it went (new table `agent_outcomes`)
+  - checks passed first time, checks still failing at the end, and tokens; "you asked for it again" joins once something detects it
+  - the profile shows one line that reports failures as plainly as passes ("10 of 12 passed first time · 2 didn't pass")
+    - the router doesn't read it
+- The first specialists are the ones with a check or a toolset General lacks
+  - Coder: works in Claude Code, and its check runs the tests
+  - Researcher: web tools only; its checks open every cited source and confirm it says what is claimed, then a citation rubric
+  - IT: its setup sequence becomes a standing job, checked by a connection test that has to pass
+  - Writer and Organiser wait for their eval cases; their pre-send checks above already protect mail and calendar
+- Files are handled by the platform, so no specialist has to bring a PDF reader (its own design follows; this is what specialists rely on)
+  - files come in: a photo or PDF you attach in the chat, a mail attachment, a file from an app such as Drive
+    - each lands in the task folder with its name, type, size and where it came from; a file from outside is untrusted, like the mail it came in
+  - a built-in files toolset reads them for every agent
+    - the model reads a PDF or image directly where its provider accepts files, so scanned bills and receipts work
+    - a text-and-pages extraction serves checks and WASM modules, which can't call a model
+  - the bridge gives modules the same: a module asks heyrobots for a file's text or pages instead of shipping a parser
+  - files go out as today, made in the task folder and shared with `share_file`
+- What stays as it is
+  - General stays the generalist: every toolset, no checks beyond the pre-send ones, the fallback
+  - follow-ups, group chats and @mentions work as today; a specialist that leads runs its checks
+  - a teammate from another machine runs its spec on its home machine; the card here shows the spec's name
+
+- You can see what makes each one a specialist, in the app
+  - a specialist's profile shows what it is for, example requests, what it is not for, the tools it may use, the checks its work must pass, and its record
+  - the team list marks specialists, so they don't look like the generalist with another name
+  - a reply that passed its checks says which, from the outcome the server wrote, not from the agent's own words; one that didn't says what failed
+- You can clear the app's history and start fresh (Settings, owner only)
+  - it removes chats, tasks, their files and history, notifications and digests; agents, apps, skills, rules, jobs and settings stay
+  - what the agents learned stays unless you also tick "forget what agents learned"
+  - running work is stopped first, and actions waiting to be sent are cancelled, never sent later
+  - the spending ledger stays, so the monthly budget still counts what was spent
+- Built in passes, each one usable on its own
+  - first: the spec registry, tool allow-lists, the router card, the report gate, the outcomes record, Researcher, Coder and IT, the app view, clearing history, and the eval harness (run only with your OK, since it spends on your keys)
+    - IT stays on the single loop with a connection-test check for now, since only a schedule can start a job today
+    - pre-send checks start with what the action itself shows (an event's time zone); a known-recipient and a free-slot check need a contacts list and a calendar lookup, and come later
+  - next: the specialist file and CEL; then WASM and the bridge; then graphs; then files coming in; then making specialists by chat
+
+## Alternatives
+- A graph required for every specialist (the first draft): the research calls phase splits of one piece of work a poor boundary, and costs multiply. A graph stays an option, for shapes that need one, with its cost shown beside the single loop.
+- Checks as a separate step after the agent finishes: the agent would lose its context and need a new run to fix anything. A refusal at `report` keeps it in the same loop.
+- Personas and better prompts: cheapest, but the weakest difference in the evidence, and exactly what the agents are today.
+- Many specialists at once: an unproven specialist is a relabelled General, which is the complaint this fixes.
+
+## Behaviour
+- **The Researcher cites a page that doesn't say it.** The source check refuses the report with that claim and URL; the Researcher finds a source or drops the claim; a second identical failure ends the task with "didn't pass: one claim has no source".
+- **The Coder's tests fail twice.** The task reports the failing tests and what was tried, never "done".
+- **Mail to an address from a web page.** The pre-send check refuses it before anything is queued; after two tries the agent asks you, and the existing approval rules still apply after that.
+- **A new default model.** The harness is run again; a specialist that no longer beats General is noted in the release, and the owner chooses to keep or retire it.
