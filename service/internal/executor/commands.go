@@ -59,41 +59,46 @@ func (r *run) commandTool() (tool.Tool, error) {
 		Name:        "run_command",
 		Description: "Run a shell command in your task folder, such as python3 make_pdf.py or npm install. You get its output and exit code. " + commandsNote,
 	}, func(tc agent.Context, a commandArgs) (CommandResult, error) {
-		ws, err := filepath.Abs(r.workspace())
-		if err != nil {
-			return CommandResult{}, err
-		}
-		if err := os.MkdirAll(ws, 0o700); err != nil {
-			return CommandResult{}, err
-		}
 		limit := commandTime
 		if a.Seconds > 0 {
 			limit = min(time.Duration(a.Seconds)*time.Second, commandMaxTime)
 		}
-		ctx, cancel := context.WithTimeout(tc, limit)
-		defer cancel()
-		shell, flag := "/bin/sh", "-c"
-		if runtime.GOOS == "windows" {
-			shell, flag = "cmd", "/C"
-		}
-		cmd := exec.CommandContext(ctx, shell, flag, a.Command)
-		cmd.Dir = ws
-		var out bytes.Buffer
-		cmd.Stdout, cmd.Stderr = &out, &out
-		err = cmd.Run()
-		res := CommandResult{Output: tail(out.String(), commandOutput)}
-		var exit *exec.ExitError
-		switch {
-		case errors.Is(ctx.Err(), context.DeadlineExceeded):
-			res.TimedOut, res.ExitCode = true, -1
-			res.Error = fmt.Sprintf("stopped after %s", limit)
-		case errors.As(err, &exit):
-			res.ExitCode = exit.ExitCode()
-		case err != nil:
-			res.ExitCode, res.Error = -1, err.Error()
-		}
-		return res, nil
+		return r.shell(tc, a.Command, limit)
 	})
+}
+
+// shell runs one command in the task folder.
+func (r *run) shell(parent context.Context, command string, limit time.Duration) (CommandResult, error) {
+	ws, err := filepath.Abs(r.workspace())
+	if err != nil {
+		return CommandResult{}, err
+	}
+	if err := os.MkdirAll(ws, 0o700); err != nil {
+		return CommandResult{}, err
+	}
+	ctx, cancel := context.WithTimeout(parent, limit)
+	defer cancel()
+	shell, flag := "/bin/sh", "-c"
+	if runtime.GOOS == "windows" {
+		shell, flag = "cmd", "/C"
+	}
+	cmd := exec.CommandContext(ctx, shell, flag, command)
+	cmd.Dir = ws
+	var out bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &out
+	err = cmd.Run()
+	res := CommandResult{Output: tail(out.String(), commandOutput)}
+	var exit *exec.ExitError
+	switch {
+	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+		res.TimedOut, res.ExitCode = true, -1
+		res.Error = fmt.Sprintf("stopped after %s", limit)
+	case errors.As(err, &exit):
+		res.ExitCode = exit.ExitCode()
+	case err != nil:
+		res.ExitCode, res.Error = -1, err.Error()
+	}
+	return res, nil
 }
 
 // tail keeps the end of a long output, where errors usually are.

@@ -410,3 +410,9 @@ func shorten(s string, n int) string {
 	}
 	return string([]rune(s)[:n-1]) + "…"
 }
+
+// FetchText reads a page as plain text, with the same limits web_fetch
+// has. It is for code that checks a page, never for a model to read.
+func FetchText(ctx context.Context, c *http.Client, raw string) (string, error) {
+	return fetchText(ctx, c, raw)
+}

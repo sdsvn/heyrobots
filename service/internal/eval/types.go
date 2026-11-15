@@ -11,6 +11,7 @@ import (
 
 	"heyrobots/service/internal/core"
 	"heyrobots/service/internal/policy"
+	"heyrobots/service/internal/specialists"
 )
 
 // Candidate is what the router sees: the admitted Triggers of one batch
@@ -74,6 +75,9 @@ type AgentSummary struct {
 	// the last two weeks. Facts about setup and routing, not scores.
 	MissingSetup []core.Toolset `json:",omitempty"`
 	HandedBack   int            `json:",omitempty"`
+	// Card is a specialist's card: what it is good at, with example
+	// requests, and what it is not for. A generalist has none.
+	Card *specialists.Card `json:",omitempty"`
 }
 
 // TicketSummary describes a Ticket on the Thread.

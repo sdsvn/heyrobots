@@ -42,8 +42,11 @@ type Agent struct {
 	// FollowUpsOff holds the agent's due follow-ups until it is turned
 	// back on.
 	FollowUpsOff bool
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	// Specialist names the specialist spec the agent runs as; empty for a
+	// generalist.
+	Specialist string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // ToolsetList returns the agent's toolsets.

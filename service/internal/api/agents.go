@@ -15,6 +15,7 @@ import (
 	"heyrobots/service/internal/models"
 	"heyrobots/service/internal/policy"
 	"heyrobots/service/internal/skills"
+	"heyrobots/service/internal/specialists"
 	"heyrobots/service/internal/store"
 )
 
@@ -61,6 +62,9 @@ func (s *Server) agentView(a store.Agent, l store.AgentLoad, pol policy.Policy) 
 	if a.FollowUpsOff {
 		off := true
 		v.FollowUpsOff = &off
+	}
+	if spec, ok := specialists.Get(a.Specialist); ok {
+		v.Specialist = s.specialistView(a, spec)
 	}
 	if v.Skills == nil {
 		v.Skills = []string{}

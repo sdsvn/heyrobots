@@ -1465,6 +1465,46 @@ components:
         home: { type: string, description: The machine that runs it, when that isn't this one. Such an agent is read-only here. }
         unavailable_since: { type: string, format: date-time, description: When its machine was last heard from, while unavailable. }
         follow_ups_off: { type: boolean, description: Its follow-ups wait instead of starting tasks. }
+        specialist: { $ref: "#/components/schemas/Specialist" }
+    Specialist:
+      type: object
+      description: What makes an agent a specialist, as the server enforces it. A generalist has none.
+      required: [id, skills, not_for, tools, app_tools, runtime, output, checks, record]
+      properties:
+        id: { type: string }
+        skills:
+          type: array
+          items:
+            type: object
+            required: [description, examples]
+            properties:
+              description: { type: string }
+              examples: { type: array, items: { type: string } }
+        not_for: { type: array, items: { type: string } }
+        tools: { type: array, items: { type: string }, description: The built-in tools it may call; it never gets more than its task allows. }
+        app_tools: { type: boolean, description: It may also use connected add-ons' tools. }
+        runtime: { type: string, enum: [loop, claude-code] }
+        output: { type: string, description: What a finished answer of its holds. }
+        checks:
+          type: array
+          items:
+            type: object
+            required: [id, about, kind]
+            properties:
+              id: { type: string }
+              about: { type: string }
+              kind: { type: string, enum: [shape, tool, rubric] }
+        record: { $ref: "#/components/schemas/SpecialistRecord" }
+    SpecialistRecord:
+      type: object
+      description: How its checked work went in the last 30 days.
+      required: [checked, first_try, failed, tokens, line]
+      properties:
+        checked: { type: integer, description: Answers its checks applied to. }
+        first_try: { type: integer, description: Of those, how many passed every check the first time. }
+        failed: { type: integer, description: Of those, how many went out with a check still failing. }
+        tokens: { type: integer, format: int64, description: Tokens those answers used. }
+        line: { type: string, description: "One plain line, such as \"10 of 12 passed first time · 2 didn't pass\"." }
     ChatModel:
       type: object
       required: [provider, model, scope, models]

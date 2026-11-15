@@ -132,6 +132,13 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
+	// These tests build their own team; the shipped specialists would
+	// only crowd it.
+	for _, id := range []string{"ag_researcher", "ag_coder"} {
+		if err := st.DeleteAgent(id); err != nil {
+			t.Fatal(err)
+		}
+	}
 	sessions, err := database.NewSessionService(sqlite.Open(st.DSN()), &gorm.Config{Logger: gormlogger.Discard})
 	if err != nil {
 		t.Fatal(err)

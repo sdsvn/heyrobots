@@ -54,6 +54,13 @@ func newHarnessWith(t *testing.T, guardMW func(http.Handler) http.Handler, more 
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
+	// These tests build their own team; the shipped specialists would
+	// only crowd it.
+	for _, id := range []string{"ag_researcher", "ag_coder"} {
+		if err := st.DeleteAgent(id); err != nil {
+			t.Fatal(err)
+		}
+	}
 	v, err := vault.Open(dir, vault.FileKey{Path: filepath.Join(dir, "vault.key")})
 	if err != nil {
 		t.Fatal(err)

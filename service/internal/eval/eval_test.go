@@ -63,6 +63,13 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
+	// These tests build their own team; the shipped specialists would
+	// only crowd it.
+	for _, id := range []string{"ag_researcher", "ag_coder"} {
+		if err := st.DeleteAgent(id); err != nil {
+			t.Fatal(err)
+		}
+	}
 	c := &clock{t: time.Date(2026, 11, 11, 9, 0, 0, 0, time.UTC)}
 	fr := &fakeRouter{decide: func(Candidate) ([]Route, error) { return nil, nil }}
 	e := &env{t: t, store: st, intake: intake.New(st, c.now), clock: c, router: fr,

@@ -715,3 +715,9 @@ func declaredArgs(schema string, args map[string]any) map[string]any {
 	}
 	return out
 }
+
+// IsAppTool reports whether a tool comes from a connected add-on.
+func IsAppTool(t tool.Tool) bool {
+	_, ok := t.(*mcpTool)
+	return ok
+}

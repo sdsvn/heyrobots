@@ -13,16 +13,18 @@ import (
 
 	"heyrobots/service/internal/core"
 	"heyrobots/service/internal/ids"
+	"heyrobots/service/internal/specialists"
 	"heyrobots/service/internal/store"
 )
 
 // ReportArgs are the report tool's arguments.
 type ReportArgs struct {
-	State       string   `json:"state" jsonschema:"one of progress, waiting, ready, blocked, failed, dropped"`
-	Summary     string   `json:"summary" jsonschema:"what you did, or why you stopped; plain and honest"`
-	Result      string   `json:"result,omitempty" jsonschema:"for ready: the result itself, or the file you wrote and what it holds"`
-	HumanAction string   `json:"human_action,omitempty" jsonschema:"one concrete question the person must answer, if any"`
-	Choices     []string `json:"choices,omitempty" jsonschema:"with human_action: 2 to 5 short answers the person can tap, when the question has a few clear answers; each under 60 characters"`
+	State       string         `json:"state" jsonschema:"one of progress, waiting, ready, blocked, failed, dropped"`
+	Summary     string         `json:"summary" jsonschema:"what you did, or why you stopped; plain and honest"`
+	Result      string         `json:"result,omitempty" jsonschema:"for ready: the result itself, or the file you wrote and what it holds"`
+	HumanAction string         `json:"human_action,omitempty" jsonschema:"one concrete question the person must answer, if any"`
+	Choices     []string       `json:"choices,omitempty" jsonschema:"with human_action: 2 to 5 short answers the person can tap, when the question has a few clear answers; each under 60 characters"`
+	Data        map[string]any `json:"data,omitempty" jsonschema:"for ready, when your instructions ask for it: the structured result your work is checked against"`
 }
 
 // AckArgs are the ack tool's arguments.
@@ -57,6 +59,17 @@ func (r *run) controlTools() ([]tool.Tool, error) {
 		}
 		if state == "ready" && strings.TrimSpace(a.Result) == "" {
 			return ControlResult{Error: "a ready report needs the result"}, nil
+		}
+		if state == "ready" && r.gate != nil {
+			r.mu.Lock()
+			done := r.final != nil
+			r.mu.Unlock()
+			if done {
+				return ControlResult{Error: "you already reported"}, nil
+			}
+			if refuse := r.check(tc, specialists.Report{Summary: a.Summary, Result: a.Result, Data: a.Data, Brief: r.brief()}); refuse != "" {
+				return ControlResult{Error: refuse}, nil
+			}
 		}
 		r.mu.Lock()
 		defer r.mu.Unlock()
@@ -225,7 +238,12 @@ func (r *run) finish(rep report) error {
 			return err
 		}
 		if strings.TrimSpace(text) != "" {
-			text += footer
+			text += r.gate.checkFooter() + footer
+		}
+		if r.gate != nil && finalStates[rep.State] {
+			if err := tx.AddOutcome(r.gate.outcome(r, rep.State), r.c.Assignment.StartedAt); err != nil {
+				return err
+			}
 		}
 		if r.quietFollowUp(tx, stage) {
 			// A check that needed nothing from the owner closes quietly:

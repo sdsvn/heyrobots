@@ -9,6 +9,7 @@ import (
 	"heyrobots/service/internal/registry"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/glebarez/sqlite"
 	"google.golang.org/adk/v2/model"
@@ -50,6 +51,7 @@ import (
 	"heyrobots/service/internal/sources/calendar"
 	"heyrobots/service/internal/sources/mail"
 	"heyrobots/service/internal/sources/schedule"
+	"heyrobots/service/internal/specialists"
 	"heyrobots/service/internal/store"
 	"heyrobots/service/internal/telemetry"
 	"heyrobots/service/internal/toolsets"
@@ -219,7 +221,15 @@ func run() error {
 				c, _ := resolver.Choice(models.RoleWorker)
 				p = c.Provider
 			}
-			return p == models.ClaudeCode
+			if p == models.ClaudeCode {
+				return true
+			}
+			// A specialist that works in Claude Code does so when it is
+			// signed in here, and in the built-in loop otherwise.
+			if s, ok := specialists.Get(a.Specialist); ok && s.Runtime == specialists.ClaudeCode && a.Provider == "" {
+				return claudeReady.ok(claude)
+			}
+			return false
 		},
 		Store:      st,
 		Sessions:   sessions,
@@ -567,4 +577,27 @@ func cleanupCodes(ctx context.Context, st *store.Store, log *slog.Logger) {
 			}
 		}
 	}
+}
+
+// claudeReady remembers for a few minutes whether Claude Code is signed in
+// here, so specialists that prefer it don't ask on every task.
+var claudeReady readyCache
+
+type readyCache struct {
+	mu sync.Mutex
+	at time.Time
+	v  bool
+}
+
+func (c *readyCache) ok(w *acp.Worker) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if time.Since(c.at) < 5*time.Minute {
+		return c.v
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	v, err := w.SignedIn(ctx)
+	c.v, c.at = err == nil && v, time.Now()
+	return c.v
 }

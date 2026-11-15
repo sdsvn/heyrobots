@@ -632,6 +632,45 @@ func (e Role) Valid() bool {
 	}
 }
 
+// Defines values for SpecialistChecksKind.
+const (
+	SpecialistChecksKindRubric SpecialistChecksKind = "rubric"
+	SpecialistChecksKindShape  SpecialistChecksKind = "shape"
+	SpecialistChecksKindTool   SpecialistChecksKind = "tool"
+)
+
+// Valid indicates whether the value is a known member of the SpecialistChecksKind enum.
+func (e SpecialistChecksKind) Valid() bool {
+	switch e {
+	case SpecialistChecksKindRubric:
+		return true
+	case SpecialistChecksKindShape:
+		return true
+	case SpecialistChecksKindTool:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SpecialistRuntime.
+const (
+	SpecialistRuntimeClaudeCode SpecialistRuntime = "claude-code"
+	SpecialistRuntimeLoop       SpecialistRuntime = "loop"
+)
+
+// Valid indicates whether the value is a known member of the SpecialistRuntime enum.
+func (e SpecialistRuntime) Valid() bool {
+	switch e {
+	case SpecialistRuntimeClaudeCode:
+		return true
+	case SpecialistRuntimeLoop:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ThreadItemKind.
 const (
 	Action   ThreadItemKind = "action"
@@ -699,9 +738,12 @@ type Agent struct {
 	Purpose  string  `json:"purpose"`
 
 	// Rules Rules whose proactive work may go to it.
-	Rules    []string `json:"rules"`
-	Skills   []string `json:"skills"`
-	Toolsets []string `json:"toolsets"`
+	Rules  []string `json:"rules"`
+	Skills []string `json:"skills"`
+
+	// Specialist What makes an agent a specialist, as the server enforces it. A generalist has none.
+	Specialist *Specialist `json:"specialist,omitempty"`
+	Toolsets   []string    `json:"toolsets"`
 
 	// UnavailableSince When its machine was last heard from
 	UnavailableSince *time.Time `json:"unavailable_since,omitempty"`
@@ -1538,6 +1580,57 @@ type SkillList struct {
 type SkillRequest struct {
 	// Content The whole SKILL.md, with frontmatter naming the skill and describing it.
 	Content string `json:"content"`
+}
+
+// Specialist What makes an agent a specialist, as the server enforces it. A generalist has none.
+type Specialist struct {
+	// AppTools It may also use connected add-ons' tools.
+	AppTools bool `json:"app_tools"`
+	Checks   []struct {
+		About string               `json:"about"`
+		Id    string               `json:"id"`
+		Kind  SpecialistChecksKind `json:"kind"`
+	} `json:"checks"`
+	Id     string   `json:"id"`
+	NotFor []string `json:"not_for"`
+
+	// Output What a finished answer of its holds.
+	Output string `json:"output"`
+
+	// Record How its checked work went in the last 30 days.
+	Record  SpecialistRecord  `json:"record"`
+	Runtime SpecialistRuntime `json:"runtime"`
+	Skills  []struct {
+		Description string   `json:"description"`
+		Examples    []string `json:"examples"`
+	} `json:"skills"`
+
+	// Tools The built-in tools it may call; it never gets more than its task allows.
+	Tools []string `json:"tools"`
+}
+
+// SpecialistChecksKind defines model for Specialist.Checks.Kind.
+type SpecialistChecksKind string
+
+// SpecialistRuntime defines model for Specialist.Runtime.
+type SpecialistRuntime string
+
+// SpecialistRecord How its checked work went in the last 30 days.
+type SpecialistRecord struct {
+	// Checked Answers its checks applied to.
+	Checked int `json:"checked"`
+
+	// Failed Of those
+	Failed int `json:"failed"`
+
+	// FirstTry Of those
+	FirstTry int `json:"first_try"`
+
+	// Line One plain line, such as "10 of 12 passed first time · 2 didn't pass".
+	Line string `json:"line"`
+
+	// Tokens Tokens those answers used.
+	Tokens int64 `json:"tokens"`
 }
 
 // ThreadDetail defines model for ThreadDetail.

@@ -615,6 +615,30 @@ var migrations = []migration{
 		}
 		return nil
 	}},
+	{23, "specialist agents and how their work went", func(tx *gorm.DB) error {
+		if err := tx.Exec("ALTER TABLE agents ADD COLUMN specialist text NOT NULL DEFAULT ''").Error; err != nil {
+			return err
+		}
+		if err := tx.Exec("UPDATE agents SET specialist = 'it' WHERE id = 'ag_it'").Error; err != nil {
+			return err
+		}
+		now := time.Now().UTC()
+		// The Researcher and the Coder join the team, unless an agent here
+		// already has the name: an owner's own agent is never replaced.
+		for _, a := range []struct{ id, name, purpose, toolsets, color, badge, spec string }{
+			{"ag_researcher", "Researcher", "Finds things out from the web and says where each fact came from.", `["research","writing"]`, "mint", "search", "researcher"},
+			{"ag_coder", "Coder", "Writes and fixes code, and runs the tests before saying it works.", `["code","data","research"]`, "violet", "code", "coder"},
+		} {
+			if err := tx.Exec(`INSERT INTO agents (id, name, purpose, instructions, toolsets, any_toolset, skills, provider, model, base_url,
+				capacity, color, badge, builtin, enabled, created_at, updated_at, home, specialist)
+				SELECT ?, ?, ?, '', ?, false, '[]', '', '', '', 2, ?, ?, false, true, ?, ?, '', ?
+				WHERE NOT EXISTS (SELECT 1 FROM agents WHERE id = ? OR (name = ? AND home = ''))`,
+				a.id, a.name, a.purpose, a.toolsets, a.color, a.badge, now, now, a.spec, a.id, a.name).Error; err != nil {
+				return err
+			}
+		}
+		return tx.AutoMigrate(&AgentOutcome{})
+	}},
 }
 
 type schemaMigration struct {

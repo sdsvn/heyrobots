@@ -159,6 +159,9 @@ func (r *run) propose(action string, c changes.Change) (ProposeResult, error) {
 	if err != nil {
 		return ProposeResult{}, err
 	}
+	r.mu.Lock()
+	r.proposed = append(r.proposed, c.Title)
+	r.mu.Unlock()
 	return ProposeResult{OK: true, Note: proposedNote}, nil
 }
 

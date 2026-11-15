@@ -35,6 +35,11 @@ func TestTheTeamCanBeBuiltAndShown(t *testing.T) {
 		list.Agents[1].Name != "IT" || !slices.Equal(list.Agents[1].Toolsets, []string{"setup"}) {
 		t.Fatalf("team = %+v", list)
 	}
+	// IT is a specialist: its card, tools and checks show, and General has none.
+	if sp := list.Agents[1].Specialist; sp == nil || sp.Id != "it" || len(sp.Skills) == 0 || len(sp.NotFor) == 0 ||
+		!slices.Contains(sp.Tools, "connect_add_on") || len(sp.Checks) == 0 || sp.Record.Line != "No checked work yet" || list.Agents[0].Specialist != nil {
+		t.Fatalf("specialist = %+v", list.Agents[1].Specialist)
+	}
 	if c := h.do("GET", "/api/v1/agents", sam, nil, "").Code; c != http.StatusForbidden {
 		t.Fatalf("delegate = %d", c)
 	}

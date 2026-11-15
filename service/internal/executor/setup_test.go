@@ -26,7 +26,10 @@ func TestTheITAgentProposesSetupChangesForTheOwnersOK(t *testing.T) {
 	e.model.steps = [][]*genai.Part{
 		call("setup_status", map[string]any{}),
 		call("give_to_agent", map[string]any{"agent": "researcher", "skill": "trip-planner"}),
+		// IT must list what it proposed; leaving it out is refused.
 		reportCall("ready", "Proposed it.", "Asked to give Researcher the trip planner.", ""),
+		call("report", map[string]any{"state": "ready", "summary": "Proposed it.", "result": "Asked to give Researcher the trip planner.",
+			"data": map[string]any{"proposed": []any{"Give Researcher the skill trip-planner"}}}),
 	}
 	res := e.say(owner, "c1", "give the researcher the trip planner skill")
 	e.evalAll()
@@ -38,6 +41,12 @@ func TestTheITAgentProposesSetupChangesForTheOwnersOK(t *testing.T) {
 	}
 	if got, _ := json.Marshal(e.model.results); !strings.Contains(string(got), "Researcher") || !strings.Contains(string(got), "trip-planner") {
 		t.Fatalf("setup_status didn't show the team: %s", got)
+	}
+	if tk := e.ticket(res.ThreadIDs[0]); tk.Stage != string(core.StageReady) {
+		t.Fatalf("IT's report should pass once it lists its proposal: %+v", tk)
+	}
+	if got, _ := json.Marshal(e.model.results); !strings.Contains(string(got), "didn't list it in data.proposed") {
+		t.Fatalf("the unlisted proposal was refused first: %s", got)
 	}
 	acts := e.actions(res.ThreadIDs[0])
 	if len(acts) != 1 || acts[0].Action != changes.ActionGive || acts[0].Status != store.EffectAwaitingApproval {

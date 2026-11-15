@@ -19,6 +19,7 @@ import (
 	"heyrobots/service/internal/gate"
 	"heyrobots/service/internal/ids"
 	"heyrobots/service/internal/policy"
+	"heyrobots/service/internal/specialists"
 	"heyrobots/service/internal/store"
 	"heyrobots/service/internal/telemetry"
 )
@@ -324,6 +325,9 @@ func (e *Engine) team() ([]AgentSummary, error) {
 		l := loads[a.ID]
 		s := AgentSummary{ID: a.ID, Name: a.Name, Purpose: a.Purpose, Toolsets: a.ToolsetList(),
 			AnyToolset: a.AnyToolset, Working: len(l.Running), Waiting: l.Waiting}
+		if spec, ok := specialists.Get(a.Specialist); ok {
+			s.Card = &spec.Card
+		}
 		for _, in := range incidents {
 			switch {
 			case in.AgentID != a.ID:

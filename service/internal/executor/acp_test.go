@@ -12,6 +12,7 @@ import (
 
 	sdk "github.com/coder/acp-go-sdk"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"google.golang.org/genai"
 
 	"heyrobots/service/internal/acp"
 	"heyrobots/service/internal/core"
@@ -100,6 +101,9 @@ func (f *fake) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.PromptRespo
 		}
 		return sb.String(), nil
 	}
+	if os.Getenv(fakeAgentEnv+"_CODER") == "1" {
+		return f.codeAndGetChecked(call)
+	}
 	if _, err := call("write_file", map[string]any{"path": "drafts/thanks.md", "content": "Dear Anna, thank you!"}); err != nil {
 		return sdk.PromptResponse{}, err
 	}
@@ -118,6 +122,23 @@ func (f *fake) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.PromptRespo
 	out, err := call("report", map[string]any{"state": "ready", "summary": "Wrote the thank-you note.",
 		"result": fmt.Sprintf("Draft in drafts/thanks.md. Outside edit refused: %v", refused)})
 	if err != nil || !strings.Contains(out, `"ok":true`) {
+		return sdk.PromptResponse{}, fmt.Errorf("report: %q %v", out, err)
+	}
+	return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
+}
+
+// codeAndGetChecked reports a code change whose tests fail, which the
+// gate refuses, then one whose tests pass.
+func (f *fake) codeAndGetChecked(call func(string, map[string]any) (string, error)) (sdk.PromptResponse, error) {
+	report := func(cmd string) (string, error) {
+		return call("report", map[string]any{"state": "ready", "summary": "Fixed the split.", "result": "Changed split.go.",
+			"data": map[string]any{"changed": []any{"split.go"}, "tests_command": cmd}})
+	}
+	out, err := report("echo 'FAIL: want 33.34'; exit 1")
+	if err != nil || !strings.Contains(out, "didn't pass its checks") || !strings.Contains(out, "want 33.34") {
+		return sdk.PromptResponse{}, fmt.Errorf("failing tests weren't refused: %q %v", out, err)
+	}
+	if out, err = report("true"); err != nil || !strings.Contains(out, `"ok":true`) {
 		return sdk.PromptResponse{}, fmt.Errorf("report: %q %v", out, err)
 	}
 	return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
@@ -166,5 +187,28 @@ func TestInputSchemaUsesJSONSchemaTypes(t *testing.T) {
 	s := inputSchema(nil)
 	if b, _ := json.Marshal(s); string(b) != `{"type":"object"}` {
 		t.Fatalf("schema = %s", b)
+	}
+}
+
+func TestTheCoderInClaudeCodeIsCheckedThroughTheBridge(t *testing.T) {
+	e := newEnv(t)
+	t.Setenv(fakeAgentEnv, "1")
+	t.Setenv(fakeAgentEnv+"_CODER", "1")
+	if err := e.store.SaveAgent(store.Agent{ID: "ag_coder", Name: "Coder", Purpose: "Writes code.", Toolsets: `["code","data","research"]`,
+		Skills: `[]`, Capacity: 1, Enabled: true, Specialist: "coder", CreatedAt: e.clock, UpdatedAt: e.clock}); err != nil {
+		t.Fatal(err)
+	}
+	e.eval.Router = agentRouter{agent: "ag_coder", toolsets: []core.Toolset{core.ToolsetResearch}}
+	e.exec.ACP = &acp.Worker{Command: []string{os.Args[0], "-test.run=^$"}, ConfigDir: t.TempDir()}
+	e.exec.UsesACP = func(store.Agent) bool { return true }
+	e.model.steps = [][]*genai.Part{{{Text: `{"pass": true}`}}}
+	res := e.say(owner, "c1", "fix the bill split rounding")
+	e.evalAll()
+	if !e.work() {
+		t.Fatal("no assignment ran")
+	}
+	msgs := messages(e.view(res.ThreadIDs[0]))
+	if len(msgs) != 1 || !strings.Contains(msgs[0], "✓ Checked:") || !strings.Contains(msgs[0], "ran true") {
+		t.Fatalf("the reply says the tests were run again: %q", msgs)
 	}
 }

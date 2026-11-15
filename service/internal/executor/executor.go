@@ -40,6 +40,7 @@ import (
 	"heyrobots/service/internal/quarantine"
 	"heyrobots/service/internal/registry"
 	"heyrobots/service/internal/skills"
+	"heyrobots/service/internal/specialists"
 	"heyrobots/service/internal/store"
 	"heyrobots/service/internal/taint"
 	"heyrobots/service/internal/telemetry"
@@ -260,6 +261,10 @@ type run struct {
 	setFollowUps []store.BrainFollowUp
 	// handedBack is set when the run returned messages as not its own.
 	handedBack bool
+	// gate checks a specialist's reports; nil for a generalist.
+	gate *gate
+	// proposed are the titles of the changes this run proposed.
+	proposed []string
 }
 
 // CancelStopped cancels running Assignments whose Ticket a person stopped.
@@ -350,6 +355,9 @@ func (r *run) work(ctx context.Context) (report, error) {
 		return report{State: "failed", Summary: "The agent that had this task was removed."}, err
 	}
 	trace.SpanFromContext(ctx).SetAttributes(telemetry.GenAIAgentName.String(r.agent.Name), telemetry.AgentID.String(r.agent.ID))
+	if spec, ok := specialists.Get(r.agent.Specialist); ok {
+		r.gate = &gate{spec: spec}
+	}
 	r.startFollowUps()
 	granted := m
 	granted.Toolsets = nil
@@ -415,6 +423,9 @@ func (r *run) work(ctx context.Context) (report, error) {
 		return report{State: "failed", Summary: "The worker couldn't start."}, err
 	}
 	tools = append(tools, mem...)
+	if r.gate != nil {
+		tools = specialistTools(r.gate.spec, tools)
+	}
 	if e.Extra != nil {
 		tools = append(tools, e.Extra(r.c.Ticket)...)
 	}
