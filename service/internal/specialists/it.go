@@ -38,7 +38,7 @@ Your report is checked: every proposal you list must be one you filed, every pro
 			},
 		},
 		Checks: []Check{
-			{ID: "proposals-true", Kind: Tool, About: "The changes it lists are the ones it actually proposed", Run: checkProposals},
+			{ID: "proposals-true", Kind: Tool, About: "The changes it lists are the ones it actually proposed", When: hasProposals, Run: checkProposals},
 			{ID: "ready-works", Kind: Tool, About: "Every add-on it calls ready is connected with tools that can run", When: saysReady, Run: checkReady},
 		},
 		Cases: itCases,
@@ -46,6 +46,10 @@ Your report is checked: every proposal you list must be one you filed, every pro
 }
 
 func saysReady(r Report) bool { return len(strs(r.Data, "ready")) > 0 }
+
+// hasProposals is a reply that proposed changes or says it did; a plain
+// answer about the setup isn't checked.
+func hasProposals(r Report) bool { return len(r.Proposed) > 0 || len(strs(r.Data, "proposed")) > 0 }
 
 func checkProposals(_ context.Context, h Host, r Report) Verdict {
 	listed, filed := strs(r.Data, "proposed"), h.Proposed()

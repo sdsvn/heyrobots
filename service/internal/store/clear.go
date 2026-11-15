@@ -10,10 +10,13 @@ type Cleared struct {
 
 // historyTables hold the history of chats and tasks, in the order they are
 // cleared. Agents, groups, apps, skills, rules, jobs, settings, devices,
-// the spending ledger and what job triggers have seen all stay.
+// the spending ledger and what job triggers have seen all stay. So does
+// the log this machine shares with its team: its numbering must go on
+// where it left off, or the other machines would drop its new messages,
+// and they would send back everything it had cleared.
 var historyTables = []string{
 	"ticket_inputs", "assignments", "subscriptions", "decisions", "trigger_threads", "triggers",
-	"effects", "chat_events", "thread_reads", "incidents", "digests", "agent_outcomes", "brain_follow_ups",
+	"effects", "thread_reads", "incidents", "digests", "agent_outcomes", "brain_follow_ups",
 }
 
 // ClearHistory removes every chat and task and what hangs off them, in one

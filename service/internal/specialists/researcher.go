@@ -33,7 +33,7 @@ func researcher() Spec {
 		Tools:    []string{"web_search", "web_fetch", "save_note", "read_notes", "write_file", "read_file", "list_files"},
 		Runtime:  Loop,
 		Instructions: `You research. Search, open the pages that matter, and keep a note of each source you rely on.
-Every factual claim in a research answer comes from a page you opened. For each one, put it in your report's data under "claims", with the page's address in "url" and a short passage copied exactly from that page in "quote" that shows the claim is true.
+Every factual claim in a research answer comes from a page you opened. For each one, put it in your report's data under "claims", with the page's address in "url" and a short passage from that page in "quote" that shows the claim is true. To get the passage, ask web_fetch to quote the exact sentence that says it.
 Your report is checked: each page is opened again and must contain your quote. A claim you can't support, leave out, and say what you couldn't find.
 For a quick reply that makes no factual claims, such as a thank-you or a question back, leave "claims" out.`,
 		Output: Output{
@@ -110,7 +110,7 @@ func checkSourcesSayIt(ctx context.Context, h Host, r Report) Verdict {
 		if page == "\x00" {
 			continue
 		}
-		if !strings.Contains(page, normal(q)) {
+		if !holds(page, q) {
 			reasons = append(reasons, fmt.Sprintf("%s doesn't say %q", u, short(q)))
 		}
 	}
@@ -118,6 +118,54 @@ func checkSourcesSayIt(ctx context.Context, h Host, r Report) Verdict {
 		return Fail(reasons...)
 	}
 	return Verdict{Pass: true, Ran: fmt.Sprintf("opened %d sources and found every quote", opened)}
+}
+
+// holds reports whether a page says what a quote says. Pages reach the
+// Researcher through the quarantined reader, which may not copy a passage
+// letter for letter, so a quote holds when the page has it exactly, or
+// when every number in it is on the page and nearly all its other words
+// are. Numbers (prices, dates, versions) are what a made-up claim gets
+// wrong, so they must match exactly.
+//
+// ponytail: word coverage over the whole page, not within one passage; a
+// windowed match comes if loose quotes slip through.
+func holds(page, quote string) bool {
+	q := normal(quote)
+	if strings.Contains(page, q) {
+		return true
+	}
+	words := map[string]bool{}
+	for _, w := range tokens(page) {
+		words[w] = true
+	}
+	var other, found int
+	for _, w := range tokens(q) {
+		number := strings.ContainsAny(w, "0123456789")
+		switch {
+		case number && !words[w]:
+			return false
+		case number || len([]rune(w)) < 4:
+		default:
+			other++
+			if words[w] {
+				found++
+			}
+		}
+	}
+	return other >= 3 && found*5 >= other*4
+}
+
+// tokens splits text into words, keeping "$20", "3.5" and "1,000" whole.
+func tokens(s string) []string {
+	var out []string
+	for _, w := range strings.FieldsFunc(s, func(c rune) bool {
+		return !unicode.IsLetter(c) && !unicode.IsDigit(c) && c != '$' && c != '.' && c != ','
+	}) {
+		if w = strings.Trim(w, ".,"); w != "" {
+			out = append(out, w)
+		}
+	}
+	return out
 }
 
 // normal folds case, spacing and typographic quotes and dashes, so a

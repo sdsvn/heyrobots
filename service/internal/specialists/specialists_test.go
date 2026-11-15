@@ -138,3 +138,20 @@ func TestEverySpecIsComplete(t *testing.T) {
 		}
 	}
 }
+
+func TestAQuoteHoldsWhenThePageSaysIt(t *testing.T) {
+	page := normal("Pricing. The Starter plan costs $20 per seat per month, billed annually, for teams up to 10 people.")
+	for _, c := range []struct {
+		quote string
+		want  bool
+	}{
+		{"The Starter plan costs $20 per seat per month", true},
+		{"Starter plan costs $20 per seat each month, billed annually", true},
+		{"The Starter plan costs $25 per seat per month", false},
+		{"Starter is free forever for every team", false},
+	} {
+		if got := holds(page, c.quote); got != c.want {
+			t.Errorf("holds(%q) = %v, want %v", c.quote, got, c.want)
+		}
+	}
+}

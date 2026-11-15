@@ -58,6 +58,8 @@ type Report struct {
 	Data    map[string]any
 	// Brief is what the task was asked to do, in the person's words.
 	Brief string
+	// Proposed are the titles of the changes the task proposed.
+	Proposed []string
 }
 
 // Kind says how a check works.
@@ -144,8 +146,10 @@ type Spec struct {
 }
 
 // Kept are the tools every agent keeps, specialist or not: reporting,
-// handing back, its memory, the team and sharing a file.
-var Kept = []string{"report", "ack", "hand_back", "remember", "forget", "recall", "follow_up", "close_follow_up", "team", "share_file"}
+// handing back, its memory, the team, sharing a file, and proposing a
+// rule, a setting or a standing job, each of which waits for the owner.
+var Kept = []string{"report", "ack", "hand_back", "remember", "forget", "recall", "follow_up", "close_follow_up", "team", "share_file",
+	"make_rule", "set_setting", "make_job"}
 
 // Allows reports whether the specialist may call a built-in tool.
 func (s Spec) Allows(tool string) bool {

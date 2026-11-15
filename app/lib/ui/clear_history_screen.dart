@@ -97,6 +97,7 @@ class _ClearHistoryScreenState extends State<ClearHistoryScreen> {
                           const SizedBox(height: 8),
                           line(Icons.remove_circle_outline, p.danger, 'Every chat and task, with their files and history'),
                           line(Icons.remove_circle_outline, p.danger, 'Actions waiting for your OK or to be sent; they are cancelled, never sent later'),
+                          line(Icons.remove_circle_outline, p.danger, 'Follow-ups the agents set, and their notes on what went wrong'),
                           line(Icons.remove_circle_outline, p.danger, 'Digests, notifications and how the specialists\' checked work went'),
                           const SizedBox(height: 8),
                           Text('Stays', style: TextStyle(fontWeight: FontWeight.w900, color: p.ink)),

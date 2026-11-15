@@ -22,6 +22,9 @@ func TestClearingHistoryKeepsTheTeamAndTheLedger(t *testing.T) {
 			Status: EffectAwaitingApproval, Approval: ApprovalAwaiting, CreatedAt: now}); err != nil {
 			return err
 		}
+		if _, err := tx.AppendEvent("m_a", "th_dm", "message", "d1", map[string]string{"text": "hi"}, now); err != nil {
+			return err
+		}
 		return tx.AddOutcome(AgentOutcome{TicketID: "tk_1", AgentID: "ag_it", Checked: true, CreatedAt: now}, now)
 	}); err != nil {
 		t.Fatal(err)
@@ -43,7 +46,10 @@ func TestClearingHistoryKeepsTheTeamAndTheLedger(t *testing.T) {
 		}
 		return n
 	}
-	for table, want := range map[string]int64{"tickets": 0, "effects": 0, "agent_outcomes": 0, "threads": 1, "usages": 1, "brain_facts": 1, "agents": 4} {
+	for table, want := range map[string]int64{"tickets": 0, "effects": 0, "agent_outcomes": 0, "threads": 1, "usages": 1, "brain_facts": 1, "agents": 4,
+		// The log shared with the team's other machines stays, so their
+		// numbering goes on and nothing cleared comes back from them.
+		"chat_events": 1} {
 		if got := count(table); got != want {
 			t.Errorf("%s: %d rows, want %d", table, got, want)
 		}

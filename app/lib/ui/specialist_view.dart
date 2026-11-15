@@ -166,7 +166,7 @@ class SpecialistSection extends StatelessWidget {
             style: TextStyle(fontSize: 12, color: p.muted),
           ),
           const SizedBox(height: 12),
-          const SectionLabel('Held to these tools'),
+          const SectionLabel('Its heyrobots tools'),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
@@ -179,8 +179,8 @@ class SpecialistSection extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             [
-              if (s.runtime.toJson() == 'claude-code') 'Works in your Claude Code when it\'s signed in here.',
               'Never more than its task allows.',
+              if (s.runtime.toJson() == 'claude-code') 'It works in your Claude Code when that\'s signed in here, where it also reads and edits files in its task folder.',
             ].join(' '),
             style: TextStyle(fontSize: 12, color: p.muted),
           ),

@@ -67,7 +67,7 @@ func (r *run) controlTools() ([]tool.Tool, error) {
 			if done {
 				return ControlResult{Error: "you already reported"}, nil
 			}
-			if refuse := r.check(tc, specialists.Report{Summary: a.Summary, Result: a.Result, Data: a.Data, Brief: r.brief()}); refuse != "" {
+			if refuse := r.check(tc, specialists.Report{Summary: a.Summary, Result: a.Result, Data: a.Data, Brief: r.brief(), Proposed: r.Proposed()}); refuse != "" {
 				return ControlResult{Error: refuse}, nil
 			}
 		}

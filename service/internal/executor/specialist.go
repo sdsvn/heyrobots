@@ -31,6 +31,9 @@ type gate struct {
 	lastKey  string
 	passed   []string
 	failed   []string
+	// refused are the reasons of the last refusal, for a turn that ends
+	// another way after it (blocked, waiting, or no report at all).
+	refused []string
 }
 
 // specialistTools keeps the tools a specialist may call: the ones every
@@ -98,16 +101,16 @@ func (r *run) check(ctx context.Context, rep specialists.Report) string {
 		}
 	}
 	if len(reasons) == 0 {
-		g.passed, g.failed = passed, nil
+		g.passed, g.failed, g.refused = passed, nil, nil
 		return ""
 	}
 	key := strings.Join(reasons, "\n")
 	g.refusals++
 	if g.refusals > maxRefusals || key == g.lastKey {
-		g.passed, g.failed = passed, reasons
+		g.passed, g.failed, g.refused = passed, reasons, nil
 		return ""
 	}
-	g.lastKey = key
+	g.lastKey, g.refused = key, reasons
 	return "Your report didn't pass its checks. Fix these, then report again:\n- " + strings.Join(reasons, "\n- ")
 }
 
@@ -118,18 +121,30 @@ func (g *gate) checkFooter() string {
 	if g == nil || !g.checked {
 		return ""
 	}
-	if len(g.failed) > 0 {
-		return "\n\n⚠ Didn't pass its checks: " + strings.Join(g.failed, "; ")
+	if f := g.failing(); len(f) > 0 {
+		return "\n\n⚠ Didn't pass its checks: " + strings.Join(f, "; ")
+	}
+	if len(g.passed) == 0 {
+		return ""
 	}
 	return "\n\n✓ Checked: " + strings.Join(g.passed, " · ")
+}
+
+// failing is what still fails: the reasons the host gave up on, or those
+// of a refusal the turn never answered with a passing report.
+func (g *gate) failing() []string {
+	if len(g.failed) > 0 {
+		return g.failed
+	}
+	return g.refused
 }
 
 // outcome is the record of this turn.
 func (g *gate) outcome(r *run, state string) store.AgentOutcome {
 	passed, _ := json.Marshal(g.passed)
-	failed, _ := json.Marshal(g.failed)
+	failed, _ := json.Marshal(g.failing())
 	return store.AgentOutcome{TicketID: r.c.Ticket.ID, AgentID: r.agent.ID, Specialist: g.spec.ID, State: state,
-		Checked: g.checked, FirstTry: g.checked && g.refusals == 0 && len(g.failed) == 0,
+		Checked: g.checked, FirstTry: g.checked && g.refusals == 0 && len(g.failing()) == 0,
 		Passed: string(passed), Failed: string(failed), Refusals: g.refusals, CreatedAt: r.e.Now().UTC()}
 }
 
@@ -189,13 +204,22 @@ func (r *run) Judge(ctx context.Context, checklist string, rep specialists.Repor
 	if _, err := r.countCalls(nil, nil); err != nil {
 		return specialists.Verdict{}, err
 	}
-	llm, err := r.judgeModel(ctx)
-	if err != nil {
-		return specialists.Verdict{}, err
-	}
 	data, _ := json.MarshalIndent(rep.Data, "", "  ")
 	in := fmt.Sprintf("# Checklist\n%s\n\n# What was asked\n%s\n\n# The answer\n%s\n\n%s\n\n# Its data\n%s",
 		checklist, shorten(rep.Brief, 4000), shorten(rep.Summary, 2000), shorten(rep.Result, 8000), shorten(string(data), 6000))
+	llm, err := r.judgeModel(ctx)
+	if err != nil {
+		// With the owner's own Claude Code as the brain there's no model
+		// API; ask it once, with no tools, as the router does.
+		if r.e.Ask == nil {
+			return specialists.Verdict{}, err
+		}
+		text, err := r.e.Ask(ctx, judgeInstruction+"\n\n"+in+"\n\nReply with the JSON only. Don't use any tools.")
+		if err != nil {
+			return specialists.Verdict{}, err
+		}
+		return verdictFrom(text)
+	}
 	req := &model.LLMRequest{
 		Contents: []*genai.Content{genai.NewContentFromText(in, genai.RoleUser)},
 		Config: &genai.GenerateContentConfig{
@@ -218,13 +242,20 @@ func (r *run) Judge(ctx context.Context, checklist string, rep specialists.Repor
 			}
 		}
 	}
+	return verdictFrom(b.String())
+}
+
+// verdictFrom reads the judge's JSON answer.
+func verdictFrom(answer string) (specialists.Verdict, error) {
 	var out struct {
 		Pass    bool     `json:"pass"`
 		Reasons []string `json:"reasons"`
 	}
-	raw := strings.TrimSpace(b.String())
-	raw = strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(raw, "```json"), "```"), "```")
-	if err := json.Unmarshal([]byte(strings.TrimSpace(raw)), &out); err != nil {
+	raw := strings.TrimSpace(answer)
+	if i, j := strings.Index(raw, "{"), strings.LastIndex(raw, "}"); i >= 0 && j > i {
+		raw = raw[i : j+1]
+	}
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
 		return specialists.Verdict{}, fmt.Errorf("the judge's answer wasn't JSON: %w", err)
 	}
 	if out.Pass {

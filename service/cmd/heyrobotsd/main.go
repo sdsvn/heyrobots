@@ -215,6 +215,7 @@ func run() error {
 	var srv *api.Server
 	workers := &executor.Engine{
 		ACP: claude,
+		Ask: claude.Ask,
 		UsesACP: func(a store.Agent) bool {
 			p := a.Provider
 			if p == "" {

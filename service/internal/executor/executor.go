@@ -107,6 +107,9 @@ type Engine struct {
 	// says so of.
 	ACP     *acp.Worker
 	UsesACP func(a store.Agent) bool
+	// Ask answers a one-off question through the owner's own agent, for
+	// checks when no model API is set up.
+	Ask func(ctx context.Context, prompt string) (string, error)
 
 	brOnce sync.Once
 	br     *bridge

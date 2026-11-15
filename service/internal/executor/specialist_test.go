@@ -1,13 +1,16 @@
 package executor
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
 
+	"google.golang.org/adk/v2/model"
 	"google.golang.org/genai"
 
 	"heyrobots/service/internal/core"
@@ -59,7 +62,7 @@ func TestASpecialistsReportIsCheckedBeforeAnyoneSeesIt(t *testing.T) {
 		t.Fatal("no assignment ran")
 	}
 	tools := e.model.tools[0]
-	if !slices.Contains(tools, "web_fetch") || !slices.Contains(tools, "report") || !slices.Contains(tools, "remember") || slices.Contains(tools, "make_rule") {
+	if !slices.Contains(tools, "web_fetch") || !slices.Contains(tools, "report") || !slices.Contains(tools, "remember") || !slices.Contains(tools, "make_rule") || slices.Contains(tools, "run_command") {
 		t.Fatalf("a specialist gets its own tools and the ones every agent keeps, nothing else: %v", tools)
 	}
 	if !strings.Contains(e.model.systems[0], "How your work is checked") {
@@ -162,10 +165,49 @@ func TestEveryToolASpecNamesExists(t *testing.T) {
 	}
 	have := e.model.tools[0]
 	for _, s := range specialists.All() {
-		for _, name := range append(slices.Clone(s.Tools), specialists.Kept...) {
+		for _, name := range s.Tools {
 			if !slices.Contains(have, name) {
 				t.Errorf("%s names a tool that doesn't exist: %s (have %v)", s.ID, name, have)
 			}
 		}
+	}
+}
+
+func TestATurnThatStopsAfterARefusalSaysWhatDidntPass(t *testing.T) {
+	e := newEnv(t)
+	srv := e.addSpecialistResearcher()
+	// Refused once, then the model stops without reporting again.
+	e.model.steps = [][]*genai.Part{researchReport(srv.URL+"/crm", "HubSpot is free forever")}
+	res := e.say(owner, "c1", "compare three CRMs")
+	e.evalAll()
+	e.work()
+	msgs := messages(e.view(res.ThreadIDs[0]))
+	last := msgs[len(msgs)-1]
+	if strings.Contains(last, "✓") || !strings.Contains(last, "⚠ Didn't pass its checks:") {
+		t.Fatalf("an unanswered refusal is never shown as checked: %q", last)
+	}
+	if o := e.outcomes("ag_researcher"); len(o) != 1 || o[0].FirstTry || o[0].Failed == "null" {
+		t.Fatalf("outcome = %+v", o)
+	}
+}
+
+func TestWithoutAModelAPITheJudgeAsksTheOwnersAgent(t *testing.T) {
+	e := newEnv(t)
+	e.exec.Model = func(context.Context) (model.LLM, error) {
+		return nil, errors.New("Claude Code can't answer model calls")
+	}
+	var asked string
+	e.exec.Ask = func(_ context.Context, prompt string) (string, error) {
+		asked = prompt
+		return "Sure.\n```json\n{\"pass\": false, \"reasons\": [\"prices aren't dated\"]}\n```", nil
+	}
+	e.exec.init()
+	r := &run{e: e.exec}
+	v, err := r.Judge(context.Background(), "- Prices are dated.", specialists.Report{Brief: "compare CRMs", Result: "HubSpot is $20."})
+	if err != nil || v.Pass || len(v.Reasons) != 1 || v.Reasons[0] != "prices aren't dated" {
+		t.Fatalf("verdict = %+v, %v", v, err)
+	}
+	if !strings.Contains(asked, "Prices are dated") || !strings.Contains(asked, "Don't use any tools") || r.calls != 1 {
+		t.Fatalf("the owner's agent was asked once, with the checklist and no tools: %q, %d calls", asked, r.calls)
 	}
 }
