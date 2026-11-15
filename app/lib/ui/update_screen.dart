@@ -62,6 +62,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
     try {
       final u = await widget.state.api.getUpdate(check: fresh);
       if (!mounted) return;
+      widget.state.noteUpdate(u);
       setState(() => _u = u);
       if (u.state != 'idle' && u.state != 'failed') _follow();
     } catch (e) {
@@ -91,6 +92,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
       try {
         final u = await widget.state.api.getUpdate();
         if (!mounted) return;
+        widget.state.noteUpdate(u);
         setState(() {
           _u = u;
           _lost = false;

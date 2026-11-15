@@ -172,8 +172,14 @@ class _ChatsTabState extends State<ChatsTab> {
                       ),
                       const SizedBox(width: 10),
                       SquareButton(
-                        icon: Icon(Icons.settings_outlined, size: 21, color: p.ink),
-                        label: 'Settings',
+                        icon: Badge(
+                          key: const Key('settings:update-dot'),
+                          isLabelVisible: s.update?.newer ?? false,
+                          smallSize: 9,
+                          backgroundColor: p.danger,
+                          child: Icon(Icons.settings_outlined, size: 21, color: p.ink),
+                        ),
+                        label: (s.update?.newer ?? false) ? 'Settings · ${s.update!.latest} is out' : 'Settings',
                         onPressed: () => _push(SettingsScreen(state: s)),
                       ),
                     ],
@@ -511,18 +517,13 @@ class _ChatRow extends StatelessWidget {
     }
     return Row(
       children: [
-        if (mine) ...[
-          Ticks(color: last!.seen == true ? p.accent : p.muted, double: last.seen == true, label: last.seen == true ? 'Seen' : 'Sent'),
-          const SizedBox(width: 6),
-        ],
+        if (mine) ...[Ticks(color: last!.seen == true ? p.accent : p.muted, double: last.seen == true, label: last.seen == true ? 'Seen' : 'Sent'), const SizedBox(width: 6)],
         Expanded(
           child: Text.rich(
             TextSpan(
               children: [
                 ?who,
-                TextSpan(
-                  text: last == null ? (t.group != null ? t.group!.members.map((m) => m.name).join(', ') : 'Say hi') : (mine ? 'You: ${last.text}' : last.text),
-                ),
+                TextSpan(text: last == null ? (t.group != null ? t.group!.members.map((m) => m.name).join(', ') : 'Say hi') : (mine ? 'You: ${last.text}' : last.text)),
               ],
             ),
             maxLines: 1,

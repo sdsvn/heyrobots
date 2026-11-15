@@ -28,6 +28,7 @@ The server does the updating, because it already runs on the computer, keeps run
   - database changes in the new version run at its first start, as today; they can't be undone, which is why going back is by hand only
 - The app shows it and comes back by itself
   - Settings gains an "Updates" row: "heyrobots 0.5.1 · up to date", or "0.5.2 is out" with the release notes and an "Update" button
+  - the app asks when it starts and once a day while it stays open; when a newer one is out, the Settings button carries a dot
   - after you tap it, the app shows "Updating…", reconnects when the server answers again, and shows the new version
   - the Mac app whose bundle was replaced asks to relaunch ("Restart heyrobots to finish") and reopens itself
   - the web app comes inside the server, so it is new as soon as the server is back

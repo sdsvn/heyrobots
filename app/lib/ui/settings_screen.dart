@@ -38,9 +38,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _loadUpdate() {
-    widget.state.api.getUpdate().then((u) {
-      if (mounted) setState(() => _lines['update'] = updateLine(u));
-    }, onError: (_) {});
+    widget.state.checkUpdate().then((_) {
+      final u = widget.state.update;
+      if (mounted && u != null) setState(() => _lines['update'] = updateLine(u));
+    });
   }
 
   void _load() {
@@ -51,23 +52,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
     api.getPolicy().then((p) {
       if (mounted) setState(() => _policy = p);
     }, onError: (_) {});
-    line('brain', api.listBrains().then((b) {
-      final work = b.work.where((x) => x.selected).firstOrNull?.name;
-      final quick = b.quick.where((x) => x.selected).firstOrNull?.name;
-      return [?work, if (quick != null) '$quick for quick reads'].join(' · ');
-    }));
-    line('apps', api.listApps().then((l) {
-      final names = l.apps.where((a) => a.connected).map((a) => a.name).toList();
-      final suggested = l.apps.where((a) => !a.connected && a.status.toJson() == 'found').length;
-      final on = names.isEmpty ? 'Nothing connected yet' : names.take(4).join(', ');
-      return suggested == 0 ? on : '$on · $suggested more suggested';
-    }));
+    line(
+      'brain',
+      api.listBrains().then((b) {
+        final work = b.work.where((x) => x.selected).firstOrNull?.name;
+        final quick = b.quick.where((x) => x.selected).firstOrNull?.name;
+        return [?work, if (quick != null) '$quick for quick reads'].join(' · ');
+      }),
+    );
+    line(
+      'apps',
+      api.listApps().then((l) {
+        final names = l.apps.where((a) => a.connected).map((a) => a.name).toList();
+        final suggested = l.apps.where((a) => !a.connected && a.status.toJson() == 'found').length;
+        final on = names.isEmpty ? 'Nothing connected yet' : names.take(4).join(', ');
+        return suggested == 0 ? on : '$on · $suggested more suggested';
+      }),
+    );
     line('skills', api.listSkills().then((l) => '${l.skills.length} installed'));
-    line('people', api.listDevices().then((l) {
-      final live = l.devices.where((d) => d.revokedAt == null).toList();
-      final people = {for (final d in live) if (d.delegateName != null && d.delegateName!.isNotEmpty) d.delegateName!}.toList();
-      return '${['You', ...people].join(' and ')} · ${live.length} device${live.length == 1 ? '' : 's'}';
-    }));
+    line(
+      'people',
+      api.listDevices().then((l) {
+        final live = l.devices.where((d) => d.revokedAt == null).toList();
+        final people = {
+          for (final d in live)
+            if (d.delegateName != null && d.delegateName!.isNotEmpty) d.delegateName!,
+        }.toList();
+        return '${['You', ...people].join(' and ')} · ${live.length} device${live.length == 1 ? '' : 's'}';
+      }),
+    );
     line('spending', api.getUsage().then((u) => '${usd(u.spentUsd)} this month · stops at \$${u.budgetUsd.toStringAsFixed(u.budgetUsd % 1 == 0 ? 0 : 2)}'));
   }
 
@@ -124,7 +137,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               children: [
                                 for (final (i, (m, label)) in [(AcceptMode.off, 'Ask me'), (AcceptMode.observe, 'Suggest'), (AcceptMode.auto, 'Just do it')].indexed) ...[
                                   if (i > 0) const SizedBox(width: 4),
-                                  Expanded(child: Segment(key: Key('mode:${m.toJson()}'), label: label, selected: mode == m, onTap: () => _setMode(m))),
+                                  Expanded(
+                                    child: Segment(key: Key('mode:${m.toJson()}'), label: label, selected: mode == m, onTap: () => _setMode(m)),
+                                  ),
                                 ],
                               ],
                             ),
@@ -137,40 +152,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   RowsCard(
                     children: [
                       if (owner) ...[
-                        _Row(key: const Key('row:brain'), glyph: Glyph.sparkle, tint: 'peach', title: 'Brain', line: _lines['brain'], onTap: () => _open(SetupScreen(state: s))),
-                        _Row(key: const Key('row:apps'), glyph: Glyph.puzzle, tint: 'sky', title: 'Add-ons', line: _lines['apps'], onTap: () => _open(ConnectAppsScreen(state: s))),
-                        _Row(key: const Key('row:skills'), glyph: Glyph.book, tint: 'mint', title: 'Skills', line: _lines['skills'], onTap: () => _open(SkillsScreen(state: s))),
+                        _Row(
+                          key: const Key('row:brain'),
+                          glyph: Glyph.sparkle,
+                          tint: 'peach',
+                          title: 'Brain',
+                          line: _lines['brain'],
+                          onTap: () => _open(SetupScreen(state: s)),
+                        ),
+                        _Row(
+                          key: const Key('row:apps'),
+                          glyph: Glyph.puzzle,
+                          tint: 'sky',
+                          title: 'Add-ons',
+                          line: _lines['apps'],
+                          onTap: () => _open(ConnectAppsScreen(state: s)),
+                        ),
+                        _Row(
+                          key: const Key('row:skills'),
+                          glyph: Glyph.book,
+                          tint: 'mint',
+                          title: 'Skills',
+                          line: _lines['skills'],
+                          onTap: () => _open(SkillsScreen(state: s)),
+                        ),
                       ],
-                      _Row(key: const Key('row:people'), glyph: Glyph.team, tint: 'violet', title: 'People', line: owner ? _lines['people'] : s.me?.name, onTap: () => _open(DevicesScreen(state: s))),
+                      _Row(
+                        key: const Key('row:people'),
+                        glyph: Glyph.team,
+                        tint: 'violet',
+                        title: 'People',
+                        line: owner ? _lines['people'] : s.me?.name,
+                        onTap: () => _open(DevicesScreen(state: s)),
+                      ),
                       if (owner) ...[
-                        _Row(key: const Key('row:spending'), glyph: Glyph.clock, tint: 'sun', title: 'Spending', line: _lines['spending'], onTap: () => _open(UsageScreen(state: s))),
-                        _Row(key: const Key('row:machines'), glyph: Glyph.chip, tint: 'mint', title: 'Your machines', line: 'One team across them', onTap: () => _open(MachinesScreen(state: s))),
+                        _Row(
+                          key: const Key('row:spending'),
+                          glyph: Glyph.clock,
+                          tint: 'sun',
+                          title: 'Spending',
+                          line: _lines['spending'],
+                          onTap: () => _open(UsageScreen(state: s)),
+                        ),
+                        _Row(
+                          key: const Key('row:machines'),
+                          glyph: Glyph.chip,
+                          tint: 'mint',
+                          title: 'Your machines',
+                          line: 'One team across them',
+                          onTap: () => _open(MachinesScreen(state: s)),
+                        ),
                         _Row(
                           key: const Key('row:phone'),
                           glyph: Glyph.phone,
                           tint: 'rose',
                           title: 'Add a phone',
                           line: 'Show a code to scan',
-                          onTap: () => _open(PairingCodeScreen(state: s, request: const PairingCodeRequest(role: Role.owner))),
+                          onTap: () => _open(
+                            PairingCodeScreen(
+                              state: s,
+                              request: const PairingCodeRequest(role: Role.owner),
+                            ),
+                          ),
                         ),
                       ],
-                      _Row(key: const Key('row:update'), glyph: Glyph.bolt, tint: 'sky', title: 'Updates', line: _lines['update'], onTap: () => _open(UpdateScreen(state: s))),
+                      _Row(
+                        key: const Key('row:update'),
+                        glyph: Glyph.bolt,
+                        tint: 'sky',
+                        title: 'Updates',
+                        line: _lines['update'],
+                        onTap: () => _open(UpdateScreen(state: s)),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 14),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Text(
-                      'Digest time, quiet hours, budgets: just tell me in a chat. "Send the digest at 7" works.',
-                      style: TextStyle(fontSize: 13, color: p.muted),
-                    ),
+                    child: Text('Digest time, quiet hours, budgets: just tell me in a chat. "Send the digest at 7" works.', style: TextStyle(fontSize: 13, color: p.muted)),
                   ),
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-              child: Text('heyrobots $appVersion · this Mac · all data stays here', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted)),
+              child: Text(
+                'heyrobots $appVersion · this Mac · all data stays here',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: p.muted),
+              ),
             ),
           ],
         ),
@@ -178,7 +248,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-
 
 class _Row extends StatelessWidget {
   const _Row({super.key, required this.glyph, required this.tint, required this.title, required this.line, required this.onTap});
@@ -276,11 +345,13 @@ class DevicesScreen extends StatelessWidget {
               ListTile(
                 leading: Icon(d.role == Role.owner ? Icons.smartphone : Icons.person_outline),
                 title: Text(d.id == state.me?.id ? '${d.name} (this device)' : d.name),
-                subtitle: Text([
-                  d.role == Role.owner ? 'Owner' : 'Delegate ${d.delegateName ?? ''}',
-                  if (d.platform != null) d.platform!,
-                  if (d.revokedAt != null) 'Removed ${ago(d.revokedAt!)}' else if (d.lastSeenAt != null) 'Seen ${ago(d.lastSeenAt!)}',
-                ].join(' · ')),
+                subtitle: Text(
+                  [
+                    d.role == Role.owner ? 'Owner' : 'Delegate ${d.delegateName ?? ''}',
+                    if (d.platform != null) d.platform!,
+                    if (d.revokedAt != null) 'Removed ${ago(d.revokedAt!)}' else if (d.lastSeenAt != null) 'Seen ${ago(d.lastSeenAt!)}',
+                  ].join(' · '),
+                ),
                 trailing: d.revokedAt != null || d.id == state.me?.id
                     ? null
                     : IconButton(
@@ -304,7 +375,13 @@ class DevicesScreen extends StatelessWidget {
               onTap: () async {
                 final name = await _askName(context);
                 if (name != null && context.mounted) {
-                  _open(context, PairingCodeScreen(state: state, request: PairingCodeRequest(role: Role.delegate, delegateName: name)));
+                  _open(
+                    context,
+                    PairingCodeScreen(
+                      state: state,
+                      request: PairingCodeRequest(role: Role.delegate, delegateName: name),
+                    ),
+                  );
                 }
               },
             ),
@@ -319,7 +396,6 @@ class DevicesScreen extends StatelessWidget {
     );
   }
 }
-
 
 /// Shows a one-time code as a QR code for another device to scan.
 class PairingCodeScreen extends StatelessWidget {
@@ -337,7 +413,9 @@ class PairingCodeScreen extends StatelessWidget {
       body: Loaded<PairingCode>(
         load: () => state.api.createPairingCode(body: request),
         builder: (context, code, reload) {
-          final servers = [for (final u in code.servers ?? [code.serverUrl]) Uri.parse(u)];
+          final servers = [
+            for (final u in code.servers ?? [code.serverUrl]) Uri.parse(u),
+          ];
           final payload = PairingPayload(servers.first, code.code, servers: servers);
           return ListView(
             padding: const EdgeInsets.all(24),
@@ -362,7 +440,10 @@ class PairingCodeScreen extends StatelessWidget {
               const SizedBox(height: 8),
               Text('Works once, until ${clock(code.expiresAt)}.', style: theme.textTheme.bodySmall),
               const SizedBox(height: 8),
-              Align(alignment: Alignment.centerLeft, child: TextButton(onPressed: reload, child: const Text('New code'))),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(onPressed: reload, child: const Text('New code')),
+              ),
             ],
           );
         },
@@ -370,7 +451,6 @@ class PairingCodeScreen extends StatelessWidget {
     );
   }
 }
-
 
 class UsageScreen extends StatefulWidget {
   const UsageScreen({super.key, required this.state});
@@ -382,8 +462,7 @@ class UsageScreen extends StatefulWidget {
 }
 
 class _UsageScreenState extends State<UsageScreen> {
-  Future<(UsageView, PolicyView)> _load() async =>
-      (await widget.state.api.getUsage(), await widget.state.api.getPolicy());
+  Future<(UsageView, PolicyView)> _load() async => (await widget.state.api.getUsage(), await widget.state.api.getPolicy());
 
   Future<void> _editLimits(PolicyView p, VoidCallback reload) async {
     final l = p.limits;
@@ -399,9 +478,21 @@ class _UsageScreenState extends State<UsageScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(controller: budget, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Monthly budget (USD)', prefixText: '\$')),
-                TextField(controller: perHour, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Sends to others per hour, per account')),
-                TextField(controller: perDay, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Sends to others per day, per account')),
+                TextField(
+                  controller: budget,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Monthly budget (USD)', prefixText: '\$'),
+                ),
+                TextField(
+                  controller: perHour,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Sends to others per hour, per account'),
+                ),
+                TextField(
+                  controller: perDay,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Sends to others per day, per account'),
+                ),
               ],
             ),
           ),
@@ -457,14 +548,16 @@ class _UsageScreenState extends State<UsageScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Limits'),
-                subtitle: Text(
-                  'Up to ${l?.sendsPerHour ?? 10} sends an hour and ${l?.sendsPerDay ?? 50} a day to other people, per account.',
-                ),
+                subtitle: Text('Up to ${l?.sendsPerHour ?? 10} sends an hour and ${l?.sendsPerDay ?? 50} a day to other people, per account.'),
                 trailing: TextButton(onPressed: () => _editLimits(p, reload), child: const Text('Change')),
               ),
               if (u.tickets.isNotEmpty) const SectionHeader('Spending by task'),
               for (final t in u.tickets)
-                ListTile(dense: true, title: Text(t.scope, maxLines: 1, overflow: TextOverflow.ellipsis), trailing: Text(usd(t.spentUsd))),
+                ListTile(
+                  dense: true,
+                  title: Text(t.scope, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  trailing: Text(usd(t.spentUsd)),
+                ),
             ],
           );
         },
@@ -474,10 +567,5 @@ class _UsageScreenState extends State<UsageScreen> {
 }
 
 /// A policy update that keeps everything but what is given.
-PolicyUpdate updateFrom(PolicyView p, {AcceptMode? mode, List<RulePolicy>? rules, Limits? limits}) => PolicyUpdate(
-  mode: mode ?? p.mode,
-  toolsets: p.toolsets,
-  delegates: p.delegates,
-  rules: rules ?? p.rules,
-  limits: limits ?? p.limits,
-);
+PolicyUpdate updateFrom(PolicyView p, {AcceptMode? mode, List<RulePolicy>? rules, Limits? limits}) =>
+    PolicyUpdate(mode: mode ?? p.mode, toolsets: p.toolsets, delegates: p.delegates, rules: rules ?? p.rules, limits: limits ?? p.limits);

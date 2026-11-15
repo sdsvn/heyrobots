@@ -11,14 +11,8 @@ import 'platform.dart';
 
 /// Everything the app shows, kept fresh from the server.
 class AppState extends ChangeNotifier {
-  AppState({
-    required this.credentials,
-    required this.verifier,
-    this.httpClient,
-    bool? streamEvents,
-    this.pollEvery = const Duration(seconds: 15),
-    this.liveUpdates = true,
-  }) : streamEvents = streamEvents ?? !kIsWeb;
+  AppState({required this.credentials, required this.verifier, this.httpClient, bool? streamEvents, this.pollEvery = const Duration(seconds: 15), this.liveUpdates = true})
+    : streamEvents = streamEvents ?? !kIsWeb;
 
   /// Off in tests, which refresh by hand.
   final bool liveUpdates;
@@ -48,7 +42,12 @@ class AppState extends ChangeNotifier {
   int _generation = 0;
   Timer? _refreshSoon;
   Timer? _poll;
+  Timer? _updateDaily;
   bool _disposed = false;
+
+  /// The computer's update status, checked when the app starts and once a
+  /// day while it stays open.
+  UpdateStatus? update;
 
   bool get paired => _creds != null;
   bool get isOwner => me?.role == Role.owner;
@@ -83,7 +82,9 @@ class AppState extends ChangeNotifier {
     for (final s in p.servers) {
       try {
         res = await openApi(s, inner: httpClient?.call())
-            .pairDevice(body: PairRequest(code: p.code.trim(), deviceName: deviceName.trim(), platform: platformName(), installId: install))
+            .pairDevice(
+              body: PairRequest(code: p.code.trim(), deviceName: deviceName.trim(), platform: platformName(), installId: install),
+            )
             .timeout(const Duration(seconds: 8));
         server = s;
         paired = true;
@@ -106,6 +107,9 @@ class AppState extends ChangeNotifier {
     _api = openApi(_creds!.server, token: _creds!.token, inner: httpClient?.call());
     final gen = ++_generation;
     if (!liveUpdates) return;
+    unawaited(checkUpdate(fresh: true));
+    _updateDaily?.cancel();
+    _updateDaily = Timer.periodic(const Duration(days: 1), (_) => checkUpdate(fresh: true));
     if (streamEvents) {
       unawaited(_listen(gen));
     } else {
@@ -120,11 +124,7 @@ class AppState extends ChangeNotifier {
     if (api == null) return;
     try {
       me = await api.getMe();
-      final results = await Future.wait([
-        api.listAttention().then((r) => r.items),
-        api.listThreads().then((r) => r.threads),
-        if (me!.role == Role.owner) api.listDigests().then((r) => r.digests),
-      ]);
+      final results = await Future.wait([api.listAttention().then((r) => r.items), api.listThreads().then((r) => r.threads), if (me!.role == Role.owner) api.listDigests().then((r) => r.digests)]);
       attention = results[0] as List<AttentionItem>;
       final before = {for (final t in threads) t.id: t.updatedAt};
       threads = results[1] as List<ThreadSummary>;
@@ -280,6 +280,21 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
+  /// Asks the server for its update status; fresh asks GitHub too. A
+  /// failed check keeps the last answer.
+  Future<void> checkUpdate({bool fresh = false}) async {
+    final api = _api;
+    if (api == null) return;
+    try {
+      noteUpdate(await api.getUpdate(check: fresh));
+    } catch (_) {}
+  }
+
+  void noteUpdate(UpdateStatus u) {
+    update = u;
+    _notify();
+  }
+
   void _notify() {
     if (!_disposed) notifyListeners();
   }
@@ -289,6 +304,7 @@ class AppState extends ChangeNotifier {
     _disposed = true;
     _generation++;
     _poll?.cancel();
+    _updateDaily?.cancel();
     _refreshSoon?.cancel();
     _threadChanges.close();
     super.dispose();
@@ -297,8 +313,7 @@ class AppState extends ChangeNotifier {
 
 final _rand = Random.secure();
 
-String _messageId() =>
-    List.generate(16, (_) => _rand.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+String _messageId() => List.generate(16, (_) => _rand.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
 
 /// Actions that reach other people or can't be undone need biometrics.
 bool needsBiometrics(String reach) => reach == 'others' || reach == 'irreversible';

@@ -7,6 +7,7 @@ import 'package:heyrobots/pairing.dart';
 import 'package:heyrobots/platform.dart';
 import 'package:heyrobots/state.dart';
 import 'package:heyrobots/ui/app_screen.dart';
+import 'package:heyrobots/ui/chats_tab.dart';
 import 'package:heyrobots/ui/connect_apps_screen.dart';
 import 'package:heyrobots/ui/settings_screen.dart';
 import 'package:heyrobots/ui/skills_screen.dart';
@@ -42,8 +43,7 @@ void main() {
     await settle(tester);
   }
 
-  Iterable<Map<String, Object?>> bodies(String method, String path) =>
-      server.requests.where((r) => r.method == method && r.url.path == path).map((r) => jsonDecode(r.body) as Map<String, Object?>);
+  Iterable<Map<String, Object?>> bodies(String method, String path) => server.requests.where((r) => r.method == method && r.url.path == path).map((r) => jsonDecode(r.body) as Map<String, Object?>);
 
   testWidgets('setup picks a brain with a key, tests both, then shows the tabs', (tester) async {
     server.brainsChosen = false;
@@ -126,7 +126,9 @@ void main() {
     await tester.tap(find.text('Connect'));
     await settle(tester);
     final sent = bodies('POST', '/api/v1/apps/registry~io.github.acme~notes/connect');
-    expect(sent.last, {'settings': {'NOTES_TOKEN': 'tok-1'}});
+    expect(sent.last, {
+      'settings': {'NOTES_TOKEN': 'tok-1'},
+    });
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets('a phone lists apps but never starts a sign-in', (tester) async {
@@ -205,5 +207,13 @@ void main() {
     expect(server.requests.where((r) => r.method == 'POST' && r.url.path == '/api/v1/update'), hasLength(1));
     expect(find.byKey(const Key('update:progress')), findsOneWidget);
     expect(find.byKey(const Key('update:start')), findsNothing);
+  });
+
+  testWidgets('a dot on Settings says a new version is out', (tester) async {
+    await show(tester, ChatsTab(state: state));
+    expect(find.bySemanticsLabel('Settings'), findsOneWidget);
+    await tester.runAsync(state.checkUpdate);
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Settings · 0.6.0 is out'), findsOneWidget);
   });
 }
