@@ -353,20 +353,23 @@ func run() error {
 			engine.Kick()
 			workers.Kick()
 		},
-		Store:     st,
-		Cluster:   node,
-		Devices:   devices.New(st, time.Now),
-		Vault:     v,
-		MCP:       mcpServers,
-		Registry:  mcpRegistry,
-		Files:     filepath.Join(cfg.DataDir, "files"),
-		Models:    resolver,
-		ACP:       claude,
-		Skills:    skillLib,
-		Jobs:      jobLib,
-		Broker:    api.NewBroker(),
-		Log:       log,
-		Update:    updater,
+		Store:    st,
+		Cluster:  node,
+		Devices:  devices.New(st, time.Now),
+		Vault:    v,
+		MCP:      mcpServers,
+		Registry: mcpRegistry,
+		Files:    filepath.Join(cfg.DataDir, "files"),
+		Models:   resolver,
+		ACP:      claude,
+		Skills:   skillLib,
+		Jobs:     jobLib,
+		Broker:   api.NewBroker(),
+		Log:      log,
+		Update:   updater,
+		ClearHistory: func(ctx context.Context, forget bool) (store.Cleared, string, error) {
+			return clearHistory(ctx, st, workers, cfg.DataDir, forget)
+		},
 		ServerURL: cfg.ServerURL,
 		Addresses: reachable(cfg.ServerURL, cfg.Listen, scheme, tailName),
 		ShowPairingCode: func(code string, expires time.Time, servers []string) {
@@ -600,4 +603,36 @@ func (c *readyCache) ok(w *acp.Worker) bool {
 	v, err := w.SignedIn(ctx)
 	c.v, c.at = err == nil && v, time.Now()
 	return c.v
+}
+
+// clearHistory stops running work, keeps a backup of the database, clears
+// the chats and tasks, and removes the tasks' folders and shared files.
+func clearHistory(ctx context.Context, st *store.Store, workers *executor.Engine, dataDir string, forget bool) (store.Cleared, string, error) {
+	workers.Hold(true)
+	defer workers.Hold(false)
+	workers.StopAll()
+	for wait := time.Now().Add(30 * time.Second); workers.Running() > 0; {
+		if time.Now().After(wait) {
+			return store.Cleared{}, "", errors.New("running work didn't stop in time; try again in a minute")
+		}
+		select {
+		case <-ctx.Done():
+			return store.Cleared{}, "", ctx.Err()
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
+	backup, err := st.Backup("before-clearing-history", time.Now())
+	if err != nil {
+		return store.Cleared{}, "", fmt.Errorf("the backup failed, so nothing was cleared: %w", err)
+	}
+	c, err := st.ClearHistory(forget)
+	if err != nil {
+		return store.Cleared{}, backup, err
+	}
+	for _, dir := range []string{"workspaces", "files"} {
+		if err := os.RemoveAll(filepath.Join(dataDir, dir)); err != nil {
+			return c, backup, err
+		}
+	}
+	return c, backup, nil
 }

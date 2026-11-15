@@ -31,10 +31,12 @@ import (
 // Options configures the Server.
 type Options struct {
 	// Update checks for and installs new releases; nil when off.
-	Update  *update.Updater
-	Store   *store.Store
-	Devices *devices.Service
-	Vault   *vault.Vault
+	Update *update.Updater
+	// ClearHistory clears the chats and tasks; nil when off.
+	ClearHistory HistoryClearer
+	Store        *store.Store
+	Devices      *devices.Service
+	Vault        *vault.Vault
 	// Web serves the companion app's web build at /, if there is one.
 	Web http.Handler
 	// Models gives each role its model. Without it, only Gemini is set up.

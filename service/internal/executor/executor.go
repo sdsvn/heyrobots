@@ -267,6 +267,17 @@ type run struct {
 	proposed []string
 }
 
+// StopAll cancels every running Assignment, as if each task were stopped.
+// Hold first, so nothing new starts, and wait for Running to reach zero.
+func (e *Engine) StopAll() {
+	e.init()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for _, cancel := range e.active {
+		cancel(errStopped)
+	}
+}
+
 // CancelStopped cancels running Assignments whose Ticket a person stopped.
 // Call it after Eval decides, since a stop is an Eval decision.
 func (e *Engine) CancelStopped() {

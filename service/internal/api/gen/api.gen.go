@@ -1121,6 +1121,24 @@ type ChatModelUpdate struct {
 	Model   string  `json:"model"`
 }
 
+// ClearHistoryRequest defines model for ClearHistoryRequest.
+type ClearHistoryRequest struct {
+	// ForgetBrain Also forget what the agents learned about you and your work.
+	ForgetBrain bool `json:"forget_brain"`
+}
+
+// ClearedHistory defines model for ClearedHistory.
+type ClearedHistory struct {
+	// Actions Actions that were waiting to be sent and now never will be.
+	Actions int64 `json:"actions"`
+
+	// Backup Where the backup taken before clearing is
+	Backup      string `json:"backup"`
+	Chats       int64  `json:"chats"`
+	ForgotBrain bool   `json:"forgot_brain"`
+	Tasks       int64  `json:"tasks"`
+}
+
 // ConnectRequest defines model for ConnectRequest.
 type ConnectRequest struct {
 	// Settings Values a server that runs here needs, by name, when it asks for them.
@@ -1816,6 +1834,9 @@ type CreateGroupJSONRequestBody = GroupRequest
 // UpdateGroupJSONRequestBody defines body for UpdateGroup for application/json ContentType.
 type UpdateGroupJSONRequestBody = GroupRequest
 
+// ClearHistoryJSONRequestBody defines body for ClearHistory for application/json ContentType.
+type ClearHistoryJSONRequestBody = ClearHistoryRequest
+
 // UpdateIncidentJSONRequestBody defines body for UpdateIncident for application/json ContentType.
 type UpdateIncidentJSONRequestBody = IncidentUpdate
 
@@ -1947,6 +1968,9 @@ type ServerInterface interface {
 
 	// (GET /api/v1/health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+	// ClearHistory Clear the history and start fresh
+	// (POST /api/v1/history/clear)
+	ClearHistory(w http.ResponseWriter, r *http.Request)
 
 	// (POST /api/v1/incidents/{incidentId})
 	UpdateIncident(w http.ResponseWriter, r *http.Request, incidentId int64)
@@ -2801,6 +2825,20 @@ func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// ClearHistory operation middleware
+func (siw *ServerInterfaceWrapper) ClearHistory(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClearHistory(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // UpdateIncident operation middleware
 func (siw *ServerInterfaceWrapper) UpdateIncident(w http.ResponseWriter, r *http.Request) {
 
@@ -3498,6 +3536,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agents", wrapper.CreateAgent)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/agents/{agentId}", wrapper.DeleteAgent)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/agents/{agentId}", wrapper.UpdateAgent)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/history/clear", wrapper.ClearHistory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/update", wrapper.GetUpdate)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/update", wrapper.StartUpdate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agents/{agentId}/brain", wrapper.GetAgentBrain)

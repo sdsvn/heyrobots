@@ -428,6 +428,24 @@ paths:
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
+  /api/v1/history/clear:
+    post:
+      operationId: clearHistory
+      summary: Clear the history and start fresh
+      description: Stops running work, keeps a backup of the database, then removes every chat and task, their files, and actions waiting to be sent, which are never sent. Agents, apps, skills, rules, jobs, settings and the spending ledger stay. What agents learned stays unless forget_brain is set. Owner devices only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ClearHistoryRequest" }
+      responses:
+        "200":
+          description: Cleared.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClearedHistory" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /api/v1/update:
     get:
       operationId: getUpdate
@@ -1466,6 +1484,20 @@ components:
         unavailable_since: { type: string, format: date-time, description: When its machine was last heard from, while unavailable. }
         follow_ups_off: { type: boolean, description: Its follow-ups wait instead of starting tasks. }
         specialist: { $ref: "#/components/schemas/Specialist" }
+    ClearHistoryRequest:
+      type: object
+      required: [forget_brain]
+      properties:
+        forget_brain: { type: boolean, description: Also forget what the agents learned about you and your work. }
+    ClearedHistory:
+      type: object
+      required: [tasks, chats, actions, forgot_brain, backup]
+      properties:
+        tasks: { type: integer, format: int64 }
+        chats: { type: integer, format: int64 }
+        actions: { type: integer, format: int64, description: Actions that were waiting to be sent and now never will be. }
+        forgot_brain: { type: boolean }
+        backup: { type: string, description: Where the backup taken before clearing is, on the server. }
     Specialist:
       type: object
       description: What makes an agent a specialist, as the server enforces it. A generalist has none.
