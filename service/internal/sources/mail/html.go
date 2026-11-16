@@ -6,12 +6,14 @@ import (
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/renderer/html"
 )
 
+// Hard wraps keep a letter's lines ("Best,\nAnn") as written.
 var markdown = goldmark.New(goldmark.WithExtensions(
 	extension.NewTable(extension.WithTableCellAlignMethod(extension.TableCellAlignAttribute)),
 	extension.Strikethrough, extension.Linkify, extension.TaskList,
-))
+), goldmark.WithRendererOptions(html.WithHardWraps()))
 
 // Styles go inline on each tag, since most mail apps drop style sheets.
 var inline = strings.NewReplacer(

@@ -85,7 +85,7 @@ func (r *run) chatSection() string {
 			}
 		}
 		for _, e := range v.Effects {
-			if e.Kind != "message" || e.TicketID == r.c.Ticket.ID {
+			if e.Kind != "message" && e.Kind != store.KindUI || e.TicketID == r.c.Ticket.ID {
 				continue
 			}
 			who := names[e.TicketID]
@@ -95,7 +95,13 @@ func (r *run) chatSection() string {
 			if who == r.agent.Name {
 				who = "You (" + who + ")"
 			}
-			lines = append(lines, line{e.CreatedAt, who + ": " + shorten(e.Body, 600)})
+			body := e.Body
+			if e.Kind == store.KindUI {
+				// A tapped button comes back as a short message, so the
+				// next task needs what it answered.
+				body = "(showed buttons) " + body
+			}
+			lines = append(lines, line{e.CreatedAt, who + ": " + shorten(body, 600)})
 		}
 		return nil
 	})

@@ -17,6 +17,14 @@ void main() {
     expect(plainText('## Go 1.27.4 is out\n\nReleased **2026-11-10**, see [notes](https://go.dev).'), 'Go 1.27.4 is out Released 2026-11-10, see notes.');
   });
 
+  testWidgets('a reply keeps its single line breaks', (tester) async {
+    await tester.pumpWidget(_wrap(const ReplyText('Name: Ann\nDate: Friday\n\n```\na\nb\n```')));
+    final text = tester.widgetList<SelectableText>(find.byType(SelectableText)).map((t) => t.textSpan?.toPlainText() ?? t.data).join('|');
+    expect(text, contains('Ann\nDate: Friday'));
+    expect(text, contains('a\nb'));
+    expect(text, isNot(contains('b  ')));
+  });
+
   testWidgets('a reply shows its markdown formatted, not raw', (tester) async {
     await tester.pumpWidget(_wrap(const ReplyText('## Plan\n\n- **one**\n- two\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n`code`')));
     final text = tester.widgetList<SelectableText>(find.byType(SelectableText)).map((t) => t.textSpan?.toPlainText() ?? t.data).join('|');

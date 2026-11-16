@@ -195,6 +195,9 @@ func TestARepliesMarkdownGoesOutAsHTMLToo(t *testing.T) {
 			t.Errorf("html lacks %s:\n%s", want, html)
 		}
 	}
+	if letter := HTML("Hi Bob,\nThanks.\n\nBest,\nAnn"); !strings.Contains(letter, "Best,<br>") {
+		t.Errorf("a letter's lines ran together:\n%s", letter)
+	}
 	if strings.Contains(html, "<script") || strings.Contains(html, "<img") || !strings.Contains(html, "<thead>") {
 		t.Fatalf("raw html passed through:\n%s", html)
 	}

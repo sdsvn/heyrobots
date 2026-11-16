@@ -67,7 +67,7 @@ class ReplyText extends StatelessWidget {
       horizontalRuleDecoration: BoxDecoration(border: Border(top: BorderSide(color: p.line, width: 2))),
     );
     return MarkdownBody(
-      data: text,
+      data: hardBreaks(text),
       selectable: selectable,
       styleSheet: sheet,
       onTapLink: (label, href, _) {
@@ -88,6 +88,19 @@ class ReplyText extends StatelessWidget {
       child: Text(label, style: TextStyle(fontSize: 15, color: p.accent, fontWeight: FontWeight.w800, decoration: TextDecoration.underline, decorationColor: p.accent)),
     );
   }
+}
+
+/// Keeps a reply's single line breaks, as plain text showed them, by making
+/// each one a markdown hard break; code blocks stay as they are.
+String hardBreaks(String text) {
+  final lines = text.split('\n');
+  var fence = false;
+  for (var i = 0; i < lines.length - 1; i++) {
+    final t = lines[i].trimLeft();
+    if (t.startsWith('```') || t.startsWith('~~~')) fence = !fence;
+    if (!fence && t.isNotEmpty && lines[i + 1].trim().isNotEmpty && !t.startsWith('```') && !t.startsWith('~~~')) lines[i] = '${lines[i]}  ';
+  }
+  return lines.join('\n');
 }
 
 /// A reply's words without its markdown, for one-line previews.
@@ -176,7 +189,7 @@ class InlineImage extends StatelessWidget {
     return LimitedBox(
       maxWidth: 360,
       child: GestureDetector(
-        onTap: () => showImage(context, Image.network(url), label),
+        onTap: () => showImage(context, Image.network(url, webHtmlElementStrategy: WebHtmlElementStrategy.fallback), label),
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
           child: ConstrainedBox(
@@ -185,6 +198,9 @@ class InlineImage extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               child: Image.network(
                 url,
+                // In the browser app, a site without CORS headers still shows
+                // its picture, drawn by the page instead of fetched.
+                webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
                 width: width,
                 fit: BoxFit.contain,
                 alignment: Alignment.centerLeft,
