@@ -3,3 +3,4 @@
 !/service/internal/webapp/dist/README.md
 /graphify-out/cache/
 .DS_Store
+/.dev-data/
