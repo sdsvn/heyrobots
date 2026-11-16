@@ -151,7 +151,9 @@ func run() error {
 	// Each role runs on the model the owner chose in settings, or on the
 	// configured Gemini models until they do.
 	gem := func(name string) models.Choice { return models.Choice{Provider: models.Gemini, Model: name} }
-	resolver := &models.Resolver{Store: st, Vault: v, Defaults: map[string]models.Choice{
+	// The owner's own Claude Code, for agents whose brain it is.
+	claude := &acp.Worker{Command: cfg.ACPCommand, ConfigDir: cfg.ClaudeConfigDir, Model: cfg.AgentModel, Log: log}
+	resolver := &models.Resolver{Store: st, Vault: v, ClaudeCode: models.ClaudeCodeModel{Ask: claude.Ask, Search: claude.Search}, Defaults: map[string]models.Choice{
 		models.RoleRouter: gem(cfg.RouterModel), models.RoleReader: gem(cfg.RouterModel), models.RoleWorker: gem(cfg.WorkerModel),
 	}}
 	ledger := &usage.Ledger{Store: st, Prices: cfg.ModelPrices, Override: resolver.Price, Log: log}
@@ -200,8 +202,6 @@ func run() error {
 	}
 	reader := &quarantine.Reader{Model: router.Metered(resolver.Model(models.RoleReader), ledger.Record)}
 	mcpServers := &gateway.MCP{Store: st, Vault: v, Reader: reader, Log: log}
-	// The owner's own Claude Code, for agents whose brain it is.
-	claude := &acp.Worker{Command: cfg.ACPCommand, ConfigDir: cfg.ClaudeConfigDir, Model: cfg.AgentModel, Log: log}
 	// The owner's own ACP agent can route too, so no API key is needed.
 	engine.Router = router.Either{
 		Model: &router.Router{Prompt: prompts.Router, Model: smallModel},

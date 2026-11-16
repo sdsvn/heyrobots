@@ -27,6 +27,7 @@ import (
 
 	"heyrobots/service/internal/acp"
 	"heyrobots/service/internal/core"
+	"heyrobots/service/internal/models"
 	"heyrobots/service/internal/policy"
 	"heyrobots/service/internal/quarantine"
 	"heyrobots/service/internal/specialists"
@@ -44,7 +45,7 @@ func TestLiveSpecialistBeatsGeneral(t *testing.T) {
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	w := &acp.Worker{Log: log, Model: os.Getenv("LIVE_MODEL")}
-	judge := askLLM{w}
+	var judge model.LLM = models.ClaudeCodeModel{Ask: w.Ask, Search: w.Search}
 
 	type result struct {
 		pass    bool

@@ -118,7 +118,7 @@ func Build(ctx context.Context, c Choice, key string, hc *http.Client) (model.LL
 		}
 		return NewOpenAI(c.Model, key, NormalizeURL(c.BaseURL), hc), nil
 	case ClaudeCode:
-		return nil, errors.New("Claude Code does the work itself and can't answer model calls; jobs and quick calls need a model")
+		return nil, errors.New("Claude Code does the work itself and can't answer model calls here")
 	}
 	return nil, fmt.Errorf("unknown provider %q", c.Provider)
 }
@@ -132,6 +132,9 @@ type Resolver struct {
 	// Defaults are used for roles the owner hasn't set.
 	Defaults map[string]Choice
 	HTTP     *http.Client
+	// ClaudeCode answers one-shot calls for roles set to the owner's own
+	// Claude Code. Without it those roles have no model.
+	ClaudeCode model.LLM
 
 	mu    sync.Mutex
 	cache map[string]cached
@@ -161,6 +164,9 @@ func (r *Resolver) Model(role string) func(ctx context.Context) (model.LLM, erro
 		c, err := r.Choice(role)
 		if err != nil {
 			return nil, err
+		}
+		if c.Provider == ClaudeCode && r.ClaudeCode != nil {
+			return r.ClaudeCode, nil
 		}
 		key, _ := r.Vault.Get(KeyName(c.Provider, c.BaseURL))
 		if key == "" && c.Provider != OpenAI && c.Provider != ClaudeCode {
@@ -275,6 +281,9 @@ func Check(ctx context.Context, m model.LLM) error {
 // ForChoice builds a model for a choice outside the roles, such as an
 // agent's own model, with the key saved for its provider.
 func (r *Resolver) ForChoice(ctx context.Context, c Choice) (model.LLM, error) {
+	if c.Provider == ClaudeCode && r.ClaudeCode != nil {
+		return r.ClaudeCode, nil
+	}
 	key, _ := r.Vault.Get(KeyName(c.Provider, c.BaseURL))
 	return Build(ctx, c, key, r.HTTP)
 }

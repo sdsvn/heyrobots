@@ -41,7 +41,7 @@ var Roles = []string{RoleRouter, RoleReader, RoleWorker}
 
 // ErrNoWebSearch is returned for a web search request to a provider that
 // has no search of its own.
-var ErrNoWebSearch = errors.New("web search needs a Gemini or Anthropic reader model; choose one for the reader in settings")
+var ErrNoWebSearch = errors.New("web search needs a Gemini, Anthropic or Claude Code reader; choose one for the reader in settings")
 
 // defaultMaxTokens caps a reply when the request sets no limit.
 const defaultMaxTokens = 16000

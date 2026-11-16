@@ -15,47 +15,17 @@ import (
 	"testing"
 	"time"
 
-	"iter"
-
 	"google.golang.org/adk/v2/model"
-	"google.golang.org/genai"
 
 	"heyrobots/service/internal/acp"
 	"heyrobots/service/internal/core"
+	"heyrobots/service/internal/models"
 	"heyrobots/service/internal/outbox"
 	"heyrobots/service/internal/quarantine"
 	"heyrobots/service/internal/router"
-	"heyrobots/service/prompts"
 	"heyrobots/service/internal/store"
+	"heyrobots/service/prompts"
 )
-
-// askLLM answers one-shot model calls, such as the quarantined reader's,
-// through Claude Code.
-type askLLM struct{ w *acp.Worker }
-
-func (askLLM) Name() string { return "claude-code" }
-
-func (a askLLM) GenerateContent(ctx context.Context, req *model.LLMRequest, _ bool) iter.Seq2[*model.LLMResponse, error] {
-	return func(yield func(*model.LLMResponse, error) bool) {
-		var b strings.Builder
-		if req.Config != nil && req.Config.SystemInstruction != nil {
-			for _, p := range req.Config.SystemInstruction.Parts {
-				b.WriteString(p.Text + "\n\n")
-			}
-		}
-		for _, c := range req.Contents {
-			for _, p := range c.Parts {
-				b.WriteString(p.Text + "\n")
-			}
-		}
-		text, err := a.w.Ask(ctx, b.String()+"\nReply with the answer only, no tools.")
-		if err != nil {
-			yield(nil, err)
-			return
-		}
-		yield(&model.LLMResponse{Content: genai.NewContentFromText(text, genai.RoleModel), TurnComplete: true}, nil)
-	}
-}
 
 func newLiveWorld(t *testing.T) *mailWorld {
 	w := newMailWorld(t)
@@ -66,7 +36,9 @@ func newLiveWorld(t *testing.T) *mailWorld {
 	w.exec.ACP = &acp.Worker{Log: log, Model: os.Getenv("LIVE_MODEL")}
 	// The real router, through Claude Code too.
 	w.eval.Router = &router.ACP{Prompt: prompts.Router, Ask: w.exec.ACP.Ask}
-	w.exec.Reader = &quarantine.Reader{Model: func(context.Context) (model.LLM, error) { return askLLM{w.exec.ACP}, nil }}
+	w.exec.Reader = &quarantine.Reader{Model: func(context.Context) (model.LLM, error) {
+		return models.ClaudeCodeModel{Ask: w.exec.ACP.Ask, Search: w.exec.ACP.Search}, nil
+	}}
 	w.exec.UsesACP = func(store.Agent) bool { return true }
 	w.exec.RunLimit = 10 * time.Minute
 	// The real clock drives Claude Code; the test's clock drives the

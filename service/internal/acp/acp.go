@@ -6,6 +6,7 @@ package acp
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -242,6 +244,10 @@ func (w *Worker) take(ctx context.Context) (*proc, error) {
 // load sessions, it loads that one; Loaded says whether it did. Each
 // session has its own adapter, ended by Close or when ctx ends.
 func (w *Worker) Start(ctx context.Context, client acp.Client, dir string, servers []acp.McpServer, loadID string) (*Session, error) {
+	return w.start(ctx, client, dir, servers, loadID, nil)
+}
+
+func (w *Worker) start(ctx context.Context, client acp.Client, dir string, servers []acp.McpServer, loadID string, meta map[string]any) (*Session, error) {
 	p, err := w.take(ctx)
 	defer w.Warm()
 	if err != nil {
@@ -260,7 +266,7 @@ func (w *Worker) Start(ctx context.Context, client acp.Client, dir string, serve
 			w.Log.Info("acp session not loaded, starting a new one", "err", err)
 		}
 	}
-	ns, err := p.conn.NewSession(ctx, acp.NewSessionRequest{Cwd: dir, McpServers: servers})
+	ns, err := p.conn.NewSession(ctx, acp.NewSessionRequest{Cwd: dir, McpServers: servers, Meta: meta})
 	if err != nil {
 		s.Close()
 		return nil, s.wrap(err)
@@ -377,22 +383,43 @@ func (w *Worker) Check(ctx context.Context) error {
 	return nil
 }
 
-// Ask opens a throwaway session in an empty folder, with no tools of
-// heyrobots', sends one prompt and returns the agent's answer.
+// Ask opens a throwaway session in an empty folder with no tools at all,
+// sends one prompt and returns the agent's answer.
 func (w *Worker) Ask(ctx context.Context, prompt string) (string, error) {
+	return w.ask(ctx, prompt, nil)
+}
+
+// Search is Ask with Claude Code's own web search as its only tool, for a
+// quarantined web search when Claude Code is the reader.
+func (w *Worker) Search(ctx context.Context, query string) (string, error) {
+	return w.ask(ctx, query, []string{"WebSearch"})
+}
+
+// ask runs one prompt with only the built-in tools named. The adapter is
+// told to drop every other tool, the owner's MCP servers included, and
+// any other tool that still shows up fails the answer: the reader's
+// quarantine promises a call that can't act.
+func (w *Worker) ask(ctx context.Context, prompt string, tools []string) (string, error) {
 	dir, err := os.MkdirTemp("", "heyrobots-acp-ask")
 	if err != nil {
 		return "", err
 	}
 	defer os.RemoveAll(dir)
-	c := &textClient{}
-	s, err := w.Start(ctx, c, dir, nil, "")
+	if tools == nil {
+		tools = []string{}
+	}
+	c := &textClient{allow: tools}
+	meta := map[string]any{"claudeCode": map[string]any{"options": map[string]any{"tools": tools, "strictMcpConfig": true}}}
+	s, err := w.start(ctx, c, dir, nil, "", meta)
 	if err != nil {
 		return "", err
 	}
 	defer s.Close()
 	if _, err := s.Prompt(ctx, prompt); err != nil {
 		return "", err
+	}
+	if bad := c.Stray(); bad != "" {
+		return "", fmt.Errorf("Claude Code used a tool it wasn't given (%s)", bad)
 	}
 	return c.Text(), nil
 }
@@ -466,17 +493,55 @@ func (BaseClient) WaitForTerminalExit(context.Context, acp.WaitForTerminalExitRe
 // textClient collects what the agent says.
 type textClient struct {
 	BaseClient
-	mu  sync.Mutex
-	buf strings.Builder
+	// allow names the built-in tools this session may use.
+	allow []string
+	mu    sync.Mutex
+	buf   strings.Builder
+	names map[acp.ToolCallId]string
+	stray string
+}
+
+// RequestPermission allows only the tools the session was given. The
+// adapter names a tool on its tool_call update, not on the request, so
+// the name is looked up by the call's id; an unknown call is refused.
+func (c *textClient) RequestPermission(_ context.Context, p acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
+	c.mu.Lock()
+	name := c.names[p.ToolCall.ToolCallId]
+	c.mu.Unlock()
+	return Answer(p, name != "" && slices.Contains(c.allow, name)), nil
 }
 
 func (c *textClient) SessionUpdate(_ context.Context, n acp.SessionNotification) error {
-	if ch := n.Update.AgentMessageChunk; ch != nil && ch.Content.Text != nil {
-		c.mu.Lock()
-		c.buf.WriteString(ch.Content.Text.Text)
-		c.mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	switch u := n.Update; {
+	case u.AgentMessageChunk != nil && u.AgentMessageChunk.Content.Text != nil:
+		c.buf.WriteString(u.AgentMessageChunk.Content.Text.Text)
+	case u.ToolCall != nil:
+		name := toolName(u.ToolCall.Meta)
+		if c.names == nil {
+			c.names = map[acp.ToolCallId]string{}
+		}
+		c.names[u.ToolCall.ToolCallId] = name
+		if c.stray == "" && (name == "" || !slices.Contains(c.allow, name)) {
+			c.stray = cmp.Or(name, u.ToolCall.Title, "unnamed")
+		}
 	}
 	return nil
+}
+
+// toolName reads the tool's name from the adapter's metadata.
+func toolName(meta map[string]any) string {
+	cc, _ := meta["claudeCode"].(map[string]any)
+	name, _ := cc["toolName"].(string)
+	return name
+}
+
+// Stray names a tool the agent used that it wasn't given.
+func (c *textClient) Stray() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.stray
 }
 
 func (c *textClient) Text() string {
