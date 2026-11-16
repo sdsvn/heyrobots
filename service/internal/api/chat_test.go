@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"heyrobots/service/internal/api/gen"
 	"heyrobots/service/internal/core"
 	"heyrobots/service/internal/eval"
+	"heyrobots/service/internal/store"
 )
 
 func (h *harness) send(token, clientID, threadID, text string) (int, gen.SendMessageResponse) {
@@ -170,5 +172,23 @@ func TestDeletingAConversation(t *testing.T) {
 	}
 	if rec := h.do("DELETE", "/api/v1/threads/"+msg.ThreadId, owner, nil, ""); rec.Code != http.StatusNotFound {
 		t.Fatalf("deleted twice: %d", rec.Code)
+	}
+}
+
+func TestAnUpdatedThreadMovesUpForTheBrowserApp(t *testing.T) {
+	h := newHarness(t, nil)
+	old := time.Now().UTC().Add(-time.Hour)
+	if err := h.store.Tx(func(tx *store.Tx) error {
+		return tx.CreateThread(store.Thread{ID: "th1", Source: "app", Key: "th1", CreatedBy: "app:owner", CreatedAt: old, UpdatedAt: old})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	h.srv.ThreadUpdated("th1")
+	var th store.Thread
+	if err := h.store.Tx(func(tx *store.Tx) (err error) { th, err = tx.Thread("th1"); return }); err != nil {
+		t.Fatal(err)
+	}
+	if !th.UpdatedAt.After(old) {
+		t.Fatalf("updated at %v; the browser polls for a change to it", th.UpdatedAt)
 	}
 }

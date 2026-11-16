@@ -119,9 +119,15 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 // ThreadUpdated tells apps that a Thread changed, for example after Eval.
+// It also moves the Thread's time, so the browser app, which polls the
+// list instead of streaming events, sees the same change and the list
+// keeps the latest activity first.
 func (s *Server) ThreadUpdated(threadID string) {
 	var th store.Thread
 	if err := s.opts.Store.Tx(func(tx *store.Tx) error {
+		if err := tx.TouchThread(threadID, s.opts.Now().UTC()); err != nil {
+			return err
+		}
 		var err error
 		th, err = tx.Thread(threadID)
 		return err
