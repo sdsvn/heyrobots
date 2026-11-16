@@ -35,8 +35,11 @@ func TestAQuickCallGetsOnlyTheToolsItWasGiven(t *testing.T) {
 	}
 
 	search := &textClient{allow: []string{"WebSearch"}}
+	if search.Used() {
+		t.Fatal("nothing searched yet")
+	}
 	call(search, "t1", "WebSearch")
-	if !allowed(search, "t1") || search.Stray() != "" {
+	if !allowed(search, "t1") || !search.Used() || search.Stray() != "" {
 		t.Fatal("a search may use web search")
 	}
 	if allowed(search, "unknown") {

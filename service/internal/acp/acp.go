@@ -421,6 +421,10 @@ func (w *Worker) ask(ctx context.Context, prompt string, tools []string) (string
 	if bad := c.Stray(); bad != "" {
 		return "", fmt.Errorf("Claude Code used a tool it wasn't given (%s)", bad)
 	}
+	// A search that never searched would pass off memory as the web.
+	if len(tools) > 0 && !c.Used() {
+		return "", errors.New("Claude Code answered without searching the web")
+	}
 	return c.Text(), nil
 }
 
@@ -499,6 +503,7 @@ type textClient struct {
 	buf   strings.Builder
 	names map[acp.ToolCallId]string
 	stray string
+	used  bool
 }
 
 // RequestPermission allows only the tools the session was given. The
@@ -523,7 +528,10 @@ func (c *textClient) SessionUpdate(_ context.Context, n acp.SessionNotification)
 			c.names = map[acp.ToolCallId]string{}
 		}
 		c.names[u.ToolCall.ToolCallId] = name
-		if c.stray == "" && (name == "" || !slices.Contains(c.allow, name)) {
+		switch {
+		case name != "" && slices.Contains(c.allow, name):
+			c.used = true
+		case c.stray == "":
 			c.stray = cmp.Or(name, u.ToolCall.Title, "unnamed")
 		}
 	}
@@ -535,6 +543,13 @@ func toolName(meta map[string]any) string {
 	cc, _ := meta["claudeCode"].(map[string]any)
 	name, _ := cc["toolName"].(string)
 	return name
+}
+
+// Used says the agent called a tool it was given.
+func (c *textClient) Used() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.used
 }
 
 // Stray names a tool the agent used that it wasn't given.
