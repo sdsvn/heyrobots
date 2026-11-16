@@ -45,7 +45,7 @@ This changes only the app: the chat screen's bubbles in `app/lib/ui/chat_screen.
   - tapping a button sends its action back to the agent as a message in the same chat
   - the server checks each component against the catalog's own schema before storing it and tells the agent what to fix; one the app still can't draw shows as the agent's plain text fallback instead
   - today's simple cards stay as they are in this change and move onto A2UI in a follow-up, so later there is one way to show UI
-  - what can go wrong: images inside a surface follow the same rule as markdown images (shared files and `https` addresses load); A2UI is young (0.x), so a breaking release means pinning and updating both packages together
+  - what can go wrong: images inside a surface load only from `https` addresses, like markdown images; a shared file can't be placed inside a surface yet; A2UI is young (0.x), so a breaking release means pinning and updating both packages together
 
 ## Alternatives
 - Write a small markdown renderer by hand. It would cover bold and lists, but not tables or code blocks, and it would become ours to maintain.
