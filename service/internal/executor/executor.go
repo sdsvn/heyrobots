@@ -264,6 +264,9 @@ type run struct {
 	setFollowUps []store.BrainFollowUp
 	// handedBack is set when the run returned messages as not its own.
 	handedBack bool
+	// showedUI is set once the run showed a card: the card is its reply,
+	// so the report doesn't say it again.
+	showedUI bool
 	// gate checks a specialist's reports; nil for a generalist.
 	gate *gate
 	// proposed are the titles of the changes this run proposed.

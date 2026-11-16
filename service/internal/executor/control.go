@@ -57,7 +57,10 @@ func (r *run) controlTools() ([]tool.Tool, error) {
 		if !finalStates[state] {
 			return ControlResult{Error: "state must be progress, waiting, ready, blocked, failed or dropped"}, nil
 		}
-		if state == "ready" && strings.TrimSpace(a.Result) == "" {
+		r.mu.Lock()
+		showedUI := r.showedUI
+		r.mu.Unlock()
+		if state == "ready" && strings.TrimSpace(a.Result) == "" && !showedUI {
 			return ControlResult{Error: "a ready report needs the result"}, nil
 		}
 		if state == "ready" && r.gate != nil {
@@ -206,7 +209,10 @@ func (r *run) finish(rep report) error {
 		case "ready":
 			open, stage = false, core.StageReady
 			text = rep.Result
-			if s := strings.TrimSpace(rep.Summary); s != "" && s != strings.TrimSpace(rep.Result) {
+			r.mu.Lock()
+			showedUI := r.showedUI
+			r.mu.Unlock()
+			if s := strings.TrimSpace(rep.Summary); s != "" && s != strings.TrimSpace(rep.Result) && !showedUI {
 				text = s + "\n\n" + rep.Result
 			}
 		case "failed":

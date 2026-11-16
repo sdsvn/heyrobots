@@ -1006,7 +1006,7 @@ class _TheirBubble extends StatelessWidget {
         texts.add(
           SizedBox(
             width: maxWidth - 28,
-            child: UiSurface(key: Key('ui:${part.id}'), messages: u.messages, onAction: (a) => onUiAction(actionMessage(a)), fallback: ReplyText(part.text ?? '')),
+            child: UiSurface(key: Key('ui:${part.id}'), messages: u.messages, onAction: onUiAction, fallback: ReplyText(part.text ?? '')),
           ),
         );
       } else if (part.file case final f?) {

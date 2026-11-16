@@ -1,3 +1,4 @@
+import 'package:a2ui_core/a2ui_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heyrobots/ui/rich_reply.dart';
@@ -53,17 +54,34 @@ void main() {
             {'id': 'root', 'component': 'Column', 'children': ['q', 'b']},
             {'id': 'q', 'component': 'Text', 'text': 'Book the 7pm table?'},
             {'id': 'b', 'component': 'Button', 'child': 'bl', 'action': {'event': {'name': 'book', 'context': {'time': '19:00'}}}},
-            {'id': 'bl', 'component': 'Text', 'text': 'Book it'},
+            {'id': 'bl', 'component': 'Text', 'text': '**Book** it'},
           ],
         },
       },
     ];
-    await tester.pumpWidget(_wrap(UiSurface(messages: messages, onAction: (a) => sent = actionMessage(a), fallback: const Text('fallback'))));
+    await tester.pumpWidget(_wrap(UiSurface(messages: messages, onAction: (m) => sent = m, fallback: const Text('fallback'))));
     await tester.pumpAndSettle();
     expect(find.text('fallback'), findsNothing);
     await tester.tap(find.text('Book it'));
     await tester.pumpAndSettle();
-    expect(sent, 'book (time: 19:00)');
+    // The label, as the person saw it; the time the agent wrote into the
+    // button it already knows.
+    expect(sent, 'Book it');
+  });
+
+  test('a tap sends what the person filled in, not what the agent wrote', () {
+    final messages = [
+      {
+        'updateComponents': {
+          'components': [
+            {'id': 'b', 'component': 'Button', 'child': 'l', 'action': {'event': {'name': 'book', 'context': {'time': '19:00', 'name': {'path': '/name'}}}}},
+            {'id': 'l', 'component': 'Text', 'text': 'Book it'},
+          ],
+        },
+      },
+    ];
+    final a = A2uiRendererAction(name: 'book', surfaceId: 's', sourceComponentId: 'b', timestamp: DateTime.now(), context: {'time': '19:00', 'name': 'Ann'});
+    expect(actionMessage(a, messages), 'Book it (name: Ann)');
   });
 
   testWidgets("a surface that can't be drawn shows its text", (tester) async {

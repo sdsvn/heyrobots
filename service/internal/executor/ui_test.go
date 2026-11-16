@@ -21,7 +21,7 @@ func TestAnAgentShowsNativeUI(t *testing.T) {
 		call("show_ui", map[string]any{"text": "x", "components": `[{"id":"root","component":"Column","children":["gone"]}]`}),
 		call("show_ui", map[string]any{"text": "x", "components": `[{"id":"top","component":"Text","text":"hi"}]`}),
 		call("show_ui", map[string]any{"text": "x", "components": `[{"id":"root","component":"Text","text":"hi","variant":"h3"}]`}),
-		reportCall("ready", "Asked.", "Shall I book it?", ""),
+		reportCall("ready", "Showed a card with two times.", "", ""),
 	}
 	res := e.say(owner, "c1", "book us a table")
 	e.evalAll()
@@ -30,12 +30,18 @@ func TestAnAgentShowsNativeUI(t *testing.T) {
 	}
 	var shown int
 	for _, ef := range e.view(res.ThreadIDs[0]).Effects {
+		if ef.Kind == "message" && ef.TicketID != "" && strings.Contains(ef.Body, "Showed a card") {
+			t.Errorf("the report repeated the card: %q", ef.Body)
+		}
 		if m, ok := ef.UI(); ok {
 			shown++
 			if ef.Body != "Book the 7pm table?" || len(m) != 2 || m[0]["createSurface"] == nil || !strings.Contains(ef.Payload, `"Book it"`) {
 				t.Fatalf("ui = %q %s", ef.Body, ef.Payload)
 			}
 		}
+	}
+	if tk := e.ticket(res.ThreadIDs[0]); tk.Stage != "ready" {
+		t.Fatalf("a ready report after a card needs no result: stage %q", tk.Stage)
 	}
 	if shown != 1 {
 		t.Fatalf("shown %d surfaces, want 1", shown)

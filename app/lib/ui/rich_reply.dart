@@ -418,12 +418,13 @@ final CatalogImplementation chatCatalog = () {
 }();
 
 /// An A2UI surface an agent sent. Its buttons' actions come back through
-/// [onAction]; [fallback] shows when the surface can't be drawn.
+/// [onAction], as the message to send; [fallback] shows when the surface
+/// can't be drawn.
 class UiSurface extends StatefulWidget {
   const UiSurface({super.key, required this.messages, required this.onAction, required this.fallback});
 
   final List<Object?> messages;
-  final void Function(A2uiRendererAction) onAction;
+  final void Function(String) onAction;
   final Widget fallback;
 
   @override
@@ -440,7 +441,7 @@ class _UiSurfaceState extends State<UiSurface> {
   void initState() {
     super.initState();
     _subs.add(_processor.model.onSurfaceCreated.subscribe((s) => _surface ??= s).unsubscribe);
-    _subs.add(_processor.model.onAction.subscribe(widget.onAction).unsubscribe);
+    _subs.add(_processor.model.onAction.subscribe((a) => widget.onAction(actionMessage(a, widget.messages))).unsubscribe);
     try {
       final errors = _processor.processMessagesWithErrors(jsonDecode(jsonEncode(widget.messages)));
       _failed = errors.isNotEmpty || _surface == null;
@@ -469,8 +470,32 @@ class _UiSurfaceState extends State<UiSurface> {
   }
 }
 
-/// What a tapped button sends back to the agent, as a message in the chat.
-String actionMessage(A2uiRendererAction a) {
-  final ctx = a.context.entries.where((e) => e.value != null && '${e.value}'.isNotEmpty).map((e) => '${e.key}: ${e.value}').join(', ');
-  return a.userMessage ?? (ctx.isEmpty ? a.name : '${a.name} ($ctx)');
+/// What a tapped button sends back to the agent, as the person's message:
+/// the button's label, as they saw it, and anything they filled in on the
+/// card. Values the agent wrote into the button itself it already knows.
+String actionMessage(A2uiRendererAction a, List<Object?> messages) {
+  final components = <String, Map>{
+    for (final m in messages)
+      if (m case {'updateComponents': {'components': final List cs}})
+        for (final c in cs)
+          if (c case {'id': final String id}) id: c,
+  };
+  final button = components[a.sourceComponentId];
+  final label = switch (components[button?['child']]) {
+    {'text': final String t} => plainText(t),
+    _ => '',
+  };
+  final fixed = switch (button) {
+    {'action': {'event': {'context': final Map ctx}}} => {
+      for (final e in ctx.entries)
+        if (e.value is! Map) e.key,
+    },
+    _ => const <Object?>{},
+  };
+  final filled = a.context.entries
+      .where((e) => !fixed.contains(e.key) && e.value != null && '${e.value}'.isNotEmpty)
+      .map((e) => '${e.key}: ${e.value}')
+      .join(', ');
+  final head = a.userMessage ?? (label.isNotEmpty ? label : a.name);
+  return filled.isEmpty ? head : '$head ($filled)';
 }

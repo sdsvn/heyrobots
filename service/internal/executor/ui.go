@@ -44,7 +44,8 @@ func (r *run) uiTool() (tool.Tool, error) {
 		Description: "Show the person a small native UI in the chat, such as a card with options and buttons, when choosing or confirming is easier than typing. " +
 			`components is a JSON array of A2UI v1.0 basic catalog components: each has an "id" and a "component" (Card, Column, Row, List, Text, Image, Icon, Divider, Button, TextField, CheckBox, ChoicePicker, Slider, DateTimeInput, Tabs, Modal); the one with id "root" is the top, and parents name children by id ("child": "id" or "children": ["id", ...]). ` +
 			`Text has "text" (markdown: use "### " for a heading) and an optional "variant", "body" or "caption". A Button has "child" (a Text's id) and "action": {"event": {"name": "...", "context": {...}}}; tapping it sends the person's reply to you. Images need an https "url". ` +
-			"text says the same thing in words, for where the UI can't be drawn. Only in the app's chats.",
+			"text says the same thing in words, for where the UI can't be drawn. Only in the app's chats. " +
+			"The card is your reply: when you report ready, leave result empty, or put only what the card doesn't already say.",
 	}, func(_ agent.Context, a uiArgs) (ControlResult, error) {
 		if core.ReplySource(r.mandate.Received.Source) != core.SourceApp {
 			return ControlResult{Error: "native UI only shows in the app's chats; reply in text"}, nil
@@ -68,6 +69,9 @@ func (r *run) uiTool() (tool.Tool, error) {
 		if err != nil {
 			return ControlResult{}, err
 		}
+		r.mu.Lock()
+		r.showedUI = true
+		r.mu.Unlock()
 		return ControlResult{OK: true}, nil
 	})
 }
