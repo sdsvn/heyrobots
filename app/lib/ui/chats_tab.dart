@@ -10,6 +10,7 @@ import 'icons.dart';
 import 'new_group_screen.dart';
 import 'plans_tab.dart';
 import 'settings_screen.dart';
+import 'rich_reply.dart';
 import 'theme.dart';
 import 'thread_screen.dart';
 
@@ -523,7 +524,7 @@ class _ChatRow extends StatelessWidget {
             TextSpan(
               children: [
                 ?who,
-                TextSpan(text: last == null ? (t.group != null ? t.group!.members.map((m) => m.name).join(', ') : 'Say hi') : (mine ? 'You: ${last.text}' : last.text)),
+                TextSpan(text: last == null ? (t.group != null ? t.group!.members.map((m) => m.name).join(', ') : 'Say hi') : (mine ? 'You: ${last.text}' : plainText(last.text))),
               ],
             ),
             maxLines: 1,

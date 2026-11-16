@@ -17,6 +17,7 @@ import 'common.dart';
 import 'connect_apps_screen.dart';
 import 'icons.dart';
 import 'plans_tab.dart';
+import 'rich_reply.dart';
 import 'theme.dart';
 
 /// A chat with one agent or with a group of them.
@@ -509,6 +510,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 cardState: (c) => _cardState(c),
                 onCard: _openCard,
                 onFile: _download,
+                state: s,
+                onUiAction: (text) => _send(text),
               ),
             ),
           );
@@ -747,8 +750,7 @@ class _ChatScreenState extends State<ChatScreen> {
   /// browser or the system downloads it from there.
   Future<void> _download(SharedFile f) async {
     try {
-      final link = await s.api.createFileLink(fileId: f.id);
-      final url = s.server!.resolve(link.url);
+      final url = await fileUrl(s, f);
       if (!await launchUrl(url, mode: LaunchMode.externalApplication) && mounted) showMessage(context, 'Open $url to download ${f.name}.');
     } catch (e) {
       if (mounted) showMessage(context, describeError(e));
@@ -977,8 +979,12 @@ class _TheirBubble extends StatelessWidget {
     required this.cardState,
     required this.onCard,
     required this.onFile,
+    required this.state,
+    required this.onUiAction,
   });
 
+  final AppState state;
+  final void Function(String) onUiAction;
   final _Entry entry;
   final Future<void> Function(SharedFile) onFile;
   final bool group, showName, lastOfRun;
@@ -995,12 +1001,20 @@ class _TheirBubble extends StatelessWidget {
     for (final part in entry.parts) {
       if (part.kind == ThreadItemKind.card) {
         texts.add(_CardTile(card: part.card!, state: cardState(part.card!), onTap: () => onCard(part.card!)));
+      } else if (part.ui case final u?) {
+        // A fixed width: a surface has no natural width for the bubble to hug.
+        texts.add(
+          SizedBox(
+            width: maxWidth - 28,
+            child: UiSurface(key: Key('ui:${part.id}'), messages: u.messages, onAction: (a) => onUiAction(actionMessage(a)), fallback: ReplyText(part.text ?? '')),
+          ),
+        );
       } else if (part.file case final f?) {
-        if ((part.text ?? '').isNotEmpty && part.text != f.name) texts.add(SelectableText(part.text!, style: TextStyle(fontSize: 15, height: 1.4, color: p.ink)));
-        texts.add(FileTile(file: f, onDownload: () => onFile(f)));
+        if ((part.text ?? '').isNotEmpty && part.text != f.name) texts.add(ReplyText(part.text!));
+        texts.add(SharedFileView(file: f, state: state, width: maxWidth - 28, onDownload: () => onFile(f)));
       } else if ((part.text ?? '').isNotEmpty) {
         final failed = part.status == 'failed' || part.status == 'uncertain';
-        texts.add(SelectableText(part.text!, style: TextStyle(fontSize: 15, height: 1.4, color: p.ink)));
+        texts.add(ReplyText(part.text!));
         if (failed) {
           texts.add(
             Text(

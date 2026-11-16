@@ -417,7 +417,11 @@ func (r *run) work(ctx context.Context) (report, error) {
 	if err != nil {
 		return report{State: "failed", Summary: "The worker couldn't start."}, err
 	}
-	tools = append(tools, team, share)
+	ui, err := r.uiTool()
+	if err != nil {
+		return report{State: "failed", Summary: "The worker couldn't start."}, err
+	}
+	tools = append(tools, team, share, ui)
 	if r.mayRun() {
 		run, err := r.commandTool()
 		if err != nil {

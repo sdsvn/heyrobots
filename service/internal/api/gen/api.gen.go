@@ -1121,6 +1121,11 @@ type ChatModelUpdate struct {
 	Model   string  `json:"model"`
 }
 
+// ChatSurface Native UI an agent sent, as A2UI v1.0 messages for one surface on the basic catalog. The item's text is what to show where it can't be drawn.
+type ChatSurface struct {
+	Messages []map[string]interface{} `json:"messages"`
+}
+
 // ClearHistoryRequest defines model for ClearHistoryRequest.
 type ClearHistoryRequest struct {
 	// ForgetBrain Also forget what the agents learned about you and your work.
@@ -1681,6 +1686,9 @@ type ThreadItem struct {
 	Status     *string        `json:"status,omitempty"`
 	Text       *string        `json:"text,omitempty"`
 	TicketId   *string        `json:"ticket_id,omitempty"`
+
+	// Ui Native UI an agent sent, as A2UI v1.0 messages for one surface on the basic catalog. The item's text is what to show where it can't be drawn.
+	Ui *ChatSurface `json:"ui,omitempty"`
 }
 
 // ThreadItemKind defines model for ThreadItem.Kind.

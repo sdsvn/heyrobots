@@ -46,6 +46,7 @@ export 'default_client/models/chat_card_kind.dart';
 export 'default_client/models/chat_model.dart';
 export 'default_client/models/chat_model_scope.dart';
 export 'default_client/models/chat_model_update.dart';
+export 'default_client/models/chat_surface.dart';
 export 'default_client/models/clear_history_request.dart';
 export 'default_client/models/cleared_history.dart';
 export 'default_client/models/connect_request.dart';

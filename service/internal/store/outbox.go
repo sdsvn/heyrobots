@@ -218,6 +218,22 @@ func AddressReply(e Effect, requester core.Identity, owner bool) Effect {
 // KindFile is an Effect that shares a file in a chat.
 const KindFile = "file"
 
+// KindUI is an Effect that shows native UI in a chat: its Payload holds the
+// A2UI messages, its Body the same in words.
+const KindUI = "ui"
+
+// UI returns the A2UI messages a UI Effect shows.
+func (e Effect) UI() ([]map[string]any, bool) {
+	if e.Kind != KindUI {
+		return nil, false
+	}
+	var m []map[string]any
+	if json.Unmarshal([]byte(e.Payload), &m) != nil || len(m) == 0 {
+		return nil, false
+	}
+	return m, true
+}
+
 // SharedFile is what a file Effect's Payload holds: the file as the person
 // sees it, and where the server keeps its copy, relative to the files folder.
 type SharedFile struct {

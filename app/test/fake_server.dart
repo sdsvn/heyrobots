@@ -396,7 +396,7 @@ class FakeServer {
     }
     final link = RegExp(r'^/api/v1/files/([^/]+)/link$').firstMatch(path);
     if (link != null && r.method == 'POST') {
-      return _json(200, {'url': '/files/key-${link[1]}', 'expires_at': '2026-11-11T09:41:00Z'});
+      return _json(200, {'url': '/files/key-${link[1]}', 'expires_at': DateTime.now().toUtc().add(const Duration(minutes: 10)).toIso8601String()});
     }
     final thread = RegExp(r'^/api/v1/threads/([^/]+)$').firstMatch(path);
     if (thread != null && r.method == 'DELETE') {

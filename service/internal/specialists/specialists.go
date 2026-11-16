@@ -148,7 +148,7 @@ type Spec struct {
 // Kept are the tools every agent keeps, specialist or not: reporting,
 // handing back, its memory, the team, sharing a file, and proposing a
 // rule, a setting or a standing job, each of which waits for the owner.
-var Kept = []string{"report", "ack", "hand_back", "remember", "forget", "recall", "follow_up", "close_follow_up", "team", "share_file",
+var Kept = []string{"report", "ack", "hand_back", "remember", "forget", "recall", "follow_up", "close_follow_up", "team", "share_file", "show_ui",
 	"make_rule", "set_setting", "make_job"}
 
 // Allows reports whether the specialist may call a built-in tool.

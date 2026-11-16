@@ -321,6 +321,9 @@ func (s *Server) GetThread(w http.ResponseWriter, r *http.Request, threadID stri
 		}
 		cardItem(e, &item)
 		item.File = fileView(e)
+		if m, ok := e.UI(); ok {
+			item.Ui = &gen.ChatSurface{Messages: m}
+		}
 		out.Items = append(out.Items, item)
 	}
 	order := map[gen.ThreadItemKind]int{gen.Message: 0, gen.Decision: 1, gen.Reply: 2, gen.Action: 2, gen.Card: 2}

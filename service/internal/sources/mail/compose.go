@@ -63,8 +63,6 @@ func (o Outgoing) Compose(now time.Time) ([]byte, error) {
 		{"Date", now.Format(time.RFC1123Z)},
 		{"Message-ID", "<" + randomID() + "@heyrobots>"},
 		{"MIME-Version", "1.0"},
-		{"Content-Type", "text/plain; charset=utf-8"},
-		{"Content-Transfer-Encoding", "base64"},
 	}
 	if len(o.Cc) > 0 {
 		cc, err := list(o.Cc)
@@ -89,14 +87,25 @@ func (o Outgoing) Compose(now time.Time) ([]byte, error) {
 			return nil, err
 		}
 	}
-	b.WriteString("\r\n")
-	enc := base64.StdEncoding.EncodeToString([]byte(o.Body))
+	// The text as written, which reads fine in any mail app, and the same
+	// text as HTML for the apps that show formatting.
+	boundary := "hr-" + randomID()
+	fmt.Fprintf(&b, "Content-Type: multipart/alternative; boundary=%q\r\n\r\n", boundary)
+	for _, part := range []struct{ typ, body string }{{"text/plain", o.Body}, {"text/html", HTML(o.Body)}} {
+		fmt.Fprintf(&b, "--%s\r\nContent-Type: %s; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n", boundary, part.typ)
+		writeBase64(&b, part.body)
+	}
+	fmt.Fprintf(&b, "--%s--\r\n", boundary)
+	return b.Bytes(), nil
+}
+
+func writeBase64(b *bytes.Buffer, s string) {
+	enc := base64.StdEncoding.EncodeToString([]byte(s))
 	for len(enc) > 76 {
 		b.WriteString(enc[:76] + "\r\n")
 		enc = enc[76:]
 	}
 	b.WriteString(enc + "\r\n")
-	return b.Bytes(), nil
 }
 
 func randomID() string {

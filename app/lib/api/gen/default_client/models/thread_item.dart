@@ -2,6 +2,7 @@
 
 import 'agent_ref.dart';
 import 'chat_card.dart';
+import 'chat_surface.dart';
 import 'shared_file.dart';
 import 'thread_item_kind.dart';
 
@@ -25,6 +26,9 @@ class ThreadItem {
 
     /// A file an agent shared in the chat, to download.
     this.file,
+
+    /// Native UI an agent sent, as A2UI v1.0 messages for one surface on the basic catalog. The item's text is what to show where it can't be drawn.
+    this.ui,
     this.additionalProperties = const {},
   });
 
@@ -56,6 +60,9 @@ class ThreadItem {
         : null,
     file: json.containsKey("file")
         ? SharedFile.fromJson(json["file"] as Map<String, Object?>)
+        : null,
+    ui: json.containsKey("ui")
+        ? ChatSurface.fromJson(json["ui"] as Map<String, Object?>)
         : null,
     additionalProperties: {
       for (final entry in json.entries)
@@ -96,6 +103,9 @@ class ThreadItem {
   /// A file an agent shared in the chat, to download.
   final SharedFile? file;
 
+  /// Native UI an agent sent, as A2UI v1.0 messages for one surface on the basic catalog. The item's text is what to show where it can't be drawn.
+  final ChatSurface? ui;
+
   static const _knownKeys = <String>{
     "kind",
     "id",
@@ -113,6 +123,7 @@ class ThreadItem {
     "approval",
     "last_error",
     "file",
+    "ui",
   };
 
   final Map<String, Object?> additionalProperties;
@@ -136,5 +147,6 @@ class ThreadItem {
     if (this.approval != null) "approval": this.approval,
     if (this.lastError != null) "last_error": this.lastError,
     if (this.file != null) "file": this.file?.toJson(),
+    if (this.ui != null) "ui": this.ui?.toJson(),
   };
 }

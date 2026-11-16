@@ -1,0 +1,152 @@
+{
+  "doc": {
+    "slug": "index.markdown",
+    "title": "Show replies with formatting, and images and PDFs inside the chat",
+    "version": 1,
+    "markdown": "---\nco-review: design\n---\n# Show replies with formatting, and images and PDFs inside the chat\n\n## Context\nThe app draws every reply as plain text, so an agent's markdown shows up as raw `**` and `-`. Agents write markdown anyway, and the live Go-release answer showed the problem. Files an agent shares with `share_file` appear only as a tile with a Download button: you can't see a photo or a PDF without downloading it and opening it somewhere else.\n\nThis changes only the app: the chat screen's bubbles in `app/lib/ui/chat_screen.dart` and the older thread screen, plus the file tile in `chat_kit.dart`. The server and the API stay as they are, except for two steps: email replies gain an HTML version, and the A2UI step adds a tool and a reply part kind.\n\n## Design\n- Agents' replies render as markdown\n  - uses `flutter_markdown_plus` 1.0.12, the maintained successor of the Flutter team's discontinued `flutter_markdown`; it is a new dependency\n  - covers what agents actually write: headings, bold and italic, bullet and numbered lists, quotes, inline code and code blocks, tables, links and horizontal rules\n  - styled from the app's Palette and Nunito, so it matches the existing bubbles in light and dark; code uses a monospace font on the ground colour\n  - text stays selectable, as it is today\n  - your own messages stay plain text, exactly as you typed them\n  - what can go wrong: a long table or code block is wider than the bubble, so it scrolls sideways inside the bubble instead of stretching it\n- Links open outside the app, and say where they go\n  - tapping a link opens it in the browser, as file downloads already do\n  - a link whose visible text differs from where it goes shows the real address before it opens, since replies can carry text from web pages\n- Images an agent shares show in the chat\n  - a shared file whose type is an image shows as a picture in the bubble, at most the bubble's width and 320 points tall\n  - it loads through the same short-lived file link the Download button uses, so nothing new is exposed and the server needs no change\n  - tapping it opens the picture full screen, where you can zoom; the Download button stays under it\n  - if it fails to load (the link expired, the file is gone), it falls back to today's file tile\n- Images in markdown load from the web\n  - `![alt](https://…)` shows the picture inline, sized like a shared image, and tapping it opens it full screen\n  - only `https` addresses load; anything else, or a picture that fails to load, shows its alt text as a link\n  - what can go wrong: loading tells that website the message was read, and a reply can carry an address copied from an untrusted page (the owner accepted this); in the browser app, a site that doesn't allow cross-origin loading shows the link fallback\n- PDFs an agent shares show a preview\n  - the chat shows the first page as a picture, with the page count and the Download button\n  - tapping it opens a viewer inside the app with every page, zoom and scrolling\n  - uses `pdfrx` 2.12.1, a new dependency that renders PDFs the same way on iPhone, Android, Mac and the web; on the web it brings its PDF engine as a WebAssembly file\n  - a PDF that won't open (damaged, or protected by a password) falls back to the file tile\n- Every other file stays a tile, as today, including videos and audio\n- Replies sent by email are formatted too\n  - the mail composer in `internal/sources/mail` sends each reply as both plain text (the markdown as written, which still reads well) and HTML rendered from it, so mail apps show headings, lists, tables and code\n  - renders with `goldmark` v1.8.7, a new Go dependency, with tables and autolinks on; raw HTML inside a reply is escaped, never passed through, since replies can carry text from web pages\n  - styles are inline and plain (system font, no remote stylesheets), because most mail apps drop anything else\n  - what can go wrong: web images in the HTML are left to the mail app, which usually blocks them until the reader allows it; A2UI surfaces can't run in email, so their text fallback is sent instead\n- Agents can reply with native UI as well as text, using A2UI\n  - a new `show_ui` tool lets an agent send an A2UI surface (protocol v1.0: a flat list of components such as cards, rows, text, images, buttons and text fields); it is stored as a new reply part kind next to text, files and cards, so this step does change the server and the API\n  - the app renders it with `a2ui_flutter` 0.3.0 and `a2ui_core` 0.7.0 (the successors of Flutter's `genui`) using the basic catalog without its video and audio players, themed from the Palette and Nunito so it looks like the rest of the chat\n  - tapping a button sends its action back to the agent as a message in the same chat, the way the existing card buttons do\n  - the server checks a surface against the catalog before storing it; one that doesn't parse shows as the agent's plain text fallback instead\n  - today's simple cards stay as they are in this change and move onto A2UI in a follow-up, so later there is one way to show UI\n  - what can go wrong: images inside a surface follow the same rule as markdown images (shared files and `https` addresses load); A2UI is young (0.x), so a breaking release means pinning and updating both packages together\n\n## Alternatives\n- Write a small markdown renderer by hand. It would cover bold and lists, but not tables or code blocks, and it would become ours to maintain.\n- Open PDFs in the browser's own viewer instead of `pdfrx`. That needs no dependency, but the server would have to serve PDFs for viewing instead of downloading, and drop the sandbox rule that keeps a file from running anything, because that rule breaks Chrome's PDF viewer. On phones it would leave the app.\n- Tell agents to write plain text. Formatting helps for longer answers, and the app is the only place they mostly write to.\n\n"
+  },
+  "threads": [
+    {
+      "id": "t1",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Agents' replies render as markdown",
+        "source": "Agents' replies render as markdown"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "15:29",
+          "body": "It should also support https://pub.dev/packages/a2ui_flutter if already for the UI nativity of chat"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "15:30",
+          "body": "Yes, it fits. I added a step: agents get a `show_ui` tool that sends an A2UI surface, and the app renders it with `a2ui_flutter` 0.3.0 and `a2ui_core` 0.7.0 (the basic catalog, themed from the Palette). Buttons send their action back to the agent as a chat message, like today's cards do. Unlike the markdown work, this one changes the server and the API (a new reply part kind). I also added an open question: should the existing cards move onto A2UI later?"
+        }
+      ]
+    },
+    {
+      "id": "t2",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Should pictures from the web in markdown load after a tap (\"Show image\"), or nev",
+        "source": "Should pictures from the web in markdown load after a tap (\"Show image\"), or never?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "15:30",
+          "body": "image in markdown should always load"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "15:31",
+          "body": "Done: markdown images now always load, limited to `https` addresses, and tapping one opens it full screen. A2UI surfaces follow the same rule. I moved this out of Open Questions into the Design. I also noted the trade-off you're accepting: the image's site learns the message was read. In the browser app, a site that blocks cross-origin loading falls back to a link."
+        }
+      ]
+    },
+    {
+      "id": "t3",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Should videos and audio files play inline too, or stay tiles for now?",
+        "source": "Should videos and audio files play inline too, or stay tiles for now?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "15:31",
+          "body": "Tiles"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "15:31",
+          "body": "Done: videos and audio stay tiles. The A2UI step also leaves out the basic catalog's video and audio players, so surfaces follow the same rule. I moved this into the Design."
+        }
+      ]
+    },
+    {
+      "id": "t4",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Should today's simple cards move onto A2UI later, so there is one way to show UI",
+        "source": "Should today's simple cards move onto A2UI later, so there is one way to show UI, or stay as they are?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "15:31",
+          "body": "yes"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "15:31",
+          "body": "Noted in the Design: cards keep working as they are in this change, and they move onto A2UI in a follow-up. That keeps this change from also touching the approval flows that use cards."
+        }
+      ]
+    },
+    {
+      "id": "t5",
+      "target": "doc",
+      "anchor": {
+        "type": "tree-node",
+        "nodeId": "Replies sent by email still carry raw markdown. Is that a follow-up, or should i",
+        "source": "Replies sent by email still carry raw markdown. Is that a follow-up, or should it be part of this change?"
+      },
+      "status": "resolved",
+      "severity": "medium",
+      "labels": [],
+      "intent": "comment",
+      "messages": [
+        {
+          "author": "Sarath Sadasivan Pillai",
+          "role": "human",
+          "time": "15:31",
+          "body": "it should be part of the change"
+        },
+        {
+          "author": "claude-code",
+          "role": "agent",
+          "time": "15:32",
+          "body": "Added as a Design step. Email replies go out as both plain text and HTML, rendered with goldmark v1.8.7 (a new Go dependency). Any raw HTML in a reply is escaped, and styles are inline so mail apps keep them. A2UI surfaces can't run in email, so email gets their text fallback. That was the last open question, so the Open Questions section is gone."
+        }
+      ]
+    }
+  ],
+  "seq": 5,
+  "review": {
+    "decision": "approve",
+    "summary": "",
+    "submittedAt": "15:32",
+    "count": 1
+  }
+}

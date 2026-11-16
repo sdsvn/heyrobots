@@ -1190,6 +1190,17 @@ components:
         approval: { type: string }
         last_error: { type: string }
         file: { $ref: "#/components/schemas/SharedFile" }
+        ui: { $ref: "#/components/schemas/ChatSurface" }
+    ChatSurface:
+      type: object
+      description: >-
+        Native UI an agent sent, as A2UI v1.0 messages for one surface on the
+        basic catalog. The item's text is what to show where it can't be drawn.
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          items: { type: object, additionalProperties: true }
     SharedFile:
       type: object
       description: A file an agent shared in the chat, to download.

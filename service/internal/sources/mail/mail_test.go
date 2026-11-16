@@ -178,3 +178,24 @@ func TestComposeRefusesHeaderInjection(t *testing.T) {
 		t.Fatalf("%s", raw)
 	}
 }
+
+func TestARepliesMarkdownGoesOutAsHTMLToo(t *testing.T) {
+	body := "## Plan\n\n- **one**\n- two\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n<script>alert(1)</script>\n\nSee https://go.dev and <img src=x onerror=alert(1)>"
+	raw, err := Outgoing{From: "ann@gmail.com", To: []string{"bob@example.com"}, Subject: "x", Body: body}.Compose(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := Parse(raw)
+	if err != nil || p.Text != body {
+		t.Fatalf("the plain part should be the text as written: %q %v", p.Text, err)
+	}
+	html := HTML(body)
+	for _, want := range []string{"<h2>Plan</h2>", "<strong>one</strong>", `<td style=`, `<a href="https://go.dev">`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("html lacks %s:\n%s", want, html)
+		}
+	}
+	if strings.Contains(html, "<script") || strings.Contains(html, "<img") || !strings.Contains(html, "<thead>") {
+		t.Fatalf("raw html passed through:\n%s", html)
+	}
+}

@@ -9,6 +9,7 @@ import 'agent_avatar.dart';
 import 'bit.dart';
 import 'chat_screen.dart';
 import 'common.dart';
+import 'rich_reply.dart';
 import 'theme.dart';
 
 /// One conversation, or a new one when threadId is null.
@@ -449,7 +450,7 @@ class _Bubble extends StatelessWidget {
               children: [
                 if (label != null && label!.isNotEmpty)
                   Text(label!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: p.muted)),
-                SelectableText(text, style: TextStyle(fontSize: 15, height: 1.45, color: mine ? Colors.white : p.ink)),
+                mine ? SelectableText(text, style: const TextStyle(fontSize: 15, height: 1.45, color: Colors.white)) : ReplyText(text),
               ],
             ),
     );
