@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"heyrobots/service/internal/agentfiles"
 	"heyrobots/service/internal/core"
 	"heyrobots/service/internal/store"
 )
@@ -32,6 +33,27 @@ func (r *run) agentSection() string {
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+func (r *run) syncAgentFiles(state, summary, result string) {
+	if r.agent.ID == "" || r.e.Workspaces == "" {
+		return
+	}
+	var view store.ThreadView
+	err := r.e.Store.Tx(func(tx *store.Tx) error {
+		var err error
+		view, err = tx.ThreadView(r.c.Ticket.OriginThreadID)
+		return err
+	})
+	if err == nil {
+		err = agentfiles.SyncProfile(r.e.Workspaces, r.agent)
+	}
+	if err == nil {
+		err = agentfiles.SyncHistory(r.e.Workspaces, r.agent, view, r.c.Assignment, state, summary, result, r.e.Now())
+	}
+	if err != nil {
+		r.e.Log.Warn("agent files", "agent", r.agent.ID, "assignment", r.c.Assignment.ID, "err", err)
+	}
 }
 
 // chatContextLen is how many earlier messages of a chat a new task sees.

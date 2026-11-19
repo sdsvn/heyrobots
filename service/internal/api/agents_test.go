@@ -13,8 +13,10 @@ import (
 )
 
 func TestTheTeamCanBeBuiltAndShown(t *testing.T) {
+	workspaces := t.TempDir()
 	h := newHarnessWith(t, nil, func(h *harness, o *Options) {
 		o.Skills = &skills.Library{Dir: t.TempDir()}
+		o.Workspaces = workspaces
 	})
 	owner := h.completeSetup()
 	sam := h.pair(h.inviteDelegate(owner, "sam"), "sam's phone")
@@ -54,6 +56,10 @@ func TestTheTeamCanBeBuiltAndShown(t *testing.T) {
 	json.Unmarshal(rec.Body.Bytes(), &a)
 	if a.Name != "Researcher" || a.Skills[0] != "trip-planner" || !slices.Contains(a.Delegates, "sam") {
 		t.Fatalf("agent = %+v", a)
+	}
+	profile, err := os.ReadFile(filepath.Join(workspaces, "agents", a.Id, "AGENT.md"))
+	if err != nil || !strings.Contains(string(profile), "Finds things out.") || !strings.Contains(string(profile), "Generalist") {
+		t.Fatalf("agent profile = %q, err = %v", profile, err)
 	}
 	// Sam now may use both the General agent and the Researcher.
 	pol, _ := h.store.Policy()

@@ -265,6 +265,12 @@ func (s *Server) saveAgent(w http.ResponseWriter, r *http.Request, a store.Agent
 		s.internal(w, "save agent", err)
 		return
 	}
+	if s.opts.Workspaces != "" {
+		if err := agentfiles.SyncProfile(s.opts.Workspaces, a); err != nil {
+			s.internal(w, "write agent profile", err)
+			return
+		}
+	}
 	// Left out, who may use the agent stays as it was.
 	cur, err := s.opts.Store.Policy()
 	if err != nil {

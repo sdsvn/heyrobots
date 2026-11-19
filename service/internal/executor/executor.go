@@ -31,6 +31,7 @@ import (
 	"google.golang.org/genai"
 
 	"heyrobots/service/internal/acp"
+	"heyrobots/service/internal/agentfiles"
 	"heyrobots/service/internal/core"
 	"heyrobots/service/internal/gateway"
 	"heyrobots/service/internal/google"
@@ -343,6 +344,7 @@ func (e *Engine) execute(ctx context.Context, c store.Claimed) {
 	if err := r.finish(rep); err != nil {
 		e.Log.Error("finish assignment", "ticket", c.Ticket.ID, "err", err)
 	}
+	r.syncAgentFiles(rep.State, rep.Summary, rep.Result)
 	if e.OnChanged != nil {
 		e.OnChanged(c.Ticket.OriginThreadID)
 	}
@@ -375,6 +377,7 @@ func (r *run) work(ctx context.Context) (report, error) {
 	if spec, ok := specialists.Get(r.agent.Specialist); ok {
 		r.gate = &gate{spec: spec}
 	}
+	r.syncAgentFiles("started", "", "")
 	r.startFollowUps()
 	granted := m
 	granted.Toolsets = nil
@@ -386,6 +389,11 @@ func (r *run) work(ctx context.Context) (report, error) {
 	r.toolsets = granted.Toolsets
 
 	ws := r.workspace()
+	if e.Workspaces != "" {
+		if err := agentfiles.CopyProfile(e.Workspaces, r.agent, ws); err != nil {
+			e.Log.Warn("agent profile", "agent", r.agent.ID, "err", err)
+		}
+	}
 	env := toolsets.Env{Workspace: ws, Reader: e.Reader, Web: e.Web, Google: e.Google}
 	gs, err := e.gw.Open(ctx, gateway.Task{
 		TicketID: r.c.Ticket.ID, ThreadID: r.c.Ticket.OriginThreadID, Mandate: granted, Policy: r.pol, Trusted: r.trustedSources(),

@@ -55,6 +55,8 @@ type Options struct {
 	MCP *gateway.MCP
 	// Files is where shared files are kept.
 	Files string
+	// Workspaces holds durable agent profiles and history.
+	Workspaces string
 	// Registry finds MCP servers in the official MCP registry.
 	Registry *registry.Client
 	Broker   *Broker
