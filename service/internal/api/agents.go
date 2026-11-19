@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	managedagentfiles "heyrobots/service/internal/agentfiles"
 	"heyrobots/service/internal/api/gen"
 	"heyrobots/service/internal/core"
 	"heyrobots/service/internal/ids"
@@ -266,7 +267,7 @@ func (s *Server) saveAgent(w http.ResponseWriter, r *http.Request, a store.Agent
 		return
 	}
 	if s.opts.Workspaces != "" {
-		if err := agentfiles.SyncProfile(s.opts.Workspaces, a); err != nil {
+		if err := managedagentfiles.SyncProfile(s.opts.Workspaces, a); err != nil {
 			s.internal(w, "write agent profile", err)
 			return
 		}
